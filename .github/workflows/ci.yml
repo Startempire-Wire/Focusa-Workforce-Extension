@@ -41,7 +41,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Enable Corepack
         if: steps.detect.outputs.source_present == 'true'
