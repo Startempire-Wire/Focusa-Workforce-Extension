@@ -1,0 +1,114 @@
+name: Workforce CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f AGENTS.md
+          test -f docs/00-workforce-canonical-product-and-implementation-spec.md
+          test -f docs/01-source-recovery-and-migration-runbook.md
+          test -f docs/02-chromebook-install-pairing-and-dogfood-runbook.md
+          test -f docs/03-build-release-and-continuous-delivery-contract.md
+
+      - name: Detect extension source
+        id: detect
+        shell: bash
+        run: |
+          if [[ -f package.json || -f manifest.json || -f src/manifest.json ]]; then
+            echo "source_present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_present=false" >> "$GITHUB_OUTPUT"
+            echo "Extension source has not yet been recovered into this repository. Documentation baseline only."
+          fi
+
+      - name: Setup Node
+        if: steps.detect.outputs.source_present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Enable Corepack
+        if: steps.detect.outputs.source_present == 'true'
+        run: corepack enable
+
+      - name: Install dependencies
+        if: steps.detect.outputs.source_present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f pnpm-lock.yaml ]]; then
+            pnpm install --frozen-lockfile
+          elif [[ -f package-lock.json ]]; then
+            npm ci
+          elif [[ -f yarn.lock ]]; then
+            yarn install --frozen-lockfile
+          elif [[ -f package.json ]]; then
+            npm install
+          fi
+
+      - name: Test
+        if: steps.detect.outputs.source_present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node -e "const p=require('./package.json'); process.exit(p.scripts?.test ? 0 : 1)"; then
+            npm run test
+          else
+            echo "No test script yet; recovery parity must add one before stable promotion."
+          fi
+
+      - name: Build
+        if: steps.detect.outputs.source_present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f scripts/build.mjs ]]; then
+            node scripts/build.mjs
+          elif node -e "const p=require('./package.json'); process.exit(p.scripts?.build ? 0 : 1)"; then
+            npm run build
+          else
+            echo "No recognized build entrypoint." >&2
+            exit 1
+          fi
+
+      - name: Validate unpacked extension
+        if: steps.detect.outputs.source_present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d dist
+          test -f dist/manifest.json
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('dist/manifest.json','utf8')); if(m.manifest_version!==3) throw new Error('Expected Manifest V3'); if(!m.name || !m.version) throw new Error('Manifest missing name/version'); console.log(m.name, m.version)"
+
+      - name: Build checksums
+        if: steps.detect.outputs.source_present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Upload unpacked build
+        if: steps.detect.outputs.source_present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: focusa-workforce-unpacked
+          path: |
+            dist/
+            SHA256SUMS
+          if-no-files-found: error
