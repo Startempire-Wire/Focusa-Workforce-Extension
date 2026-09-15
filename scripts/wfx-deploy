@@ -25,7 +25,10 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve the real script path because the Chromebook workbench intentionally exposes
+# this command as ~/.local/bin/wfx -> <repo>/scripts/wfx-deploy.
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
 NODE=${UIAI_WFX_NODE:-$(command -v node || echo node)}
 
 # Stable local dist dir shared by local browser channels (single build output).
@@ -84,12 +87,6 @@ deploy_local_browser() {
   refresh_local_browser_copy "$1"
 }
 
-deploy_local_browser() {
-  require_repo
-  [[ -d "$REPO_ROOT/dist" ]] || { echo "building (no dist yet)"; do_build; }
-  refresh_local_browser_copy "$1"
-}
-
 refresh_local_browser_copy() {
   # One shared build output; per-browser copies keep channels independent.
   local dir="$LOCAL_DIST_ROOT/dist-$1"
@@ -123,7 +120,7 @@ cdt_reload() {
   if pgrep -f -- "--user-data-dir=$HOME/.config/focusa-workforce/$1" >/dev/null 2>&1; then
     pkill -f -- "--user-data-dir=$HOME/.config/focusa-workforce/$1" 2>/dev/null || true
     sleep 2
-    nohup "$(dirname "$0")/wfx-deploy" launch "$1" >/dev/null 2>&1 &
+    nohup "$SCRIPT_PATH" launch "$1" >/dev/null 2>&1 &
     echo "relaunched $1 with refreshed dist"
   else
     echo "$1 not running via wfx-deploy; deployed dist will load on next launch"
