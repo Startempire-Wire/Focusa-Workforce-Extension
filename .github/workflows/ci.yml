@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64, ovh-build-2]
     steps:
       - uses: actions/checkout@v4
 
