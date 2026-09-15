@@ -394,6 +394,15 @@ Primary upstream source families include:
 
 ---
 
+## Workbench: clone, build, deploy (Chromebook, cloud-capable)
+
+This repo is the single codebase for every deployment channel. Clone it, then
+use `scripts/wfx-deploy` (symlink `wfx`): `build`, `test`, `gh` (push + CI),
+`brave` / `chrome` (stable local dist copies + `launch`), and `veragensia`
+(existing OVH atomic-promotion pipeline for `https://os.focusa.dev`). All
+targets consume the same checkout and the same `scripts/build.mjs` output; no
+codebase duplication. See `docs/migration/parity-report.md` §7.
+
 ## Immediate priorities
 
 1. Recover the deployed extension source and provenance.
