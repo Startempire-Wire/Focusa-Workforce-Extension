@@ -57,23 +57,92 @@ Prioritize a functioning, dogfoodable extension over process ceremony. Preserve 
 
 Workforce must not become a duplicate Wirebot App or a second runtime/state store.
 
-## Current highest-priority gate
+## Current state: source recovered, redesign unlocked
 
-Recover the actual deployed extension source from:
+The migration is complete. This repository is now the authoritative Workforce source.
+
+Recovered provenance and cutover proof live in `docs/migration/parity-report.md`. The pre-redesign reference point is preserved on:
+
+```text
+baseline/pre-redesign-2026-09-15
+```
+
+Known Veragensia extension ID:
+
+```text
+ohfbbkpacpcapicpgplnnmifmlnmjggj
+```
+
+Do **not** resume Workforce development in the old Focusa monorepo worktree at:
 
 ```text
 /home/wirebot/focusa-piext-sync/apps/workforce-extension
 ```
 
-Follow `docs/01-source-recovery-and-migration-runbook.md`.
+That tree is provenance/rollback material only.
 
-Do not replace the deployed implementation with a greenfield rewrite before recovery/parity is attempted.
+## Build-agent operating environment
 
-Known deployed extension ID:
+The primary implementation agent may be running partly on the Chromebook and partly on cloud/server infrastructure. Treat these as one development topology, not competing sources of truth.
+
+Canonical paths and flows:
 
 ```text
-ohfbbkpacpcapicpgplnnmifmlnmjggj
+GitHub
+Startempire-Wire/Focusa-Workforce-Extension
+        |
+        +--> Chromebook checkout (daily dogfood / UI work)
+        |      ~/src/focusa-workforce-extension
+        |      ~/.local/bin/wfx -> repo/scripts/wfx-deploy
+        |
+        +--> cloud/self-hosted CI runner (test/build)
+        |
+        +--> kh/OVH checkout
+               /home/wirebot/focusa-workforce-extension
+               |
+               +--> Veragensia uiai-lab-push
+                       |
+                       +--> https://os.focusa.dev
 ```
+
+The repo is authoritative. Local/browser profiles, tokens, credentials, public-work snapshots and operator state remain outside Git.
+
+### Daily commands
+
+```text
+wfx test
+wfx build
+wfx brave | wfx chrome
+wfx gh
+wfx veragensia
+```
+
+`wfx gh` pushes code and triggers CI. It does **not** make the public demo live.
+
+`wfx veragensia` is the explicit live-promotion boundary. It requires the cloud checkout to match the exact local HEAD and then invokes Veragensia's staged/checksummed/atomic/rollback-protected deployment pipeline.
+
+Do not bypass this with ad-hoc copies into the live extension directory.
+
+## Redesign rule
+
+The product redesign may now proceed. Do not rewrite the proven integration core merely to adopt a new UI framework.
+
+Preserve unless a concrete contract change requires otherwise:
+
+- pairing and exact-origin permission flow;
+- canonical API/schema validation;
+- projection boundaries;
+- SSE replay/cursor semantics;
+- exact session/run/generation targeting;
+- idempotency and approval binding;
+- safe session preflight;
+- public/private Work separation;
+- least-privilege MV3 manifest behavior;
+- explicit Veragensia promotion/rollback.
+
+Prefer changing presentation and shared-client architecture around these primitives rather than replacing them.
+
+Read `docs/07-pre-redesign-baseline-and-agent-handoff.md` before substantial redesign work.
 
 ## Outcomes over process
 
@@ -84,20 +153,6 @@ ohfbbkpacpcapicpgplnnmifmlnmjggj
 - Tool failures do not justify stopping unrelated productive work.
 - Keep moving until a real external dependency blocks the next implementation step.
 - A tool call, task closure, or agent claim is not an outcome. Verify the actual result.
-
-## Source-recovery rule
-
-Parity first:
-
-```text
-recover source
-→ reproduce current build
-→ install current build on Chromebook
-→ inventory actual gaps
-→ iterate
-```
-
-Do not redesign during recovery.
 
 ## Browser architecture rules
 
@@ -148,6 +203,8 @@ Consume Focusa Spec 153B and Veragensia Doc 201. Workforce may show body/runtime
 Every consequential implementation should be tested at the narrowest practical layer, then through at least one real vertical flow.
 
 Priority acceptance flows are defined in `docs/00-workforce-canonical-product-and-implementation-spec.md`.
+
+UI tests must test integration assumptions, not merely search for identifier strings. When a page imports a runtime primitive, tests should catch a missing import or duplicate bootstrap/binding path.
 
 ## Documentation
 
