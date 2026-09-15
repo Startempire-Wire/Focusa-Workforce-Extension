@@ -20,12 +20,15 @@ test('start page persists widget visibility locally and routes actions to the co
   assert.match(js,/chrome\.tabs\.create/);
 });
 
-test('start page consumes the canonical Work Loop projection and preserves degraded states',()=>{
-  assert.match(js,/fetchWorkLoop/);
+test('start page imports and consumes the canonical Work Loop projection',()=>{
+  assert.match(js,/import \{ fetchBrowserFleet, fetchWorkLoop, ProjectionRequestError \} from '\.\/lib\/api-client\.mjs';/);
   assert.match(js,/listConnections/);
-  assert.match(js,/ProjectionRequestError/);
   assert.match(js,/Runtime unavailable/);
   assert.match(js,/projection\.status/);
+});
+
+test('start page binds its shared UI handlers exactly once',()=>{
+  assert.equal((js.match(/\bbind\(\);/g)||[]).length,1);
 });
 
 test('start page refreshes from governed SSE events and stops on page hide',()=>{
