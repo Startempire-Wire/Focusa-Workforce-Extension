@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE=${UIAI_WFX_NODE:-$(command -v node || echo node)}
 
 # Stable local dist dir shared by local browser channels (single build output).
@@ -46,11 +46,7 @@ usage: wfx-deploy <target> [args]
   gh [--snapshot FILE]                     Embed snapshot (optional), commit, push to GitHub (CI).
   brave | chrome                           Refresh the local browser channel dist from the build.
   veragensia [--snapshot FILE]             Push this checkout's HEAD to OVH lab via uiai-lab-push.
-  daily brave|chrome [-- ARGS]              Launch the DAILY profile (normal bookmarks/logins)
-                                            under the same memory guard. This is the safe
-                                            way to run Discord-heavy browsing in Linux.
-  launch brave|chrome [--fresh]            Launch browser with the deployed dist loaded
-  guard [once|watch|install|status]        OOM protection: pin daemons, warn on low memory.
+  launch brave|chrome [--fresh]            Launch browser with the deployed dist loaded.
   status                                   Show target/deploy state.
 
 Environment: UIAI_WFX_NODE, UIAI_WFX_LOCAL_DIST, UIAI_WFX_VERAGENSIA_HOST,
@@ -105,19 +101,6 @@ refresh_local_browser_copy() {
   echo "deployed dist -> $dir for $1 (tree sha256 $(find "$dir" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1))"
 }
 
-daily_browser() {
-  # Same cgroup isolation as launch, but for the operator's everyday profile
-  # (~/.config/BraveSoftware / ~/.config/google-chrome). No session-restore
-  # workarounds needed: if memory floods, only this scope is killed.
-  local b="$1"; shift || true
-  local bin; bin="$(browser_binary "$b")"
-  local lim_high=${UIAI_WFX_MEM_HIGH:-800M}
-  local lim_max=${UIAI_WFX_MEM_MAX:-1.4G}
-  systemd-run --user --scope --unit="wfx-daily-$b" \
-    -p MemoryHigh="$lim_high" -p MemoryMax="$lim_max" -p OOMPolicy=stop \
-    "$bin" --no-first-run "$@"
-}
-
 launch_browser() {
   local b="$1"; shift || true
   local bin; bin="$(browser_binary "$b")"
@@ -125,22 +108,6 @@ launch_browser() {
   [[ -d "$dir/manifest.json" ]] || { refresh_local_browser_copy "$b" >/dev/null; }
   local profile="$HOME/.config/focusa-workforce/$b"
   install -d -m 700 "$profile"
-  local lim_high=${UIAI_WFX_MEM_HIGH:-800M}
-  local lim_max=${UIAI_WFX_MEM_MAX:-1.4G}
-  # Cgroup-isolated launch: heavy tabs (e.g. Discord) saturate their own cgroup
-  # and the OOM killer eats only this browser, never the session or daemons.
-  # Set UIAI_WFX_MEM_HIGH/MAX to tune. Empty to disable isolation.
-  if [[ -n ${lim_high}${lim_max} ]] && command -v systemd-run >/dev/null 2>&1; then
-    exec systemd-run --user --scope --unit="wfx-$b" \
-      -p MemoryHigh="$lim_high" -p MemoryMax="$lim_max" -p OOMPolicy=stop \
-      "$bin" \
-      --user-data-dir="$profile" \
-      --load-extension="$dir" \
-      --disable-extensions-except="$dir" \
-      --remote-debugging-port=${UIAI_WFX_CDP_PORT:-9335} \
-      --no-first-run --no-default-browser-check \
-      "$@"
-  fi
   exec "$bin" \
     --user-data-dir="$profile" \
     --load-extension="$dir" \
@@ -161,50 +128,6 @@ cdt_reload() {
   else
     echo "$1 not running via wfx-deploy; deployed dist will load on next launch"
   fi
-}
-
-guard() {
-  # Memory guard: re-pin critical daemons below OOM-victim priority and warn on
-  # memory pressure. Run standalone or install: wfx guard install (systemd user unit).
-  local daemons="focusa-daemon rbw-agent tailscaled uiai-engine"
-  pin() { for p in $(pgrep -f "$1" 2>/dev/null); do echo -500 > /proc/$p/oom_score_adj 2>/dev/null || sudo -n bash -c "echo -500 > /proc/$p/oom_score_adj" 2>/dev/null; done; }
-  case "${1:-once}" in
-    once)
-      for d in $daemons; do pin "$d"; done
-      echo "pinned: $daemons";;
-    watch)
-      while true; do
-        for d in $daemons; do pin "$d"; done
-        avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
-        if [ "$avail" -lt 400 ]; then
-          echo "$(date +%T) WARNING: only ${avail}MiB available (browser-heavy workload will OOM)" >&2
-        fi
-        sleep 60
-      done;;
-    install)
-      mkdir -p ~/.config/systemd/user
-      cat > ~/.config/systemd/user/wfx-guard.service <<EOF
-[Unit]
-Description=Focusa Workforce memory guard (OOM pinning + pressure watch)
-
-[Service]
-ExecStart=$(readlink -f "${BASH_SOURCE[0]}") guard watch
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=default.target
-EOF
-      systemctl --user daemon-reload
-      systemctl --user enable --now wfx-guard.service
-      echo "installed wfx-guard.service (user)";;
-    *)
-      avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
-      pressure=$(cat /sys/fs/cgroup/memory.pressure 2>/dev/null | awk '/full/{print $4}')
-      echo "available: ${avail}MiB (warn threshold 400MiB)"
-      echo "full-pressure: $pressure"
-      for d in $daemons; do p=$(pgrep -f "$d" | head -1); [ -n "$p" ] && echo "$d: pid=$p oom_score=$(cat /proc/$p/oom_score_adj 2>/dev/null)"; done;;
-  esac
 }
 
 deploy_veragensia() {
@@ -241,13 +164,6 @@ case "$TARGET" in
     ;;
   launch)
     shift; launch_browser "$@"
-    ;;
-  daily)
-    shift; b=$1; shift || true; daily_browser "$b" "$@"
-    ;;
-  guard)
-    shift || true
-    guard "$@"
     ;;
   veragensia)
     shift || true
