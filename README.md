@@ -12,20 +12,19 @@ Agents, Workstreams, Workpoints, authority, Evidence, Receipts, conversation sta
 
 ## Status
 
-This repository is being established as the canonical source and release home for the existing Focusa Workforce extension.
+This repository is the **authoritative source and release home** for the existing Focusa Workforce extension.
 
-A real Workforce extension already exists and is deployed in the Veragensia public Agent Computer demo at `https://os.focusa.dev`. The current Veragensia deployment tooling builds that extension from a private Focusa worktree and loads the resulting `dist/` directory into Chromium. The source must be recovered/migrated into this repository without inventing or replacing it.
+The deployed extension source was recovered from the former Focusa monorepo worktree with its history preserved, merged here, reproduced byte-for-byte against the prior live artifact, and cut over in Veragensia. The public Agent Computer demo at `https://os.focusa.dev` now builds from a checked-out copy of this repository rather than from `/home/wirebot/focusa-piext-sync/apps/workforce-extension`.
 
-Until that source migration lands, this repository should be treated as the canonicalization point for:
+Migration provenance, artifact parity, live verification and rollback proof are recorded in `docs/migration/parity-report.md`.
 
-- the Workforce product identity;
-- the extension source once recovered;
-- build/test/release automation;
-- Chromebook installation artifacts;
-- extension-specific contracts and documentation;
-- the curated upstream architecture corpus that governs this surface.
+The exact pre-redesign reference point is preserved on:
 
-Do **not** create a second competing Workforce implementation merely because the currently deployed source is not yet present here.
+```text
+baseline/pre-redesign-2026-09-15
+```
+
+The current implementation is now cleared for iterative redesign. Read `docs/07-pre-redesign-baseline-and-agent-handoff.md` before substantial implementation work, especially when working across the Chromebook and cloud/server environments.
 
 ---
 
@@ -190,6 +189,8 @@ Chrome extension
 
 This does **not** make ChromeOS/Crostini a Full Veragensia Agent Computer. Workforce should show the actual runtime/body posture truthfully.
 
+The Chromebook is the primary operator/dogfood surface, while cloud/server infrastructure may perform CI, heavy builds, daemon work, or deployment. Those environments consume the same repository and must not fork the product code.
+
 ---
 
 ## Body-independent by design
@@ -263,72 +264,79 @@ Workforce should integrate cleanly with Wirebot without becoming a second all-pu
 
 ---
 
-## Source recovery rule
+## Source authority and migration provenance
 
-The existing deployed extension is the migration seed.
+The existing deployed extension was the migration seed and has now been recovered here.
 
-Known deployment evidence points to a Focusa worktree path:
+Original deployment source:
 
 ```text
 /home/wirebot/focusa-piext-sync/apps/workforce-extension
 ```
 
-The recovered source should be migrated here with provenance/history preserved where possible.
+That old tree is retained only for provenance/rollback during the transition period. Future Workforce development belongs in this repository.
 
-Do not scaffold a competing implementation over the top of this repo until that recovery attempt is complete.
+Authoritative server checkout used by the Veragensia deployment pipeline:
+
+```text
+/home/wirebot/focusa-workforce-extension
+```
+
+See `docs/migration/parity-report.md` for recovered history, source hashes, artifact parity, extension identity, rollback drill and live verification.
 
 ---
 
-## Intended repository shape
+## Current repository shape
 
-Once source recovery is complete, this repository should converge on something close to:
+The recovered implementation currently uses a deliberately simple MV3/ES-module layout:
 
 ```text
 src/
-  background/
-  content/
-  sidepanel/
-  startpage/
-  options/
+  background.mjs
+  sidepanel.html
+  sidepanel.mjs
+  startpage.html
+  startpage.mjs
+  startpage.css
+  wall.html
+  wall.mjs
+  wall.css
+  styles.css
   lib/
-    focusa/
-    pairing/
-    events/
-    workforce/
-    evidence/
-    approvals/
-    uiai/
-    voice/
-    topology/
+    api-client.mjs
+    audit-log.mjs
+    contracts.mjs
+    notifications.mjs
+    orchestration.mjs
+    orientation.mjs
+    pairing.mjs
+    projections.mjs
+    public-work.mjs
+    reconnect.mjs
+    session-create.mjs
+    sse-parser.mjs
+    storage.mjs
+    validation.mjs
+    views.mjs
 
-public/
 manifest.json
 scripts/
   build.mjs
-  package-extension.mjs
-  verify-build.mjs
+  check-public-work.mjs
+  wfx-deploy
 
 tests/
-  unit/
-  integration/
-  browser/
-
 docs/
-  upstream/
-  contracts/
-  decisions/
-  runbooks/
-
 .github/workflows/
 ```
 
-The actual recovered source layout wins where it is already coherent.
+Do not reorganize this merely for aesthetics. The redesign may introduce a richer presentation/runtime structure when a real implementation slice benefits from it.
 
 ---
 
 ## Build and release direction
 
-The repo should support:
+The repo supports this flow:
 
 ```text
 commit
@@ -339,14 +347,16 @@ test
   ↓
 build deterministic dist/
   ↓
-package extension artifact
-  ↓
 checksums / provenance
   ↓
-preview/demo deployment
+local Chromebook/browser dogfood
   ↓
-Chromebook install/update path
+explicit preview/demo promotion
 ```
+
+`wfx gh` pushes source and triggers CI. It does not make the public demo live.
+
+`wfx veragensia` is the explicit promotion path into the Veragensia public demo. It verifies the server checkout matches the exact local HEAD, then uses Veragensia's staged/checksummed/atomic/rollback-protected deployment path.
 
 Continuous deployment must never silently change customer/private profiles without the appropriate release/update contract. The public Veragensia demo and private Chromebook/customer channels may use different promotion rules while consuming the same versioned Workforce build.
 
@@ -394,27 +404,34 @@ Primary upstream source families include:
 
 ---
 
-## Workbench: clone, build, deploy (Chromebook, cloud-capable)
+## Workbench: clone, build, deploy (Chromebook + cloud)
 
-This repo is the single codebase for every deployment channel. Clone it, then
-use `scripts/wfx-deploy` (symlink `wfx`): `build`, `test`, `gh` (push + CI),
-`brave` / `chrome` (stable local dist copies + `launch`), and `veragensia`
-(existing OVH atomic-promotion pipeline for `https://os.focusa.dev`). All
-targets consume the same checkout and the same `scripts/build.mjs` output; no
-codebase duplication. See `docs/migration/parity-report.md` §7.
+This repo is the single codebase for every deployment channel. On the Chromebook, use `scripts/wfx-deploy` through the `wfx` symlink. The normal commands are:
 
-## Immediate priorities
+```text
+wfx test
+wfx build
+wfx brave | wfx chrome
+wfx gh
+wfx veragensia
+```
 
-1. Recover the deployed extension source and provenance.
-2. Make the repo build deterministically from a clean checkout.
-3. Produce an installable Chromebook build immediately.
-4. Pair it to a real Focusa daemon without duplicating state.
-5. Implement/verify Roster, Task Graph, Direction, Approvals, Evidence, Audit, and UIAI handoff.
-6. Add voice as an input route into the same governed operation model.
-7. Add resource/body/topology posture so local versus cloud execution is visible.
-8. Wire CI/CD for preview/demo and versioned install artifacts.
-9. Dogfood continuously on the Chromebook.
-10. Expand toward the richer Workforce operations surface while preserving Focusa/UIAI/Veragensia/Wirebot ownership boundaries.
+All targets consume the same checkout and the same `scripts/build.mjs` output; no codebase duplication. See `docs/migration/parity-report.md` §7 and `docs/07-pre-redesign-baseline-and-agent-handoff.md`.
+
+Private state (browser profiles, credentials, snapshots) stays outside the repo.
+
+## Immediate redesign priorities
+
+1. Preserve the proven pairing/API/projection/SSE/orchestration/session-preflight core while improving its integration tests.
+2. Introduce shared Workforce client/runtime state so each surface does not independently own daemon/SSE lifecycle.
+3. Make Workstreams and Project Foremen primary navigation/context.
+4. Build the real Roster/Foreman workforce view from canonical state.
+5. Add Direction + Needs You as the fastest operator loop.
+6. Add Work/Task Graph visualization and steering.
+7. Add first-class Approvals and Evidence/Receipt inspection.
+8. Add exact UIAI live-execution handoff without duplicating Cockpit.
+9. Add Radar projection, multi-daemon federation and body/topology/resource posture.
+10. Dogfood every vertical slice on the Chromebook and explicitly promote proven builds to `os.focusa.dev`.
 
 ---
 
