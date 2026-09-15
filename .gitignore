@@ -1,0 +1,7 @@
+dist/
+dist.stage/
+dist.pre-work-rollback/
+dist.rollback/
+SHA256SUMS
+node_modules/
+*.log
