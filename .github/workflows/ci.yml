@@ -1,12 +1,16 @@
-name: Workforce CI Smoke
+# CI runs on the org's repo-scoped self-hosted OVH runner (ovh-workforce).
+# The org free plan exhausts private-repo hosted minutes; this repo is public
+# and should keep self-hosted labels. Do not switch to hosted runners.
+name: Workforce CI
 on:
+  pull_request:
   workflow_dispatch:
   push:
     branches: [main]
 permissions:
   contents: read
 jobs:
-  smoke:
+  validate:
     runs-on: [self-hosted, Linux, X64, ovh-workforce]
     steps:
       - run: echo SMOKE_OK && uname -a
