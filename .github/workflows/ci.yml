@@ -109,12 +109,11 @@ jobs:
           set -euo pipefail
           find dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
-      - name: Upload unpacked build
-        if: steps.detect.outputs.source_present == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: focusa-workforce-unpacked
-          path: |
-            dist/
-            SHA256SUMS
-          if-no-files-found: error
+      - name: Log build checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat SHA256SUMS
+          echo "dist tree sha256: $(cat SHA256SUMS | sha256sum | cut -d" " -f1)"
+          echo "NOTE: artifact upload disabled (free-plan artifact storage quota hit);"
+          echo "deployment builds from a checked-out copy of this repo, not from CI artifacts."
