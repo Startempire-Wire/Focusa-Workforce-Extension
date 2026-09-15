@@ -1,5 +1,5 @@
 import { mountPublicWork } from './lib/public-work.mjs';
-import { fetchBrowserFleet } from './lib/api-client.mjs';
+import { fetchBrowserFleet, fetchWorkLoop, ProjectionRequestError } from './lib/api-client.mjs';
 import { loadNotifPrefs, saveNotifPrefs } from './lib/notifications.mjs';
 import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from './lib/notifications.mjs';
 import { listConnections } from './lib/storage.mjs';
@@ -145,9 +145,6 @@ async function renderNotifPrefToggles(){
   }
   drawer.append(wrap);
 }
-
-bind();
-
 
 // F2 client: ingest engine events through the daemon bridge (spec 181).
 async function startFleetEventStream(){
