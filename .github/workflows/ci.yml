@@ -6,6 +6,6 @@ permissions:
   contents: read
 jobs:
   smoke:
-    runs-on: [self-hosted, Linux, X64, ovh-workforce]
+    runs-on: ubuntu-latest
     steps:
       - run: echo SMOKE_OK && uname -a
