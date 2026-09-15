@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# wfx-deploy — one-codebase, multi-target deploy for the Focusa Workforce extension.
+#
+# Targets (all consume THIS checkout; the plugin codebase is never duplicated):
+#
+#   build        Build the extension dist/ from this checkout (node scripts/build.mjs).
+#                Flags: FOCUSA_PUBLIC_NEWTAB=1 public Work view; FOCUSA_BRAND white-label.
+#   gh           Push this checkout to GitHub (CI validate/test/build runs on ovh-workforce).
+#   brave        Deploy the built dist to the stable Brave load path and, if Brave was
+#                launched through `wfx-deploy launch brave`, relaunch it to pick up changes.
+#   chrome       Same as brave, for Google Chrome (or chromium when Google Chrome is absent).
+#   veragensia   Update the OVH-side checkout and run the existing uiai-lab-push pipeline
+#                (build on kh -> rsync stage -> checksum -> atomic promote -> rollback ->
+#                activation gates -> https://os.focusa.dev HTTP 200). Snapshot required.
+#   watch        Rebuild + refresh the local dist dir on source changes (local dogfood loop).
+#   launch BROWSER  Launch the given browser with the deployed dist as an unpacked
+#                extension, with a CDP debug port so later deploys can hot-reload.
+#
+# Extension identity: unpacked extensions get their ID from the load path, so the
+# stable per-host dist path (below) yields one stable ID per channel. The Veragensia
+# public demo pins ID ohfbbkpacpcapicpgplnnmifmlnmjggj via /extroot/dist.
+#
+# Private/local state (profiles, credentials, snapshots with private data) never
+# enters this repo; snapshots are passed by absolute path at deploy time.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NODE=${UIAI_WFX_NODE:-$(command -v node || echo node)}
+
+# Stable local dist dir shared by local browser channels (single build output).
+LOCAL_DIST_ROOT=${UIAI_WFX_LOCAL_DIST:-$HOME/.local/share/focusa-workforce}
+
+# Veragensia / OVH pipeline
+VERAGENSIA_HOST=${UIAI_WFX_VERAGENSIA_HOST:-kh}
+VERAGENSIA_CHECKOUT=${UIAI_WFX_VERAGENSIA_CHECKOUT:-/home/wirebot/focusa-workforce-extension}
+VERAGENSIA_PUSH=/home/wirebot/veragensia/scripts/uiai-lab-push
+VERAGENSIA_SNAPSHOT=${UIAI_WFX_VERAGENSIA_SNAPSHOT:-/home/wirebot/migration-work/public-work.2026-09-14.json}
+
+usage() {
+  cat <<'USAGE'
+usage: wfx-deploy <target> [args]
+
+  build [--public-newtab] [--brand NAME]   Build dist/ from this checkout.
+  test                                     Run node --test tests/*.test.mjs.
+  gh [--snapshot FILE]                     Embed snapshot (optional), commit, push to GitHub (CI).
+  brave | chrome                           Refresh the local browser channel dist from the build.
+  veragensia [--snapshot FILE]             Push this checkout's HEAD to OVH lab via uiai-lab-push.
+  launch brave|chrome [--fresh]            Launch browser with the deployed dist loaded.
+  status                                   Show target/deploy state.
+
+Environment: UIAI_WFX_NODE, UIAI_WFX_LOCAL_DIST, UIAI_WFX_VERAGENSIA_HOST,
+UIAI_WFX_VERAGENSIA_CHECKOUT, UIAI_WFX_VERAGENSIA_SNAPSHOT.
+USAGE
+}
+
+die() { echo "wfx-deploy: $*" >&2; exit 1; }
+
+require_repo() {
+  [[ -f "$REPO_ROOT/scripts/build.mjs" ]] || die "not a workforce-extension checkout: $REPO_ROOT"
+}
+
+browser_binary() {
+  case "$1" in
+    brave) echo brave-browser ;;
+    chrome) if command -v google-chrome >/dev/null 2>&1; then echo google-chrome
+            elif command -v google-chrome-stable >/dev/null 2>&1; then echo google-chrome-stable
+            else echo chromium; fi ;;
+    *) die "unknown browser: $1" ;;
+  esac
+}
+
+do_build() {
+  require_repo
+  local envs=()
+  [[ ${FOCUSA_PUBLIC_NEWTAB:-} == 1 || ${WFX_PUBLIC_NEWTAB:-0} == 1 ]] && envs+=(FOCUSA_PUBLIC_NEWTAB=1)
+  [[ -n ${FOCUSA_BRAND:-} ]] && envs+=(FOCUSA_BRAND="$FOCUSA_BRAND")
+  ( cd "$REPO_ROOT" && env "${envs[@]+${envs[@]}}" "$NODE" scripts/build.mjs )
+}
+
+deploy_local_browser() {
+  require_repo
+  [[ -d "$REPO_ROOT/dist" ]] || { echo "building (no dist yet)"; do_build; }
+  refresh_local_browser_copy "$1"
+}
+
+deploy_local_browser() {
+  require_repo
+  [[ -d "$REPO_ROOT/dist" ]] || { echo "building (no dist yet)"; do_build; }
+  refresh_local_browser_copy "$1"
+}
+
+refresh_local_browser_copy() {
+  # One shared build output; per-browser copies keep channels independent.
+  local dir="$LOCAL_DIST_ROOT/dist-$1"
+  install -d -m 755 "$LOCAL_DIST_ROOT"
+  rm -rf "$dir.tmp"
+  cp -a "$REPO_ROOT/dist" "$dir.tmp"
+  rm -rf "$dir"
+  mv "$dir.tmp" "$dir"
+  echo "deployed dist -> $dir for $1 (tree sha256 $(find "$dir" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1))"
+}
+
+launch_browser() {
+  local b="$1"; shift || true
+  local bin; bin="$(browser_binary "$b")"
+  local dir="$LOCAL_DIST_ROOT/dist-$b"
+  [[ -d "$dir/manifest.json" ]] || { refresh_local_browser_copy "$b" >/dev/null; }
+  local profile="$HOME/.config/focusa-workforce/$b"
+  install -d -m 700 "$profile"
+  exec "$bin" \
+    --user-data-dir="$profile" \
+    --load-extension="$dir" \
+    --disable-extensions-except="$dir" \
+    --remote-debugging-port=${UIAI_WFX_CDP_PORT:-9335} \
+    --no-first-run --no-default-browser-check \
+    "$@"
+}
+
+cdt_reload() {
+  # Best-effort hot reload: restart the browser binary only if the operator
+  # started it through this tool (CDP port owned by us).
+  if pgrep -f -- "--user-data-dir=$HOME/.config/focusa-workforce/$1" >/dev/null 2>&1; then
+    pkill -f -- "--user-data-dir=$HOME/.config/focusa-workforce/$1" 2>/dev/null || true
+    sleep 2
+    nohup "$(dirname "$0")/wfx-deploy" launch "$1" >/dev/null 2>&1 &
+    echo "relaunched $1 with refreshed dist"
+  else
+    echo "$1 not running via wfx-deploy; deployed dist will load on next launch"
+  fi
+}
+
+deploy_veragensia() {
+  require_repo
+  local snapshot="$VERAGENSIA_SNAPSHOT"
+  [[ -n $snapshot ]] || die "veragensia target requires a public-work snapshot (UIAI_WFX_VERAGENSIA_SNAPSHOT or --snapshot)"
+  local head; head="$(cd "$REPO_ROOT" && git rev-parse HEAD)"
+  echo "veragensia target: promote $(cd "$REPO_ROOT" && git rev-parse --short HEAD) via $VERAGENSIA_HOST"
+  ssh "$VERAGENSIA_HOST" "sudo -u wirebot -H bash -lc '
+    set -e
+    cd $VERAGENSIA_CHECKOUT
+    git fetch -q origin
+    git reset -q --hard origin/main
+    [[ \$(git rev-parse HEAD) == $head ]] || { echo \"ERROR: $VERAGENSIA_CHECKOUT HEAD \$(git rev-parse --short HEAD) != local HEAD $head\" >&2; exit 3; }
+    /home/wirebot/veragensia/scripts/uiai-lab-push --public-work $snapshot
+  '"
+  echo "veragensia deploy complete (HEAD $head)"
+}
+
+TARGET=${1:-}
+case "$TARGET" in
+  build) shift || true; do_build "$@" ;;
+  test) require_repo; ( cd "$REPO_ROOT" && "$NODE" --test tests/*.test.mjs ) ;;
+  gh)
+    require_repo
+    shift || true
+    [[ ${1:-} == --snapshot ]] && { snapshot="$2"; shift 2; } || snapshot=""
+    ( cd "$REPO_ROOT" && git push origin "$(git rev-parse --abbrev-ref HEAD)" )
+    echo "pushed to GitHub; CI will validate/test/build"
+    ;;
+  brave|chrome)
+    shift; refresh_local_browser_copy "$TARGET"
+    cdt_reload "$TARGET"
+    ;;
+  launch)
+    shift; launch_browser "$@"
+    ;;
+  veragensia)
+    shift || true
+    [[ ${1:-} == --snapshot ]] && { VERAGENSIA_SNAPSHOT="$2"; shift 2; }
+    deploy_veragensia "$@"
+    ;;
+  status)
+    echo "repo:        $REPO_ROOT (HEAD $(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo unknown))"
+    echo "channels:   $([[ -f $LOCAL_DIST_ROOT/dist-brave/manifest.json ]] && echo brave=deployed || echo brave=empty) / $([[ -f $LOCAL_DIST_ROOT/dist-chrome/manifest.json ]] && echo chrome=deployed || echo chrome=empty)"
+    echo "veragensia:  https://os.focusa.dev (deploys via $VERAGENSIA_HOST:$VERAGENSIA_PUSH)"
+    ;;
+  -h|--help|help|"") usage ;;
+  *) usage >&2; exit 2 ;;
+esac
