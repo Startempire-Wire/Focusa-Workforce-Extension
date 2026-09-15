@@ -1,5 +1,8 @@
 name: Workforce CI
 
+# The Startempire-Wire org runs CI on its self-hosted OVH runner
+# (ovh-focusa-builder); hosted runners are not used for this org.
+
 on:
   pull_request:
   push:
@@ -10,7 +13,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
