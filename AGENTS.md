@@ -17,6 +17,17 @@ Question
 
 Apply it twice: to the product and to the machinery used to build it.
 
+Then apply **Leverage²**:
+
+```text
+when a fix/optimization proves itself
+→ move it into the lowest correct shared primitive
+→ let later slices inherit it
+→ delete duplicated local work
+```
+
+Do not generalize speculation. Compound only improvements proven in running reality.
+
 The objective is working software that satisfies the accepted product outcome. Planning, requirements, trajectory, tests, evidence and documentation exist only to prevent wrong work or false completion.
 
 ## Start
