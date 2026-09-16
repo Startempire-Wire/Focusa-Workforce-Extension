@@ -41,16 +41,29 @@ function log(...parts) { console.log(`[wfx-dev]`, ...parts); }
 
 function git(args) { return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); }
 
+/** Run the test suite; the live loop only commits verified builds. */
+async function runTests() {
+  const files = (await readdir(resolve(root, 'tests'))).filter((f) => f.endsWith('.test.mjs')).sort();
+  if (!files.length) return { ok: false, summary: 'tests: none found' };
+  const r = spawnSync(process.execPath, ['--test', ...files.map((f) => resolve(root, 'tests', f))], { cwd: root, encoding: 'utf8' });
+  const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+  const pass = /# pass (\d+)/.exec(out)?.[1] ?? '?';
+  const fail = /# fail (\d+)/.exec(out)?.[1] ?? '?';
+  return { ok: r.status === 0, summary: `tests: ${pass} pass, ${fail} fail` };
+}
+
 /** Commit and push the working tree so GitHub tracks the live build. */
-function commitAndPush(stamp) {
+async function commitAndPush(stamp) {
   const status = git(['status', '--porcelain']).stdout.trim();
   if (!status) return 'git: nothing to commit';
+  const tests = await runTests();
+  if (!tests.ok) return `git: NOT committed — ${tests.summary}`;
   if (git(['add', '-A']).status !== 0) return 'git: add failed';
   const commit = git(['commit', '-q', '-m', `chore(dev): live build ${stamp}`, '--no-verify']);
   if (commit.status !== 0) return `git: commit failed (${(commit.stderr || commit.stdout).trim().slice(0, 120)})`;
   const push = git(['push', '-q', 'origin', 'HEAD']);
   return push.status === 0
-    ? 'git: committed + pushed'
+    ? `${tests.summary}; git: committed + pushed`
     : `git: committed; push failed (${(push.stderr || push.stdout).trim().slice(0, 120)})`;
 }
 
@@ -160,7 +173,7 @@ async function deploy({ launch = false } = {}) {
       log(`staged -> ${channelDir}`);
       log(summary);
       log(`refresh your open ${browser} tab to load it (extension pages re-read from disk; a background/service-worker change needs a chrome://extensions reload)`);
-      if (gitMode) log(commitAndPush(summary));
+      if (gitMode) log(await commitAndPush(summary));
       return;
     }
   }
@@ -171,7 +184,7 @@ async function deploy({ launch = false } = {}) {
     : `staged -> ${channelDir}; reload skipped: ${result.reason}`);
   const manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'));
   log('loaded version:', manifest.version, '| channel:', channelDir);
-  if (gitMode) log(commitAndPush(summary));
+  if (gitMode) log(await commitAndPush(summary));
 }
 
 async function main() {
