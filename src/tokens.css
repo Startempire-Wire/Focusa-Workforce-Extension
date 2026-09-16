@@ -96,3 +96,50 @@
 @media (min-width: 480px) { :root { --page-gutter: 20px; } }
 @media (min-width: 860px) { :root { --page-gutter: 24px; } }
 @media (min-width: 1180px) { :root { --page-gutter: 28px; } }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dark theme (docs/13 §2): maps the SAME semantic tokens, so every surface
+   inherits it without a second visual language. Values continue the palette the
+   extension's existing surfaces already ship.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg-app: #09111f;
+    --bg-surface: #122139;
+    --bg-subtle: #172b49;
+    --bg-hover: #1d3355;
+    --bg-selected: #1c2f4f;
+
+    --text-primary: #f4f7ff;
+    --text-secondary: #b6c4dc;
+    --text-muted: #8fa0bd;
+    --text-disabled: #6b7c99;
+    --text-inverse: #08121f;
+
+    --border-default: #24405f;
+    --border-strong: #33547c;
+    --border-focus: #86adff;
+
+    --accent: #86adff;
+    --accent-hover: #a3c1ff;
+    --accent-subtle: #16294a;
+
+    --success: #73dfb0;
+    --success-subtle: #102a22;
+    --warning: #ffd27d;
+    --warning-subtle: #2b2312;
+    --danger: #ff8f9b;
+    --danger-subtle: #2c1519;
+    --info: #8ab6ff;
+    --info-subtle: #152238;
+    --violet: #b9a2ff;
+    --violet-subtle: #241d3d;
+    --settled: #6fd8cd;
+    --settled-subtle: #102b2a;
+
+    --elevation-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+    --focus-ring: 0 0 0 3px rgba(134, 173, 255, 0.35);
+  }
+}

@@ -135,3 +135,12 @@ test('the workforce page sets border-box so fields cannot overflow their track',
   const base = await readFile(resolve(root, 'src/workforce/workforce.css'), 'utf8');
   assert.match(base, /\*, \*::before, \*::after \{ box-sizing: border-box; \}/, 'border-box is set for all elements');
 });
+
+test('the shared token layer maps dark by redefining the same semantic names', async () => {
+  const tokens = await readFile(resolve(root, 'src/tokens.css'), 'utf8');
+  assert.match(tokens, /prefers-color-scheme: dark/, 'dark theme is defined');
+  const dark = tokens.slice(tokens.indexOf('prefers-color-scheme: dark'));
+  for (const token of ['--bg-app', '--bg-surface', '--text-primary', '--text-secondary', '--border-default', '--accent', '--success', '--warning', '--danger', '--violet', '--settled']) {
+    assert.ok(dark.includes(`${token}:`), `dark theme redefines ${token}`);
+  }
+});
