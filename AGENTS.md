@@ -4,7 +4,9 @@
 **Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
 **Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md`  
 **Portable seam contract:** ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md`  
-**Current product spec:** `docs/00-workforce-canonical-product-and-implementation-spec.md`
+**Current product spec:** `docs/00-workforce-canonical-product-and-implementation-spec.md`  
+**Current redesign blueprint:** `docs/08-workforce-redesign-blueprint.md`  
+**Active implementation slice:** `docs/09-slice-1-workstream-foreman-direction-implementation.md`
 
 This file tells build agents how to change this repository without breaking product ownership, live deployment, or the human-agent workforce model.
 
@@ -28,7 +30,9 @@ Wirebot-App current product/convergence docs (read-only dependency; do not rewri
 this repo docs/00
 docs/05
 docs/06
-docs/07
+docs/08
+docs/09 for the active Slice 1
+docs/07 for migration/baseline/deployment guardrails
 current source/tests
 ```
 
@@ -204,7 +208,7 @@ Use it for behavioral comparison, not new development.
 Evolve toward:
 
 ```text
-MV3 service worker / shared Workforce runtime client
+shared Workforce runtime client
         ↓
 normalized Focusa snapshot/events
         ↓
@@ -212,6 +216,8 @@ shared application state
         ↓
 side panel · full app · start page · wall
 ```
+
+MV3 service-worker suspension is a design constraint. Do not make canonical state or long-lived work depend on keeping the service worker alive.
 
 Svelte 5 is appropriate for presentation. Do not move authority/reconciliation/business semantics into Svelte components.
 
@@ -293,6 +299,8 @@ Implement vertical slices:
 10 elastic capacity
 ```
 
+Slice 1 implementation authority is `docs/09-slice-1-workstream-foreman-direction-implementation.md`.
+
 Each slice must be useful end-to-end. Avoid framework/process ceremony before the first real slice works.
 
 ## Tests and truth
@@ -346,7 +354,7 @@ Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, 
 
 Chromebook: UI/UX dogfood, browser behavior, lightweight implementation, voice/side-panel testing.
 
-Cloud/server: heavy builds/tests, Focusa/UIAI/Veragensia integration, deployment and multi-agent build work where useful.
+Cloud/server: heavy builds/tests, Focusa/UIAI/Veragensia integration, deployment and multi-agent implementation when appropriate.
 
 GitHub is the shared source of truth. No divergent source trees.
 
