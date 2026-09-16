@@ -31,6 +31,7 @@
             <span class="meta">
               {#if entry.role}<span class="role">{entry.role}</span>{/if}
               <span class="state">{entry.state ?? 'state unknown'}</span>
+              {#if entry.runId}<span class="run">run {entry.runId}{#if Number.isSafeInteger(entry.generation) && entry.generation >= 1} · gen {entry.generation}{/if}</span>{/if}
               {#if entry.updatedAt}<span class="time">{entry.updatedAt}</span>{/if}
             </span>
           </button>
@@ -56,6 +57,7 @@
   button.selected { border-color: var(--accent); background: var(--bg-selected); }
   .name { font-weight: var(--weight-semibold); font-size: var(--text-body); }
   .meta { display: flex; gap: var(--space-tight); font-size: var(--text-micro); color: var(--text-muted); flex-wrap: wrap; }
+  .run { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .role { text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--weight-semibold); }
   @media (max-width: 479px) { .meta { font-size: var(--text-small); } }
 </style>
