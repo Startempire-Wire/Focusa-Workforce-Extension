@@ -20,7 +20,7 @@ import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../
 import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
-import { preflightSafeSession, createPreflightedSession } from '../../lib/session-create.mjs';
+import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
 
 const SELECTION_KEY = 'focusa.workforce.selection.v1';
 const INTENT_KEY = 'focusa.workforce.intents.v1';
@@ -384,6 +384,51 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     }
   }
 
+  /**
+   * Prepare a governed work session for this Workstream.
+   *
+   * Workforce never invents canonical identity. If the owner has no role profile
+   * for this scope, this returns an honest blocker naming the owning operations
+   * that satisfy it (stopgap doctrine: ready the path, do not fabricate).
+   *
+   * @returns {Promise<{ok: boolean, blocker?: object, preflight?: object, target?: object, error?: string}>}
+   */
+  async function prepareSession({ displayName, provider = 'pi', model = 'default', authProfileRef = 'default' } = {}) {
+    if (!active || !workstream) return { ok: false, error: 'select an environment and a Workstream first' };
+    const clientForSession = createWorkforceClient({ baseUrl: active.baseUrl, token: active.token });
+    const profiles = await clientForSession.roleProfiles({ ...workstream, attachmentId: 'default' });
+    record('roles', profiles);
+    const ownerProfiles = profiles.state === ResultState.OK ? (profiles.data?.profiles ?? []) : [];
+    if (ownerProfiles.length === 0) {
+      return {
+        ok: false,
+        blocker: {
+          reason: 'Focusa reports no role profile (agent identity) for this Workstream, so a session config cannot be constructed without inventing identity.',
+          ownerOperations: ['focusa.role_profile.draft', 'focusa.role_profile.review'],
+          detail: profiles.data?.schema ?? profiles.failureClass ?? profiles.state,
+        },
+      };
+    }
+    const profile = ownerProfiles[0];
+    try {
+      const config = buildSafeSessionConfig({
+        packet: {
+          project_root: workstream.projectRoot,
+          continuity_id: workstream.continuityId,
+          agent_identity_ref: profile.agent_identity_ref ?? profile.role_profile_id,
+          role_profile_ref: profile.role_profile_id,
+          role_profile_ref_fallback: null,
+        },
+        display_name: displayName || `${workstream.continuityId} session`,
+        provider, model, auth_profile_ref: authProfileRef,
+      });
+      const preflight = await preflightSafeSession(config, { baseUrl: active.baseUrl, token: active.token });
+      return { ok: true, preflight, target: null };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   async function loadBoundTarget() {
     try {
       const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
@@ -532,6 +577,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     cancelPairing,
     selectSession,
     loadOutput,
+    prepareSession,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,

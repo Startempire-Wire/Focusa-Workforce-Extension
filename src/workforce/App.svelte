@@ -27,6 +27,8 @@
   let bindResult = $state('');
   let pairUrl = $state('');
   let pairLabel = $state('');
+  let sessionName = $state('');
+  let sessionPreparation = $state(null);
 
   // Direction addresses an exact owner target. Preferred source: the owner's own
   // roster projection. Stopgap: an operator-bound target (see AGENTS.md stopgap
@@ -381,6 +383,22 @@
           {/each}
         </ul>
       </details>
+    {/if}
+    <div class="row">
+      <button type="button" onclick={async () => { sessionPreparation = await store.prepareSession({ displayName: sessionName }); }} disabled={!store.workstream}>
+        Prepare a work session
+      </button>
+      <span class="muted tiny">uses the owner's role profile and profile defaults; never invents identity</span>
+    </div>
+    {#if sessionPreparation?.ok}
+      <p class="source authoritative">preflight accepted · config {sessionPreparation.preflight.redacted_config_hash.slice(0, 12)}… — creation is a separate governed step</p>
+    {:else if sessionPreparation?.blocker}
+      <p class="gap">
+        {sessionPreparation.blocker.reason}
+        Owner operations that satisfy it: {sessionPreparation.blocker.ownerOperations.join(', ')}.
+      </p>
+    {:else if sessionPreparation?.error}
+      <p class="gap">{sessionPreparation.error}</p>
     {/if}
     {#if store.resultOf('sessions')?.state === 'ok' && store.roster.length === 0}
       <p class="muted tiny">
