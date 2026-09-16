@@ -294,6 +294,25 @@
     {/if}
   </section>
 
+  <!-- Evidence -->
+  <section class="card" aria-labelledby="wf-evidence">
+    <h2 id="wf-evidence">Evidence</h2>
+    <p class="source {store.evidenceTrail.authoritative ? 'authoritative' : 'stopgap'}">{store.evidenceTrail.disclosure}</p>
+    {#if store.evidenceTrail.entries.length === 0}
+      <p class="muted">Focusa has not reported an evidence or receipt reference for this scope yet.</p>
+    {:else}
+      <ul class="plain">
+        {#each store.evidenceTrail.entries as entry (`${entry.kind}:${entry.ref}`)}
+          <li>
+            <span class="badge">{entry.kind}</span>
+            <code>{entry.ref}</code>
+            <span class="muted tiny">via {entry.source}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+
   <!-- People -->
   <section class="card" aria-labelledby="wf-people-h">
     <h2 id="wf-people-h" class="wf-section-label">People</h2>
@@ -431,6 +450,12 @@
   .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
   .plain { margin: var(--space-micro) 0 0 var(--space-standard); padding: 0; font-size: var(--text-small); display: grid; gap: var(--space-micro); }
   .plain button { padding: 3px var(--space-tight); font-size: var(--text-micro); margin-left: var(--space-tight); min-height: 24px; }
+  .badge {
+    display: inline-block; padding: 1px var(--space-tight); margin-right: var(--space-tight);
+    border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+    font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-secondary); background: var(--bg-subtle);
+  }
   .capability { font-size: var(--text-small); }
   .capability summary { cursor: pointer; color: var(--text-secondary); }
 

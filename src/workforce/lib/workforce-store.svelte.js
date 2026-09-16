@@ -16,6 +16,7 @@ import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwne
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../lib/direction-target.mjs';
+import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { preflightSafeSession, createPreflightedSession } from '../../lib/session-create.mjs';
@@ -108,6 +109,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // Ladder view: the owner projection when it carries a committed ladder,
   // otherwise a labelled stopgap derived from owner-answered operations.
   // The cutover is automatic — see lib/trajectory-source.mjs (focusa#621).
+  const evidenceTrail = $derived(buildEvidenceTrail(reads));
   const resolvedTarget = $derived(resolveDirectionTarget({ roster, bound: boundTarget }));
   const directionTarget = $derived(resolvedTarget.target);
   const directionTargetOrigin = $derived(resolvedTarget.origin);
@@ -391,6 +393,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get sessionPresets() { return sessionPresets; },
     get trajectory() { return trajectory; },
     get trajectoryView() { return trajectoryView; },
+    get evidenceTrail() { return evidenceTrail; },
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
