@@ -44,8 +44,8 @@ UIAI owns browser/computer execution. Veragensia owns bodies/runtime/enforcement
 
 - **Side Panel** — immediate collaboration, Direction, Working Now, Needs You.
 - **Full Workforce** — deep roster/work/Evidence/topology operations.
-- **Start Page** — optional return/orientation briefing.
-- **Wall** — optional read-only situational view.
+- **Start Page** — return/orientation briefing.
+- **Wall** — read-only situational view.
 
 ## Human-agent operating loop
 
@@ -62,20 +62,49 @@ Orient
 
 The user should spend attention on direction, judgment and meaningful intervention—not agent machinery.
 
-## Shared ecosystem seams
+## Full Trajectory
 
-Cross-product reference contracts belong to ADLBOS, including:
+The redesign is governed by one connected Focusa-style Full Trajectory:
 
 ```text
-operator.partner_profile.v1
-operator.surface_handoff.v1
-operator.attention.v1
-operator.correlation.v1
-operator.capability_posture.v1
-operator.closure.v1
+HLT-WF-001
+│
+├─ MLG-0  Canonical contracts + implementation foundation
+├─ MLG-1  Workstream + Foreman + Direction
+├─ MLG-2  Working Now / People
+├─ MLG-3  Needs You
+├─ MLG-4  Trajectory / work progression
+├─ MLG-5  Evidence / closure
+├─ MLG-6  UIAI execution / takeover
+├─ MLG-7  Fleet / topology / capacity
+├─ MLG-8  Complete surfaces / accessibility
+├─ MLG-9  Voice / Radar / contextual expansion
+└─ MLG-10 Production acceptance
 ```
 
-Workforce consumes them; it does not create another integration database.
+`Full`, `Medium`, and `Short` are projections of this same trajectory, not separate plans.
+
+Current Short frontier begins at `MLG-0 / STG-0.1 / WP-0.1.1`: resolve the real current Focusa operations needed by the first slice.
+
+## UX design authority
+
+The redesign resolves the five UX planes as build contracts:
+
+```text
+Strategy  → docs/00 + docs/08 + docs/10
+Scope     → docs/10
+Structure → docs/11
+Skeleton  → docs/12
+Surface   → docs/13
+```
+
+Build agents are expected to implement these contracts rather than redesign them during construction.
+
+## Shared ecosystem seams
+
+Cross-product reference contracts belong to ADLBOS. Workforce consumes them; it does not create another integration database.
+
+Cross-product references are source-qualified and do not transfer authority. Capability support, entitlement, activation, authority, health and consent remain distinct.
 
 ## Fleet versus federation
 
@@ -109,40 +138,46 @@ Pre-redesign behavioral baseline:
 baseline/pre-redesign-2026-09-15
 ```
 
-## Redesign direction
+## Implementation direction
 
-Preserve sound core primitives—pairing, API client, contracts, orchestration, session creation, SSE/reconnect, projections and validation—while evolving presentation toward a shared runtime/projection layer and a modern Svelte 5 UI.
+Preserve sound core primitives—pairing, API client, contracts, orchestration, session creation, SSE/reconnect, projections and validation—while evolving presentation toward a shared runtime/projection layer and a Svelte 5 + JavaScript/JSDoc UI.
 
-Target vertical slices:
+No SvelteKit.
+
+Visual target is defined in `docs/13-workforce-visual-system-and-reference-surfaces.md`: light-first, precise, restrained, modern and operational.
+
+## Build-agent entry point
+
+Start here:
 
 ```text
-1. Workstream + Foreman + Direction
-2. Working Now / roster
-3. Needs You
-4. work progression / graph
-5. Evidence / verified closure
-6. UIAI execution / takeover
-7. voice
-8. fleet / topology
-9. Radar
-10. elastic capacity
+docs/15-build-agent-master-handoff.md
 ```
 
-Visual goal: **expensive calm**—clean, restrained, precise and deeply informative without dashboard theater.
+Then follow the Full Trajectory:
+
+```text
+docs/14-workforce-full-trajectory.md
+```
 
 ## Canonical local docs
 
-Read in this order for product work:
-
 ```text
-docs/00-workforce-canonical-product-and-implementation-spec.md
-docs/04-upstream-architecture-corpus.md
-docs/05-extension-runtime-data-and-integration-contracts.md
-docs/06-workforce-ux-and-interaction-spec.md
-docs/07-pre-redesign-baseline-and-agent-handoff.md
+00-workforce-canonical-product-and-implementation-spec.md
+05-extension-runtime-data-and-integration-contracts.md
+06-workforce-ux-and-interaction-spec.md
+07-pre-redesign-baseline-and-agent-handoff.md
+08-workforce-redesign-blueprint.md
+09-slice-1-workstream-foreman-direction-implementation.md
+10-workforce-product-requirements-and-proof-matrix.md
+11-workforce-experience-architecture-and-stateflow.md
+12-workforce-screen-and-component-contract.md
+13-workforce-visual-system-and-reference-surfaces.md
+14-workforce-full-trajectory.md
+15-build-agent-master-handoff.md
 ```
 
-For cross-product architecture, read ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md` and current Wirebot App convergence docs before inventing new boundaries.
+Wirebot App documentation is a read-only dependency from this workstream and must not be rewritten as part of Workforce implementation.
 
 ## Non-negotiable law
 
@@ -153,4 +188,5 @@ A surface never becomes the source of truth merely because it is the richest UI.
 Entitlement never equals authority.
 Federation never equals ambient access.
 Branding never equals identity or authority.
+Branch/Workpoint completion never equals whole accepted outcome completion.
 ```
