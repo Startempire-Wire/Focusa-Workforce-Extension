@@ -18,6 +18,19 @@ Question
 → Automate last
 ```
 
+Apply it to both the product and the build machinery.
+
+Then compound with **Leverage²**:
+
+```text
+prove a useful fix once
+→ push it into the lowest correct shared primitive
+→ let later work inherit it
+→ remove duplicated local fixes
+```
+
+Do not abstract speculative behavior. Systemize only what running reality proves useful.
+
 Default loop:
 
 ```text
@@ -273,4 +286,4 @@ Requirement IDs/source refs/test names are included only when they materially he
 
 ## Final directive
 
-> **Use the blueprint as rails, not shackles. Make the product real. Exercise engineering judgment aggressively inside resolved product boundaries. Delete ceremony, preserve truth, keep advancing, and do not stop until the accepted outcome is actually achieved or a genuine owner decision is required.**
+> **Use the blueprint as rails, not shackles. Make the product real. Exercise engineering judgment aggressively inside resolved product boundaries. Delete ceremony, preserve truth, compound proven leverage, keep advancing, and do not stop until the accepted outcome is actually achieved or a genuine owner decision is required.**
