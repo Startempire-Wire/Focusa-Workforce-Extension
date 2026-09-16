@@ -263,6 +263,26 @@
       onSelect={(entry) => { selectedSessionId = entry.id ?? ''; }}
     />
     <StateNote label="Session profiles" result={store.resultOf('profiles')} />
+    {#if store.sessionProfiles.length || store.sessionPresets.length}
+      <details class="capability">
+        <summary>Owner session capability ({store.sessionProfiles.length} profile(s), {store.sessionPresets.length} preset(s))</summary>
+        <ul class="plain">
+          {#each store.sessionProfiles as profile (profile.profile_id ?? profile.description)}
+            <li><strong>{profile.profile_id ?? 'profile'}</strong> — {profile.description ?? ''}</li>
+          {/each}
+          {#each store.sessionPresets as preset (preset.preset_id)}
+            <li><strong>{preset.preset_id}</strong> — {preset.description ?? ''}</li>
+          {/each}
+        </ul>
+      </details>
+    {/if}
+    {#if store.resultOf('sessions')?.state === 'ok' && store.roster.length === 0}
+      <p class="muted tiny">
+        Focusa silent sessions are available (profiles/presets above) but this environment has no
+        session instance yet, so there is no exact target (session · run · generation) to address
+        Direction to. Creating one is the owner's operation — Workforce never invents a target.
+      </p>
+    {/if}
   </section>
 
   {#if store.anyBlocked}
@@ -298,5 +318,7 @@
   .facts dt { opacity: 0.6; }
   .facts dd { margin: 0; }
   .plain { margin: 4px 0 0 16px; padding: 0; font-size: 12px; display: grid; gap: 4px; }
+  .capability { font-size: 12px; }
+  .capability summary { cursor: pointer; opacity: 0.8; }
   .plain button { padding: 3px 8px; font-size: 11px; margin-left: 6px; }
 </style>
