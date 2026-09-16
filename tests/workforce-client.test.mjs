@@ -267,3 +267,19 @@ test('owner event stream authorizes with the device token when paired', async ()
   await client.openEventStream({ onEvent: () => {}, signal: controller.signal }).catch(() => {});
   assert.equal(seen[0].init.headers.authorization, 'Bearer device-token');
 });
+
+test('session output requires and sends the exact target plus paging', async () => {
+  const seen = [];
+  const client = createWorkforceClient({
+    baseUrl: 'http://127.0.0.1:8787',
+    fetchImpl: fakeFetch(seen, { '/v1/silent-sessions/s-1/output': { status: 200, body: { chunks: [] } } }),
+  });
+  await client.sessionOutput({ sessionId: 's-1', runId: 'r-7', generation: 3, limit: 50, channel: 'stderr' });
+  const url = new URL(seen[0].url);
+  assert.equal(url.searchParams.get('run_id'), 'r-7');
+  assert.equal(url.searchParams.get('generation'), '3');
+  assert.equal(url.searchParams.get('limit'), '50');
+  assert.equal(url.searchParams.get('channel'), 'stderr');
+  assert.equal(url.searchParams.get('follow'), 'false');
+  assert.equal(seen[0].init.headers['x-focusa-permissions'], 'read:*');
+});

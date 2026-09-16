@@ -90,6 +90,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let boundTarget = $state(/** @type {any} */ (null));
   // In-page pairing (the side panel's proven flow, available on the full page).
   let selectedSessionId = $state('');
+  let outputCursor = $state(/** @type {string|null} */ (null));
+  let outputLines = $state(/** @type {string[]} */ ([]));
   let pairing = $state(/** @type {any} */ (null));
   let pairingBusy = $state(false);
   let pairingError = $state('');
@@ -208,7 +210,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
         onEvent: () => {
           lastEventAt = new Date().toISOString();
           if (refreshTimer) clearTimeout(refreshTimer);
-          refreshTimer = setTimeout(() => { refreshOwner().catch(() => {}); }, 800);
+          refreshTimer = setTimeout(() => {
+            refreshOwner().catch(() => {});
+            loadOutput().catch(() => {});
+          }, 800);
         },
         commitCursor: async (cursor) => {
           if (!cursor) return;
@@ -354,6 +359,31 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     }
   }
 
+  /**
+   * Read owner-reported output for the resolved exact target.
+   * The owner serves output only for an exact target; nothing is invented.
+   */
+  async function loadOutput({ reset = false } = {}) {
+    const target = resolvedTarget.target;
+    if (!active || !target) return;
+    if (reset) { outputLines = []; outputCursor = null; }
+    const result = await createWorkforceClient({ baseUrl: active.baseUrl, token: active.token }).sessionOutput({
+      sessionId: target.session_id, runId: target.run_id, generation: target.generation,
+      ...(outputCursor ? { cursor: outputCursor } : {}),
+      scope: selection.projectRoot ? { projectRoot: selection.projectRoot } : {},
+    });
+    record('output', result);
+    if (result.state === ResultState.OK) {
+      const body = result.data ?? {};
+      const chunks = body.chunks ?? body.data?.chunks ?? [];
+      const text = chunks
+        .map((chunk) => (typeof chunk === 'string' ? chunk : chunk?.text ?? chunk?.data ?? ''))
+        .filter(Boolean);
+      if (text.length) outputLines = [...outputLines, ...text].slice(-500);
+      outputCursor = body.next_cursor ?? body.cursor ?? outputCursor;
+    }
+  }
+
   async function loadBoundTarget() {
     try {
       const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
@@ -471,6 +501,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
     get selectedSessionId() { return selectedSessionId; },
+    get outputLines() { return outputLines; },
     get pairing() { return pairing; },
     get pairingBusy() { return pairingBusy; },
     get pairingError() { return pairingError; },
@@ -500,6 +531,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     beginPairing,
     cancelPairing,
     selectSession,
+    loadOutput,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,

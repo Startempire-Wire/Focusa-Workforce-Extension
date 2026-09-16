@@ -32,6 +32,7 @@
   // roster projection. Stopgap: an operator-bound target (see AGENTS.md stopgap
   // doctrine) used only until the owner reports one.
   const steerTarget = $derived(store.directionTarget);
+  const outputText = $derived(store.outputLines.join('\n'));
 
   onMount(async () => {
     await store.refreshEnvironments();
@@ -357,6 +358,16 @@
       onSelect={(entry) => store.selectSession(entry.id ?? '')}
     />
     <StateNote label="Selected person" result={store.resultOf('sessionStatus')} />
+    {#if steerTarget}
+      <div class="row">
+        <button type="button" onclick={() => store.loadOutput({ reset: true })} disabled={store.directing}>Load output</button>
+        <span class="muted tiny">owner-reported {store.outputLines.length ? `${store.outputLines.length} line(s)` : 'output (none yet)'}</span>
+      </div>
+      {#if store.outputLines.length}
+        <pre class="output" aria-label="Owner-reported session output">{outputText}</pre>
+      {/if}
+      <StateNote label="Output" result={store.resultOf('output')} />
+    {/if}
     <StateNote label="Session profiles" result={store.resultOf('profiles')} />
     {#if store.sessionProfiles.length || store.sessionPresets.length}
       <details class="capability">
@@ -485,6 +496,13 @@
   .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
   .plain { margin: var(--space-micro) 0 0 var(--space-standard); padding: 0; font-size: var(--text-small); display: grid; gap: var(--space-micro); }
   .plain button { padding: 3px var(--space-tight); font-size: var(--text-micro); margin-left: var(--space-tight); min-height: 24px; }
+  .output {
+    max-height: 260px; overflow: auto; margin: 0;
+    padding: var(--space-compact); border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm); background: var(--bg-subtle);
+    font-family: var(--font-mono); font-size: var(--text-micro); line-height: 1.5;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
   .badge {
     display: inline-block; padding: 1px var(--space-tight); margin-right: var(--space-tight);
     border: 1px solid var(--border-default); border-radius: var(--radius-pill);

@@ -64,6 +64,7 @@ export const OPERATIONS = Object.freeze({
   // Workforce members (silent sessions) — the real "who is working" source
   silentSessions: op('focusa.agent.silent_sessions', 'GET', '/v1/silent-sessions', ['project_root'], 'base_focusa', 'docs/133'),
   silentSessionStatus: op('focusa.agent.session.status', 'GET', '/v1/silent-sessions/{session_id}/status', ['project_root'], 'base_focusa', 'docs/133'),
+  silentSessionOutput: op('focusa.agent.session.output', 'GET', '/v1/silent-sessions/{session_id}/output', ['project_root'], 'base_focusa', 'docs/133'),
   silentSessionProfiles: op('focusa.agent.session.profiles', 'GET', '/v1/silent-sessions/profiles', ['project_root'], 'base_focusa', 'docs/133'),
   silentSessionPresets: op('focusa.agent.session.presets', 'GET', '/v1/silent-sessions/presets', ['project_root'], 'base_focusa', 'docs/133'),
   silentSessionPreflight: op('focusa.agent.session.preflight', 'POST', '/v1/silent-sessions/preflight', ['project_root'], 'base_focusa', 'docs/133', true),
@@ -161,7 +162,7 @@ export const SEMANTIC_RESOLUTION = Object.freeze({
   people: Object.freeze({
     requirement: 'who is working / responsibility',
     resolution: Resolution.REAL,
-    operations: Object.freeze(['silentSessions', 'silentSessionProfiles', 'silentSessionPresets', 'silentSessionStatus']),
+    operations: Object.freeze(['silentSessions', 'silentSessionProfiles', 'silentSessionPresets', 'silentSessionStatus', 'silentSessionOutput']),
   }),
   fleet: Object.freeze({
     requirement: 'fleet / multi-environment presence',

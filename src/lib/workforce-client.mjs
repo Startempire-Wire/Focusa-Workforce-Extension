@@ -236,6 +236,23 @@ export function createWorkforceClient(config) {
     sessionPresets: (projectRoot) => call('silentSessionPresets', { scope: { projectRoot } }),
     /** @param {string} sessionId */
     sessionStatus: (sessionId, scope) => call('silentSessionStatus', { path: { session_id: sessionId }, scope }),
+    /**
+     * Owner-reported output for one exact target. Requires run + generation:
+     * the owner will not serve output for an ambiguous target.
+     * @param {{sessionId: string, runId: string, generation: number, cursor?: string|null, limit?: number, channel?: string, scope?: object}} input
+     */
+    sessionOutput: (input) => call('silentSessionOutput', {
+      path: { session_id: input.sessionId },
+      scope: input.scope ?? {},
+      query: {
+        run_id: input.runId,
+        generation: String(input.generation),
+        ...(input.cursor ? { cursor: input.cursor } : {}),
+        limit: String(input.limit ?? 200),
+        channel: input.channel ?? 'stdout',
+        follow: 'false',
+      },
+    }),
 
     // ── foreman surface (owner gap) ────────────────────────────────────────
     /** @param {{projectRoot: string, continuityId: string, attachmentId?: string}} ws */
