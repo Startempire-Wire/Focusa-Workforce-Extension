@@ -1,296 +1,301 @@
 # Focusa Workforce — Upstream Architecture Corpus
 
-**Purpose:** collate the canonical source material that governs Workforce without creating a second source of truth.
-
-This file is the authoritative reading map for Workforce implementation. Source documents remain canonical in their owning repositories; this repo may carry synchronized snapshots later, but implementation agents must resolve conflicts in favor of the primitive-owning source.
-
----
-
-## 1. Focusa — workforce, identity, authority, work, evidence
-
-### Direct Workforce sources
-
-- `Startempire-Wire/focusa/docs/174-focusa-agent-workforce-extension-concept.md`
-  - original Workforce extension concept;
-  - browser-resident mission/workforce UI;
-  - roster, graph, live agent, approvals, audit, evidence, Direction Bar;
-  - multi-daemon owner lens;
-  - Managers/Crew model;
-  - extension is a window, not runtime.
-
-- `Startempire-Wire/focusa/docs/175-focusa-roles-capabilities-spec.md`
-  - roles and grounded capability semantics;
-  - assignment vs membership vs credential vs execution grant;
-  - risk-tier/consent relationships.
-
-- `Startempire-Wire/focusa/docs/173-focusa-secrets-broker-concept.md`
-  - early secret-broker/workforce relationship;
-  - superseded where Spec 156 is more authoritative, but useful provenance for the original extension concept.
-
-### Current security/authority owner
-
-- `Startempire-Wire/focusa/docs/156-focusa-project-scoped-credential-authority-secret-broker-delegated-autonomy-mfa-totp-and-cross-surface-injection-spec.md`
-  - project-scoped credential authority;
-  - secret-free projections;
-  - delegated autonomy;
-  - cross-surface injection and credential grants.
-
-### Workstream / Foreman / attention / voice
-
-- `Startempire-Wire/focusa/docs/164-workstream-rooted-canonical-runtime-design.md`
-  - Workstream-rooted runtime and identity boundary.
-
-- `Startempire-Wire/focusa/docs/181-focusa-voice-conversation-expression-and-auditable-interaction-spec.md`
-  - voice/conversation semantics;
-  - Conversation Ledger;
-  - utterance/action lineage;
-  - Expression output.
-
-- `Startempire-Wire/focusa/docs/182-focusa-project-foreman-workstream-intelligence-projection-spec.md`
-  - persistent Project Foreman;
-  - Workstream-scoped responsible intelligence;
-  - hydration, worker steering, runtime/model attachment.
-
-- `Startempire-Wire/focusa/docs/183-focusa-radar-proactive-observation-episodes-signal-economics-and-attention-routing-spec.md`
-  - Radar observations/episodes/signals;
-  - attention routing and proactive observation.
-
-- `Startempire-Wire/focusa/docs/184-focusa-ambient-operator-mobile-wearable-presence-meeting-and-sync-spec.md`
-  - mobile/wearable projection;
-  - Foreman/Wirebot routing;
-  - voice/meeting/presence sync.
-
-- `Startempire-Wire/focusa/docs/181-184-voice-foreman-radar-ambient-operator-current-manifest.md`
-  - current series manifest and cross-spec reading map.
-
-### Capability / execution design
-
-- `Startempire-Wire/focusa/docs/151-focusa-frictionless-program-design-runtime-and-agent-capability-fabric-spec.md`
-  - canonical operation/capability fabric;
-  - Workset/Workpoint binding;
-  - structured execution routes;
-  - UIAI as canonical browser execution route;
-  - agent capability availability and recovery.
-
-- `Startempire-Wire/focusa/docs/139-distributed-presence-environment-awareness-execution-placement-and-multi-daemon-coordination-spec.md`
-  - distributed presence and placement;
-  - multi-daemon coordination;
-  - environment identity and routing.
-
-### Evidence / execution continuity
-
-- `Startempire-Wire/focusa/docs/119-*`
-  - Evidence/Receipt/governance-ledger family; resolve exact active source before implementing evidence mutation.
-
-- `Startempire-Wire/focusa/docs/133-silent-sessions-final-release-proof.md`
-  - Silent Session implementation/release proof family.
-
-- `Startempire-Wire/focusa/docs/79-focusa-governed-continuous-work-loop.md`
-  - governed continuous execution/work-loop semantics.
-
-### Browser/PWA presentation direction
-
-- `Startempire-Wire/focusa/docs/117-mission-deck-onboarding-recall-pwa-spec.md`
-  - Mission Deck/PWA baseline.
-
-- `Startempire-Wire/focusa/docs/117a-living-mission-field-pwa-spec.md`
-  - richer mission field, transcript river, agent streams, evidence/authority/drift projection.
-
-### Embodiment / physical future
-
-- `Startempire-Wire/focusa/docs/153-physical-world-modeling-measurement-simulation-and-scientific-reasoning-spec.md`
-  - physical systems, sensors, actuators, controller, digital twin, robotics boundary.
-
-- `Startempire-Wire/focusa/docs/153a-physical-verification-experimental-settlement-and-high-consequence-scientific-control-addendum.md`
-  - consequential physical-actuation verification and settlement.
-
-- `Startempire-Wire/focusa/docs/153b-focusa-agent-embodiment-body-profile-and-transfer-addendum.md`
-  - body is not identity;
-  - body profiles and BodyBinding;
-  - cross-body continuity;
-  - humanoid/robotic body trajectory.
-
-- `Startempire-Wire/focusa/docs/current/FOCUSA_BRAIN_BODY_ANALOGY_GAP_MAP.md`
-  - whole-organism model;
-  - senses, motor/action body, homeostasis, learning, actuator taxonomy.
+**Status:** CURRENT source-of-truth map  
+**Purpose:** tell humans and build agents which upstream documents own which architectural questions so Workforce does not duplicate them.
 
 ---
 
-## 2. Veragensia — Agent Computer, Chromebook, cloud/runtime, bodies
+## 1. Read order
 
-- `Startempire-Wire/veragensia/docs/182-veragensia-focusa-agent-os-spec.md`
-  - Veragensia product/Agent Computer architecture;
-  - Focusa/UIAI/Pi/default full-profile composition;
-  - surfaces interchangeable, primitives platform.
-
-- `Startempire-Wire/veragensia/docs/186-veragensia-v0.1-native-chromebook-release-spec.md`
-  - constrained Chromebook/native proof;
-  - private Chromium/Workforce requirement;
-  - low-resource behavior;
-  - build unavailable artifacts elsewhere.
-
-- `Startempire-Wire/veragensia/docs/188-veragensia-v0.1-decisions-and-integration-contracts.md`
-  - native integration contracts;
-  - UIAI/Pi/Focusa boundaries;
-  - browser/computer execution relationships.
-
-- `Startempire-Wire/veragensia/docs/190-veragensia-agent-first-software-and-capability-resolution-spec.md`
-  - Agentability and capability-first software resolution.
-
-- `Startempire-Wire/veragensia/docs/191-veragensia-elastic-agent-computing-and-cloud-runtime-spec.md`
-  - local body / cloud body;
-  - Full Agent Computer, workcells, Silent Sessions, Agent Apps, browser contexts;
-  - TopologyGrant;
-  - elastic workforce/capacity.
-
-- `Startempire-Wire/veragensia/docs/193-veragensia-execution-substrate-workload-identity-and-capability-enforcement-spec.md`
-  - ExecutionPrincipal / WorkloadIdentity / EnforcementPlan;
-  - machine enforcement;
-  - Human Control Reserve.
-
-- `Startempire-Wire/veragensia/docs/194-veragensia-trusted-human-control-secure-attention-and-desktop-observation-spec.md`
-  - Secure Attention;
-  - DesktopObservation;
-  - ComputerControlLease;
-  - operator takeover/reconciliation.
-
-- `Startempire-Wire/veragensia/docs/195-veragensia-resource-identity-runtime-incarnation-and-state-transfer-spec.md`
-  - ResourceRef;
-  - RuntimeIncarnation;
-  - replicas/writer fencing;
-  - local/cloud migration and state transfer.
-
-- `Startempire-Wire/veragensia/docs/196-veragensia-platform-runtime-trust-*`
-  - platform/runtime trust family; resolve exact current filename before implementation dependency.
-
-- `Startempire-Wire/veragensia/docs/197-veragensia-voice-native-agent-computer-audio-ui-and-conversation-continuity-spec.md`
-  - voice-complete Agent Computer;
-  - keyboard/mouse optional;
-  - trusted audio and conversation continuity.
-
-- `Startempire-Wire/veragensia/docs/199-veragensia-ambient-operator-companion-sync-and-omarchy-integration-spec.md`
-  - ambient/mobile sync and native service topology;
-  - `veragens-sessiond`, `veragens-audiod`, `veragens-syncd` direction.
-
-- `Startempire-Wire/veragensia/docs/200-veragensia-living-agent-computer-implementation-tranche-plan.md`
-  - implementation sequencing and vertical-slice philosophy.
-
-- `Startempire-Wire/veragensia/docs/201-veragensia-agent-body-profiles-embodiment-and-transfer-addendum.md`
-  - integrated existing computer vs Full Agent Computer;
-  - AgentBody runtime projection;
-  - body transfer/concurrency;
-  - robotic/humanoid body and cloud augmentation.
-
-### Deployment evidence
-
-Veragensia deployment tooling currently proves that a real extension build exists outside published GitHub source and is used by `os.focusa.dev`. The migration runbook in this repo owns recovery/cutover.
-
----
-
-## 3. Wirebot App — product boundary and partner relationship
-
-- `Startempire-Wire/Wirebot-App/docs/04-wirebot-app-system-map.md`
-  - Wirebot as persistent life-and-business operating partner;
-  - one Web/PWA/Desktop/Mobile family;
-  - Focusa/UIAI/Veragensia remain distinct specialist products;
-  - Systems & Workforce is a Wirebot domain projection, not ownership of Workforce runtime.
-
-- `Startempire-Wire/Wirebot-App/docs/06-wirebot-app-primary-surfaces-and-operational-slice.md`
-  - current IA;
-  - Systems & Workforce, Work & Results, Devices & Sessions;
-  - specialist-product scoped handoff;
-  - UIAI/Focusa/Veragensia convergence boundaries.
-
-- `Startempire-Wire/Wirebot-App/docs/10-wirebot-body-independent-partner-continuity-addendum.md`
-  - Wirebot relationship independent of hardware body;
-  - body transfer consumed through Focusa/Veragensia ownership.
-
----
-
-## 4. Agent-Driven Life & Business OS — ecosystem/product convergence
-
-Relevant supporting architecture includes:
-
-- `Startempire-Wire/agent-driven-life-business-os/docs/agent-os-golden-path/04-agent-os-golden-path-ecosystem-topology-map.*`
-  - ecosystem topology and deployment ownership.
-
-- `Startempire-Wire/agent-driven-life-business-os/docs/agent-os-golden-path/06-wirebot-product-ui-options-inventory-and-consolidation-audit.md`
-  - historical/current UI ownership audit;
-  - identifies Focusa browser Workforce concept separately from Wirebot extension and UIAI browser tooling.
-
-Use this repo for ecosystem convergence context, not to override primitive-owning Focusa/Veragensia contracts.
-
----
-
-## 5. Reading order for Workforce implementation
-
-### Essential first
+For current architecture, use this order:
 
 ```text
-Focusa 174
-→ Focusa 175
-→ Focusa 164
-→ Focusa 182
-→ Focusa 156
-→ Focusa 151
-→ Veragensia 191
-→ Veragensia 193/194/195
-→ Wirebot 04/06
-→ Workforce docs/00
+1. ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
+2. ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
+3. ADLBOS AGENT_OS_GOLDEN_PATH.md
+4. Wirebot-App current product/convergence docs
+5. Focusa current Workstream/Foreman/authority/Evidence specs
+6. UIAI current execution/control/evidence contracts
+7. Veragensia current body/runtime/Agent Computer contracts
+8. this repository's canonical product/runtime/UX specs
 ```
 
-### Chromebook slice
+Older concept docs remain provenance and design evidence, but they do not override current owner-approved boundaries.
+
+---
+
+## 2. ADLBOS
+
+Repository:
 
 ```text
-Workforce docs/02
-→ Veragensia 186
-→ Veragensia 188
-→ Veragensia 191
-→ Veragensia 193
+Startempire-Wire/agent-driven-life-business-os
 ```
 
-### Voice
+ADLBOS owns portable cross-product doctrine:
+
+- Canonical Owner Principal;
+- Operating Partner versus architecture authority;
+- identity/tenancy separation;
+- product/domain ownership boundaries;
+- deployment dimensions;
+- capability/entitlement/authority separation;
+- sovereign federation rules;
+- common seam contracts;
+- Golden Path implementation doctrine;
+- agent-operation completeness;
+- Evidence/outcome handoff law.
+
+Workforce must consume this doctrine rather than creating a second ecosystem constitution.
+
+Current shared seam families:
 
 ```text
-Focusa 181
-→ Veragensia 197
-→ Focusa 184
-→ Veragensia 199
-```
-
-### Body/topology projection
-
-```text
-Focusa 139
-→ Veragensia 191
-→ Veragensia 195
-→ Focusa 153B
-→ Veragensia 201
+operator.partner_profile.v1
+operator.surface_handoff.v1
+operator.attention.v1
+operator.correlation.v1
+operator.capability_posture.v1
+operator.closure.v1
 ```
 
 ---
 
-## 6. Collation policy
+## 3. Wirebot App
 
-Do not manually fork these specifications into competing rewritten copies.
-
-If synchronized snapshots are added under `docs/upstream/`, every snapshot MUST include:
+Repository:
 
 ```text
-source repository
-source path
-source commit SHA
-sync timestamp
+Startempire-Wire/Wirebot-App
 ```
 
-and MUST be treated as a convenience snapshot only.
+Wirebot is the persistent Operating Partner / Chief of Staff implementation family.
 
-A newer primitive-owning source always wins.
+A customer may present that partner under a selected identity such as `Spock` without changing underlying architecture.
+
+Wirebot App owns owner/partner altitude:
+
+- life/business orientation;
+- portfolio priorities;
+- broad conversation;
+- Workforce Composer;
+- owner-wide Needs You;
+- organization design/commissioning;
+- network/community context;
+- accepted outcome portfolio.
+
+Wirebot is not a global Focusa Foreman.
+
+The Workforce Composer designs/commissions roles and assignments. Focusa Workforce operates them after governed binding.
 
 ---
 
-## 7. Implementation principle
+## 4. Focusa
 
-Read enough upstream material to preserve ownership, then implement.
+Repository:
 
-Do not turn the corpus into a process trap. The purpose of this map is to prevent architectural duplication while allowing the extension to move quickly.
+```text
+Startempire-Wire/focusa
+```
+
+Focusa owns canonical governed work:
+
+```text
+Project identity
+Workstream
+Foreman
+Trajectory
+Workpoint
+work/task/CallGraph semantics
+Context Authority
+capabilities / permissions
+Evidence / receipts
+conversation/work continuity
+recovery / settlement
+```
+
+Particularly relevant specification families include current equivalents of:
+
+- Professional Workspaces / CRIST;
+- Workstream Root;
+- Workforce/roles concepts;
+- Credential Authority;
+- Voice/Conversation;
+- Project Foreman;
+- Radar;
+- Ambient Operator;
+- distributed presence/resource placement;
+- body-independent agent identity/continuity.
+
+Exact current generated/runtime contracts outrank stale numbered summaries.
+
+Workforce never writes Focusa private reducer/storage state directly.
+
+---
+
+## 5. Focusa Workforce
+
+This repository owns the specialist browser workforce-operations experience.
+
+Current canonical local docs:
+
+```text
+docs/00-workforce-canonical-product-and-implementation-spec.md
+docs/05-extension-runtime-data-and-integration-contracts.md
+docs/06-workforce-ux-and-interaction-spec.md
+docs/07-pre-redesign-baseline-and-agent-handoff.md
+```
+
+This repo owns presentation/client logic, not upstream work authority.
+
+---
+
+## 6. UIAI Engine
+
+UIAI owns:
+
+- browser/computer observation;
+- structured/semantic/visual actuation;
+- browser context identity;
+- control leases/fencing;
+- takeover and reconciliation;
+- diagnostics;
+- execution proof/evidence candidates;
+- Cockpit/FPV specialist experience.
+
+Workforce renders bounded execution posture and exact handoffs into UIAI.
+
+It must not copy Cockpit or invent separate computer-control authority.
+
+---
+
+## 7. Veragensia
+
+Repository:
+
+```text
+Startempire-Wire/veragensia
+```
+
+Veragensia owns:
+
+- Agent Computer profiles;
+- integrated/full/cloud body classes;
+- runtime incarnation;
+- body identity/transfer;
+- workload identity;
+- enforcement;
+- resources/placement;
+- secure attention/human control;
+- machine lifecycle and trust posture.
+
+A body is runtime, not persistent partner identity.
+
+Workforce may project topology/body/resource state but does not own it.
+
+---
+
+## 8. W.I.N.S.
+
+W.I.N.S. owns accepted life/business outcome and portfolio semantics.
+
+Workforce may show settlement/outcome refs but must distinguish:
+
+```text
+activity
+Evidence
+verified Evidence
+Focusa settlement
+accepted W.I.N.S. outcome
+```
+
+These are not synonyms.
+
+---
+
+## 9. MeriFolio
+
+Repository:
+
+```text
+Startempire-Wire/MeriFolio
+```
+
+Current clean boundary:
+
+> portable worker identity, evidence-backed trust/standing, selective disclosure and opportunities.
+
+MeriFolio is not local Focusa Workstream authority and not the Operator's workforce runtime.
+
+Map MeriFolio refs to Focusa/Workforce refs explicitly when interoperability is needed; never merge their state models implicitly.
+
+---
+
+## 10. Startempire Wire / Draftees
+
+Startempire Wire owns community, distribution, relationships, opportunities and explicit sovereign federation.
+
+Network participation is optional.
+
+AI Draftees owns public worker marketplace/discovery/reputation semantics.
+
+Recommended path:
+
+```text
+Draftee public identity
+→ Wirebot Workforce Composer selection/assignment
+→ Focusa governed binding
+→ private Workforce operations
+```
+
+Public standing never creates private Operator authority.
+
+---
+
+## 11. Task trackers / beads
+
+Beads, GitHub Issues and other trackers may hold useful implementation/task state.
+
+They do not automatically replace Focusa Workstream/Workpoint/work authority.
+
+Where external task state drives execution, preserve stable refs and bind/compile it into the governing Focusa context rather than maintaining conflicting parallel plans.
+
+---
+
+## 12. Deployment / product-door relationships
+
+Relevant current product doors/surfaces include:
+
+```text
+focusa.dev
+wirebot.chat
+os.focusa.dev
+```
+
+A URL does not determine canonical domain ownership.
+
+`os.focusa.dev` is a Veragensia/Agent Computer demo/runtime surface and currently hosts the Workforce demo path; that does not make Veragensia the Workforce source owner.
+
+Operator Deployment is a professional implementation/deployment offer using the existing product architecture; it is not a new runtime type.
+
+---
+
+## 13. Conflict resolution
+
+When two documents appear to conflict:
+
+1. resolve the Canonical Owner Principal and current owner-approved architecture;
+2. identify which product owns the disputed domain;
+3. inspect current source/generated/runtime contracts;
+4. preserve useful historical evidence without propagating obsolete authority;
+5. update the stale current doc rather than adding another competing architecture document.
+
+---
+
+## 14. Build-agent rule
+
+A Chromebook/cloud build agent should never need to rediscover these boundaries from conversation history.
+
+If implementation reveals a real missing cross-product seam, update the owning ADLBOS/product contract and then update direct consumers.
+
+Do not patch around missing ownership with local hidden state.
