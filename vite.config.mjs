@@ -2,31 +2,38 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Build identity shown in the UI so a loaded build is never ambiguous.
- * Derived from source identity only (commit + dirty marker) so identical sources
- * always produce an identical bundle; it advances on every committed change.
+ *
+ * Derived from the content it labels (Workforce sources + manifest), so it is
+ * deterministic for identical inputs and changes on any real edit. Git-derived
+ * stamps would drift with the live loop's own commits and break build
+ * determinism.
  */
 function buildStamp() {
-  try {
-    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-    const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() ? '+' : '';
-    return `${sha}${dirty}`;
-  } catch {
-    return 'dev';
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else files.push(full);
+    }
+  };
+  walk(resolve(root, 'src/workforce'));
+  files.push(resolve(root, 'manifest.json'));
+  const hash = createHash('sha256');
+  for (const file of files.sort()) {
+    hash.update(file.slice(root.length));
+    hash.update(readFileSync(file));
   }
+  return hash.digest('hex').slice(0, 8);
 }
 
-/**
- * Minimal MV3-safe bundling for the Workforce full page.
- * - relative asset URLs (extension pages are not served from a web root)
- * - writes into the already-populated dist/ produced by scripts/build.mjs
- * - no code splitting beyond a single entry chunk per page
- */
 export default defineConfig({
   // Root is the Workforce source dir so the built page lands at dist/workforce.html
   // (Vite preserves the HTML input's path relative to its root).
