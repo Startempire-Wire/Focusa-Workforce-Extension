@@ -2,50 +2,101 @@
 
 **Product:** Focusa Workforce  
 **Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
-**Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md`  
-**Portable seam contract:** ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md`  
-**Current product spec:** `docs/00-workforce-canonical-product-and-implementation-spec.md`  
-**Current redesign blueprint:** `docs/08-workforce-redesign-blueprint.md`  
-**Active implementation slice:** `docs/09-slice-1-workstream-foreman-direction-implementation.md`
-
-This file tells build agents how to change this repository without breaking product ownership, live deployment, or the human-agent workforce model.
-
-## Mission
-
-Build the specialist browser-resident surface where an owner can understand, direct, collaborate with and verify a Focusa-governed workforce.
+**Execution authority:** `docs/15-build-agent-master-handoff.md`  
+**Full Trajectory:** `docs/14-workforce-full-trajectory.md`  
+**Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md` + `CROSS_PRODUCT_SEAM_CONTRACT.md`
 
 > **Focusa Workforce operates the workforce.**
 
-Do not reduce the product to a prettier status dashboard. Do not turn it into Wirebot, Focusa Desktop, UIAI Cockpit or Veragensia.
+The redesign package is now sufficiently specified that build agents are expected to execute it, not redesign it during implementation.
 
 ## Read order
 
-Before material redesign work:
+Read exactly:
 
 ```text
 ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
 ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
 ADLBOS CROSS_PRODUCT_SEAM_CONTRACT.md
-Wirebot-App current product/convergence docs (read-only dependency; do not rewrite from this repo)
-this repo docs/00
-docs/05
-docs/06
-docs/08
-docs/09 for the active Slice 1
-docs/07 for migration/baseline/deployment guardrails
+ADLBOS AGENTS.md
+
+docs/15-build-agent-master-handoff.md
+docs/14-workforce-full-trajectory.md
+docs/10-workforce-product-requirements-and-proof-matrix.md
+docs/11-workforce-experience-architecture-and-stateflow.md
+docs/12-workforce-screen-and-component-contract.md
+docs/13-workforce-visual-system-and-reference-surfaces.md
+
+docs/00-workforce-canonical-product-and-implementation-spec.md
+docs/05-extension-runtime-data-and-integration-contracts.md
+docs/06-workforce-ux-and-interaction-spec.md
+docs/08-workforce-redesign-blueprint.md
+docs/09-slice-1-workstream-foreman-direction-implementation.md
+docs/07-pre-redesign-baseline-and-agent-handoff.md
+
 current source/tests
+current owning Focusa contracts for the active trajectory node
 ```
 
-Current product architecture outranks older concept language when they conflict.
+Wirebot App is a read-only product/architecture dependency from this workstream. **Do not rewrite Wirebot App documentation.**
+
+## Do not improvise
+
+Do not invent or casually change:
+
+```text
+product scope
+navigation
+screen hierarchy
+visual language
+trajectory semantics
+lifecycle semantics
+attention semantics
+proof semantics
+product ownership
+authority boundaries
+cross-product reference rules
+```
+
+If source reality conflicts with the blueprint, stop only the affected trajectory node, inspect the canonical owner, update the owning blueprint deliberately if necessary, then continue ready unaffected work.
+
+Do not encode a third interpretation in client code.
+
+## Current Short frontier
+
+Start at:
+
+```text
+HLT-WF-001
+→ MLG-0
+→ STG-0.1
+→ WP-0.1.1
+```
+
+Inspect current Focusa generated/current operations required by Slice 1.
+
+Decision rule:
+
+```text
+real owning operation exists
+→ consume it
+
+real equivalent exists
+→ thin provenance-preserving adapter
+
+owning operation genuinely missing
+→ implement the smallest owning Focusa operation first
+→ prove it
+→ return to Workforce
+```
+
+Never invent convenient endpoints or client-side canonical state.
 
 ## Ownership boundaries
 
 ```text
-Canonical owner
-  root owner authority
-
-Delegated human operator
-  bounded owner-granted operational scope only
+Canonical Owner / delegated humans
+  owner-rooted authority
 
 Wirebot / customer-named Operating Partner
   owner relationship, life/business orientation,
@@ -53,16 +104,16 @@ Wirebot / customer-named Operating Partner
 
 Focusa
   Project / Workstream / Foreman / Workpoint,
-  governed work, authority, Evidence, receipts
+  governed work, authority, Evidence, settlement, continuity
 
 Focusa Workforce
-  live workforce operations UX
+  browser-resident live workforce operations UX
 
 UIAI
   browser/computer execution, diagnostics, takeover/proof
 
 Veragensia
-  body/runtime/Agent Computer/enforcement
+  body/runtime/Agent Computer/placement/enforcement
 
 W.I.N.S.
   accepted outcomes
@@ -70,313 +121,192 @@ W.I.N.S.
 
 Never create duplicate canonical state to make the extension easier to build.
 
-## Operator neutrality
+## Technology
 
-The customer-level Operating Partner may be named `Spock`, `Athena`, `Wirebot`, etc. Workforce must not hard-code the assumption that the partner is named Wirebot.
-
-Keep distinct:
+Use:
 
 ```text
-CanonicalOwnerPrincipal
-DelegatedHumanPrincipal
-OperatingPartnerPrincipal
-partner presentation name
-worker/agent identity
-runtime/session/body identity
-optional ArchitectureAuthorityPrincipal
+Svelte 5
+Vite or equivalent minimal MV3 bundling
+JavaScript + JSDoc
 ```
 
-A delegated human may operate only within the owner-issued grant. Human operator access is not co-ownership and is not architecture authority.
+Do not introduce SvelteKit.
 
-Partner identity, presentation name, model/runtime/body and optional architecture authority are distinct.
-
-## Workforce Composer versus Workforce
-
-Wirebot Workforce Composer designs/commissions roles and assignments. Focusa Workforce operates active governed work.
-
-Do not implement a second role/assignment database inside the extension. If upstream assignment data is missing, fix/track the owning contract rather than inventing local authority.
-
-## Human-agent operating loop
-
-Design around:
+Preserve/reuse sound current core modules unless focused evidence requires a change:
 
 ```text
-Orient
-→ Direct
-→ Interpret / Propose
-→ Delegate
-→ Work
-→ Collaborate / Intervene
-→ Verify
-→ Continue / Learn
+src/lib/api-client.mjs
+src/lib/contracts.mjs
+src/lib/orchestration.mjs
+src/lib/orientation.mjs
+src/lib/pairing.mjs
+src/lib/projections.mjs
+src/lib/reconnect.mjs
+src/lib/session-create.mjs
+src/lib/sse-parser.mjs
+src/lib/storage.mjs
+src/lib/validation.mjs
 ```
 
-Primary experiences:
+MV3 service-worker suspension is a design constraint. Canonical work must never depend on the worker staying alive.
+
+## Five-plane UX authority
 
 ```text
-Workstream + Foreman
-Direction
-Working Now / roster
-Needs You
-work progression
-Evidence
-UIAI watch/takeover
-fleet/topology
+Strategy  → docs/00 + docs/08 + docs/10
+Scope     → docs/10
+Structure → docs/11
+Skeleton  → docs/12
+Surface   → docs/13
 ```
+
+These are build targets, not prompts for fresh design exploration.
+
+## Full Trajectory law
+
+`Full`, `Medium`, and `Short` are coverage projections of one source-owned Trajectory.
+
+They are separate from:
+
+```text
+Human / Operations / Technical presentation depth
+```
+
+and separate from lifecycle stage.
+
+Never infer whole-project completion from current Workpoint or branch completion.
+
+Run `docs/14-workforce-full-trajectory.md` continuously through ready authorized work.
 
 ## Shared ecosystem seams
 
-Consume ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md` and shared seam families rather than inventing local variants:
+Consume ADLBOS seam families and typed/source-qualified refs. Do not assume bare IDs are globally unique.
+
+Consequential actions must preserve/revalidate current:
 
 ```text
-operator.partner_profile.v1
-operator.surface_handoff.v1
-operator.attention.v1
-operator.correlation.v1
-operator.capability_posture.v1
-operator.closure.v1
-operator.credential_use_ref.v1
+schema/version
+source ref/revision
+owner/environment scope
+actor
+correlation
+freshness/expiry
+idempotency/replay semantics
 ```
 
-These are reference envelopes, not another backend.
+Unsupported consequential versions fail closed. Ambiguous writes reconcile before retry. Wall-clock time does not establish cross-machine causal order.
 
-Cross-product refs are typed/source-qualified. Do not assume a bare `workRef`, `attentionRef`, `executionRef`, etc. is globally unique across environments or products.
+## Needs You
 
-For actionable shared envelopes, preserve machine-readable compatibility and freshness: schema/version, producer/version, source ref/revision, owner/environment scope, actor ref where applicable, correlation, issued/observed time, expiry where applicable and idempotency/replay metadata where a mutation can be retried.
+Needs You contains only human-value attention. Presenter state is not source resolution.
 
-Rules:
+```text
+seen / hidden / snoozed
+!=
+approved / denied / resolved / cancelled / expired
+```
 
-- unsupported consequential versions fail closed;
-- stale/expired cached projections may be rendered honestly but must be revalidated before mutation;
-- wall-clock timestamps from independent machines do not establish causal order;
-- prefer source revision/sequence/epoch/generation/lease semantics for conflict and freshness decisions;
-- if clock confidence is insufficient around a consequential expiry, revalidate with the source rather than guessing;
-- ambiguous consequential writes reconcile before retry.
+Refresh source state immediately before consequential action.
 
-## Credential-use references
+## Evidence truth
 
-Workforce does not move reusable secret material between products.
+Never equate:
 
-If a work/attention/handoff path needs a provider credential, carry only an opaque `operator.credential_use_ref.v1` reference or bounded use request. The owning credential authority resolves or denies it at execution time.
+```text
+agent claim = verified result
+screenshot = accepted outcome
+successful command = product completion
+one deployed branch = full trajectory completion
+```
 
-Never place raw reusable secrets in:
+Preserve:
+
+```text
+activity
+→ Focusa Evidence
+→ verification
+→ settlement / Receipt
+→ accepted outcome / W.I.N.S. where applicable
+```
+
+## Security
+
+Reusable secrets never belong in:
 
 ```text
 handoff URLs
 Direction text
 attention objects
-local projection cache
+projection cache
 Evidence
 receipts/logs
+repository files
 ```
 
-Possession of a credential reference is not authorization to use it.
+Credential references are opaque requests/references, not authority.
 
-## Terminology
+## Visual target
 
-Use `fleet` / `multi-daemon aggregation` for one Operator's multiple Focusa environments/daemons/bodies.
+Implement `docs/13-workforce-visual-system-and-reference-surfaces.md`.
 
-Reserve `sovereign federation` for explicit cross-Operator/network sharing. Do not reintroduce “multi-daemon federation.”
+Canonical redesign is light-first, restrained and operational. Do not substitute a new dashboard/theme/component-library aesthetic during build.
 
-## Source and migration baseline
+## Tests
 
-The migration into this repo is complete. Do not rebuild the extension from scratch merely because the old UI is insufficient.
-
-Preserve sound core primitives:
+For changed requirements use the smallest sufficient proof set:
 
 ```text
-pairing
-API client
-contracts
-orchestration
-session creation
-SSE / reconnect
-projections
-validation
-```
-
-The pre-redesign baseline is:
-
-```text
-baseline/pre-redesign-2026-09-15
-```
-
-Use it for behavioral comparison, not new development.
-
-## UI architecture direction
-
-Evolve toward:
-
-```text
-shared Workforce runtime client
-        ↓
-normalized Focusa snapshot/events
-        ↓
-shared application state
-        ↓
-side panel · full app · start page · wall
-```
-
-MV3 service-worker suspension is a design constraint. Do not make canonical state or long-lived work depend on keeping the service worker alive.
-
-Svelte 5 is appropriate for presentation. Do not move authority/reconciliation/business semantics into Svelte components.
-
-## UX law
-
-Target **expensive calm**: clean typography, strong hierarchy, restrained color, minimal chrome, subtle state-driven motion, technical depth one layer down, excellent degraded states, responsive Chromebook use and accessibility.
-
-Avoid gamer/neon dashboards, widget clutter and raw agent/tool chatter.
-
-## Needs You
-
-Needs You is source-bearing shared attention, not a local notification bucket.
-
-Show only owner-value items such as approval, owner truth, authentication, takeover, resource exception, recovery decision, meaningful blocker or high-value signal.
-
-Routine agent activity does not belong here.
-
-A local `seen`, `acknowledged`, `hidden` or `snoozed` state is presenter UX only. It is not the source object's approval/resolution/cancellation. Revalidate the source revision before a consequential action.
-
-## Evidence truth
-
-Do not equate agent claim with verified result, tool success with accepted work, or screenshot with accepted business outcome.
-
-Preserve:
-
-```text
-execution
-→ Focusa Evidence
-→ verification / settlement
-→ accepted outcome / W.I.N.S.
-→ optional MeriFolio standing
-```
-
-## Capability / entitlement / authority
-
-Never collapse:
-
-```text
-supported
-entitled
-activated/connected
-authorized
-available/healthy
-consented for this effect
-```
-
-Contextual expansion may explain adjacent products/capacity, but the extension never grants entitlement or authority.
-
-A cached capability posture is not current authority. Revalidate before consequential activation/use.
-
-## Browser and UIAI
-
-Useful explicit page actions:
-
-```text
-Ask Foreman about page
-Send page to Foreman
-Create work from selection
-Capture Evidence candidate
-Open in UIAI
-```
-
-UIAI remains detailed browser/computer execution authority. Workforce deep-links exact execution context rather than rebuilding Cockpit.
-
-## Development sequence
-
-Implement vertical slices:
-
-```text
-1 Workstream + Foreman + Direction
-2 Working Now / roster
-3 Needs You
-4 work progression / graph
-5 Evidence / verified closure
-6 UIAI execution / takeover
-7 voice
-8 fleet / topology
-9 Radar
-10 elastic capacity
-```
-
-Slice 1 implementation authority is `docs/09-slice-1-workstream-foreman-direction-implementation.md`.
-
-Each slice must be useful end-to-end. Avoid framework/process ceremony before the first real slice works.
-
-## Tests and truth
-
-A green unit suite is not enough when browser integration can still fail.
-
-For relevant changes verify:
-
-```text
-unit/contract tests
+unit/contract
 build
-manifest/MV3 validity
-browser load
-actual side-panel/full-page journey
-Focusa interaction
-stale/degraded behavior
+MV3/manifest
+real browser journey
+stale/degraded path
+negative authority/source case where material
 ```
 
-Add regression tests for concrete bugs found.
-
-When implementing the shared seams, include negative tests for:
-
-```text
-delegated human exceeds grant → denied
-same bare ID from two environments → no collision
-stale attention/capability cache → no consequential mutation
-unsupported consequential envelope version → fail closed
-clock disagreement → source revision/sequence wins over local timestamp ordering
-ambiguous mutation → reconcile before retry
-credential-use ref → no raw secret disclosure / no implicit grant
-presenter acknowledgement → source action remains unresolved until owner resolves it
-```
+Visual slices additionally verify 320px Side Panel, 1024px Chromebook, 1440px desktop, keyboard, visible focus, WCAG 2.2 AA and reduced motion.
 
 ## Deployment
-
-GitHub `main` is authoritative source.
-
-Live promotion remains explicit:
 
 ```text
 main + CI
 → Chromebook/browser dogfood
-→ wfx veragensia
+→ explicit wfx veragensia
 → atomic Veragensia promotion
 → os.focusa.dev
 ```
 
-Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, atomic rollback and live health verification unless an intentional migration changes them.
+Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, rollback and health gates unless a deliberate migration changes them.
 
-## Chromebook/cloud workflow
-
-Chromebook: UI/UX dogfood, browser behavior, lightweight implementation, voice/side-panel testing.
-
-Cloud/server: heavy builds/tests, Focusa/UIAI/Veragensia integration, deployment and multi-agent implementation when appropriate.
-
-GitHub is the shared source of truth. No divergent source trees.
-
-## Outcomes Over Process
-
-When implementation is authorized:
+## Outcomes over process
 
 ```text
-inspect
-→ implement smallest correct slice
-→ test/build
-→ verify running behavior
-→ fix regressions
-→ update owning docs/contracts
-→ clean temporary artifacts you created
-→ land cleanly
+orient
+→ implement the current trajectory Workpoint
+→ test
+→ verify real behavior
+→ reconcile/refine affected nodes
+→ continue ready work
+→ clean artifacts you created
 ```
 
-Keep making forward progress when a tool fails and another safe route exists.
+Tool failure is route failure when another safe route exists.
 
-Do not churn on planning/proofs/abstraction after the path is clear. Do not leave branches, helper workflows, temp files or cleanup for the owner when you created them and can remove them.
+Do not leave temporary branches, helper workflows, debug files or routine cleanup for the owner.
 
 ## Completion
 
-A change is complete only when it works against real source/contracts, browser behavior is verified where applicable, exact refs/scope/freshness remain honest, no duplicate authority/state was added, tests/build are green, deployment is promoted only when intended, docs are reconciled, and temporary implementation mess is removed.
+Report substantive progress as:
+
+```text
+Trajectory nodes completed
+Requirement IDs satisfied
+Owning operations consumed/added
+Proof/tests
+Blocked nodes
+Current Short frontier
+Live promotion status
+```
+
+Do not substitute process narrative for delivery.
