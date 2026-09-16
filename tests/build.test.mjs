@@ -29,8 +29,14 @@ function build(env = {}) {
   assert.match(result.stdout, /PASS: built Focusa Workforce MV3 unpacked extension/);
 }
 
-/** Set when a test has already produced a bundled dist, so later tests can skip work. */
-let built = false;
+/** Ensure a normal (non-isolated) bundled dist exists before reading it. */
+async function ensureDefaultBuild() {
+  try {
+    await readFile(resolve(root, 'dist', 'workforce.html'));
+  } catch {
+    build();
+  }
+}
 
 test('manifest is least-privilege MV3 with no content script', async () => {
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
@@ -55,13 +61,14 @@ test('unpacked build is deterministic and complete', async () => {
     await rm(dirA, { recursive: true, force: true });
     await rm(dirB, { recursive: true, force: true });
   }
+  await ensureDefaultBuild();
   for (const file of ['manifest.json', 'background.mjs', 'sidepanel.html', 'sidepanel.mjs', 'styles.css']) {
     await readFile(resolve(root, 'dist', file));
   }
 });
 
 test('the Workforce full page is bundled and its Svelte sources do not ship', async () => {
-  if (!built) { build(); built = true; }
+  await ensureDefaultBuild();
   const html = await readFile(resolve(root, 'dist', 'workforce.html'), 'utf8');
   assert.match(html, /workforce-assets\//, 'built page references its bundled assets');
   const assets = await readdir(resolve(root, 'dist', 'workforce'));
