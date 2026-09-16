@@ -45,7 +45,33 @@ Older/historical docs are reference/provenance only where they conflict with thi
 
 ---
 
-## 2. Non-negotiable implementation rule
+## 2. Primary execution law: accomplish the work
+
+> **The blueprint exists to remove ambiguity and accelerate implementation. It must never become a reason to spend more time proving, reporting or planning than building the actual product.**
+
+Operate with minimum sufficient ceremony:
+
+```text
+understand enough to act
+→ build real functionality
+→ verify the material acceptance condition
+→ reuse valid evidence
+→ continue immediately into the next ready authorized work
+```
+
+Do not create separate proof artifacts, reports, screenshots, matrices, checklists or tests unless they establish something materially necessary that existing evidence does not already establish.
+
+One real browser acceptance may satisfy several requirements. One existing contract test may cover several Workpoints. A valid existing receipt or source revision should be reused rather than re-proven.
+
+Do not rerun unchanged expensive checks merely because another Workpoint finished.
+
+Do not stop after each node to request permission, summarize progress, polish documentation or update tracking when the next node is already authorized and ready.
+
+If one node is blocked, continue independent ready work.
+
+---
+
+## 3. Non-negotiable implementation rule
 
 > **Do not improvise product requirements, navigation, screen hierarchy, visual language, state semantics, authority boundaries or source ownership.**
 
@@ -55,15 +81,17 @@ If implementation reality conflicts with the blueprint:
 inspect owning source/contract
 → determine whether blueprint or runtime is stale
 → stop only the affected node
-→ update the owning architecture document deliberately
+→ correct the owning architecture only if necessary
 → continue unaffected ready work
 ```
 
 Do not silently invent a third interpretation in code.
 
+Documentation changes are required only when actual architecture/source truth changes or the current blueprint would otherwise misdirect future implementation.
+
 ---
 
-## 3. Source of truth hierarchy
+## 4. Source of truth hierarchy
 
 ```text
 owner authority / ADLBOS law
@@ -83,7 +111,7 @@ Running operational truth may expose a documentation defect; it does not authori
 
 ---
 
-## 4. Current starting point
+## 5. Current starting point
 
 The first executable Workpoint from the Full Trajectory is:
 
@@ -119,7 +147,7 @@ B. equivalent real operation exists
 
 C. operation genuinely missing
    → implement the smallest owning Focusa operation first
-   → test it there
+   → verify it at its owning boundary
    → return to Workforce
 ```
 
@@ -127,7 +155,7 @@ Do not create `/v1/foreman/*` or any other endpoint because the docs suggest a c
 
 ---
 
-## 5. Development order
+## 6. Development order
 
 Follow `14-workforce-full-trajectory.md`.
 
@@ -147,42 +175,43 @@ MLG-9  Voice / Radar / contextual expansion
 MLG-10 Production acceptance
 ```
 
-Parallel work is allowed only where the dependency graph in doc 14 allows it.
+Parallelize ready independent work where dependency truth allows it.
+
+The sequence is a coverage map, not a requirement to finish every MLG serially when safe work can advance in parallel.
 
 ---
 
-## 6. Requirements discipline
+## 7. Requirements are guardrails, not bureaucracy
 
-Every implementation change must cite requirement IDs from doc 10.
+`docs/10-workforce-product-requirements-and-proof-matrix.md` prevents scope loss and false completion.
 
-Examples:
+Use requirement IDs when they help preserve coverage, resolve ambiguity, debug a failure or hand off substantive work.
 
-```text
-WF-FOR-001
-WF-DIR-003
-WF-ATT-004
-WF-WRK-009
-WF-EVD-003
-```
-
-Before closing a Workpoint:
+Do **not**:
 
 ```text
-requirement mapped
-acceptance satisfied
-proof captured/tested
-source owner preserved
-failure path tested where material
-next trajectory frontier known
+annotate every code edit with requirement IDs
+create a separate proof packet for every Workpoint
+pause implementation to keep a matrix cosmetically current
+repeat proof already supplied by a valid source/test/receipt
 ```
 
-No “done” based only on component rendering.
+Before treating a substantive outcome as complete, be satisfied that:
+
+```text
+the intended behavior works
+the owning source/authority remains correct
+a material failure path is not being ignored
+no required accepted scope is being silently dropped
+```
+
+Then advance.
 
 ---
 
-## 7. Garrett five-plane package is closed
+## 8. Garrett five-plane package is closed
 
-Use these docs as the implementation authorities:
+Use these docs as implementation authorities:
 
 ```text
 STRATEGY
@@ -203,11 +232,11 @@ SURFACE
 
 The build agent does not redesign these planes while implementing.
 
-If a real source constraint makes a requirement impossible, open/refine the affected trajectory node and change the owning plane deliberately before coding the alternative.
+If a real source constraint makes a requirement impossible, refine only the affected plane/node and continue ready work.
 
 ---
 
-## 8. UI technology
+## 9. UI technology
 
 Use:
 
@@ -240,7 +269,7 @@ Svelte components must not become business-authority owners.
 
 ---
 
-## 9. Required full-page entry
+## 10. Required full-page entry
 
 Add:
 
@@ -265,13 +294,13 @@ Current required routes:
 #/settings
 ```
 
-Do not invent additional top-level destinations without updating Structure/Skeleton first.
+Do not invent additional top-level destinations without a real product requirement.
 
 ---
 
-## 10. Visual implementation
+## 11. Visual implementation
 
-Implement doc 13 exactly as the starting design system:
+Implement doc 13 as the starting design system:
 
 ```text
 light-first
@@ -284,13 +313,13 @@ reference Side Panel
 reference Full Workforce
 ```
 
-Do not choose a new theme, gradient system, component kit look or alternate dashboard style during build.
+Do not choose a new theme, gradient system, component-kit look or alternate dashboard style during build.
 
-Component libraries may be used only if their rendered result is conformed to doc 13 rather than accepting their default aesthetic.
+Component libraries may be used only if their rendered result conforms to doc 13 rather than accepting default aesthetics.
 
 ---
 
-## 11. Human attention law
+## 12. Human attention law
 
 `Needs You` is not a notification feed.
 
@@ -306,7 +335,7 @@ Refresh the source immediately before consequential action.
 
 ---
 
-## 12. Trajectory law
+## 13. Trajectory law
 
 Do not confuse:
 
@@ -328,9 +357,11 @@ Lifecycle is separate source-owned process state.
 
 Never infer whole-project completion from current Workpoint/branch completion.
 
+Trajectory bookkeeping must remain proportional. The agent should not spend time continuously rewriting Trajectory prose when source reality has not materially changed.
+
 ---
 
-## 13. Truth and evidence law
+## 14. Truth and evidence law
 
 Never equate:
 
@@ -348,13 +379,26 @@ deployed one branch
 = HLT complete
 ```
 
-Use doc 10/14 proof obligations.
+But also never mistake **more proof** for **more progress**.
+
+Use the smallest existing or new evidence that demonstrates the applicable acceptance condition. Prefer evidence naturally produced by doing the work:
+
+```text
+source diff/revision
+focused test result
+build result
+browser behavior
+owning-system receipt
+real source state
+```
+
+Do not manufacture secondary proof-management artifacts around those results.
 
 ---
 
-## 14. Failure/recovery law
+## 15. Failure/recovery law
 
-Required handling:
+Required behavior includes:
 
 ```text
 stale source
@@ -369,13 +413,15 @@ UIAI unavailable
 source correction/revocation
 ```
 
+Test these when the implementation touches the relevant boundary or when failure risk is material. Do not run the entire failure matrix for unrelated presentation edits.
+
 On ambiguous consequential writes, reconcile before retry.
 
 Cached state may inform display; stale cached authority never authorizes mutation.
 
 ---
 
-## 15. Security and credential law
+## 16. Security and credential law
 
 Use opaque credential-use refs only when needed.
 
@@ -395,44 +441,43 @@ Possession of a ref is not authority.
 
 ---
 
-## 16. Testing minimum per slice
+## 17. Minimum sufficient verification
 
-Use the smallest sufficient set that proves the actual requirement:
+Verification is not a checklist quota.
 
-```text
-unit/contract test
-build
-manifest/MV3 validation
-browser acceptance for changed journey
-stale/degraded path
-negative authority/source case where applicable
-```
+Ask:
 
-Do not build ceremonial duplicate test suites.
+> **What is the smallest check or existing evidence that would falsify a material defect in the behavior I just changed?**
 
-For visual slices also verify:
+Possible checks:
 
 ```text
-320px Side Panel
-1024px Chromebook Full Workforce
-1440px Full Workforce
-keyboard
-focus visibility
-WCAG contrast
-reduced motion
+focused unit/contract test
+build or manifest validation
+real browser acceptance
+stale/degraded case
+negative authority/source case
 ```
+
+Use only the relevant subset.
+
+Reuse still-valid evidence. Avoid unchanged rebuilds, repeated expensive end-to-end runs and duplicate proof formats.
+
+A representative connected browser journey can satisfy multiple UI requirements when it genuinely exercises them.
+
+Run wider regression/acceptance at integration and release boundaries, not reflexively after every small edit.
 
 ---
 
-## 17. Promotion
+## 18. Promotion
 
 Normal path remains:
 
 ```text
 source changes
-→ tests/build
+→ sufficient changed-scope verification
 → main/CI according to repo workflow
-→ Chromebook dogfood
+→ Chromebook dogfood at meaningful integration/release points
 → explicit `wfx veragensia`
 → atomic live promotion
 → verify real changed journey
@@ -444,7 +489,7 @@ Preserve stable extension ID unless a deliberate migration changes it.
 
 ---
 
-## 18. Cleanup
+## 19. Cleanup
 
 You own cleanup for artifacts you create:
 
@@ -458,30 +503,32 @@ stale generated output
 abandoned migration code
 ```
 
-Do not hand routine cleanup to the owner.
+Clean as you go. Do not create elaborate cleanup phases for trivial transient files.
 
 Do not rewrite public history merely to cosmetically remove harmless prior commits unless explicitly instructed.
 
 ---
 
-## 19. Completion reporting
+## 20. Reporting
 
-At the end of each MLG or substantial STG report only:
+Reporting must not interrupt execution.
+
+At a meaningful milestone or genuine blocker, keep it terse:
 
 ```text
-Trajectory nodes completed
-Requirement IDs satisfied
-Real source operations used/added
-Tests/acceptance proof
-Known blocked trajectory nodes
-Current Short frontier
-Whether live promotion occurred
+what now works
+what materially remains
+real blocker, if any
+current frontier
+promotion status, if relevant
 ```
 
-Do not substitute a long process narrative for delivery status.
+Include requirement IDs/tests/source refs only when they materially help the next agent or explain a risk.
+
+Do not produce per-Workpoint essays, proof reports or status ceremony.
 
 ---
 
-## 20. Final directive
+## 21. Final directive
 
-> **Run the trajectory. Do not redesign the blueprint while building it. Resolve source reality through canonical owners, preserve the five-plane UX contracts, verify each accepted outcome, and continue through ready authorized work until the HLT is accepted or a genuine scoped blocker requires owner input.**
+> **Run the trajectory to completion. Build first. Verify only what materially needs verification. Reuse proof. Avoid process churn. Continue through ready authorized work without routine pauses. The objective is a working Focusa Workforce, not a beautifully documented implementation process.**
