@@ -1,15 +1,26 @@
-# CI runs on GitHub-hosted runners.
+# CI runs on the org's repo-scoped self-hosted runner.
 #
-# Why not self-hosted: this repository is public. A self-hosted runner attached
-# to a public repo can be reached by fork pull requests, which execute
-# untrusted code on the runner's host. Public repositories get unmetered
-# GitHub-hosted minutes, so the ephemeral hosted runner is both free and safe.
-# (Private-repo hosted minutes are exhausted on this org's free plan, which is
-# why the private-repo path needs a payment method or an isolated runner.)
+# Two constraints decide this, in order:
+#
+#  1. Billing: the Startempire-Wire org's Actions are billing-locked, so
+#     GitHub-hosted jobs are refused with "The job was not started because your
+#     account is locked due to a billing issue." Self-hosted jobs still run.
+#
+#  2. Fork safety: this repository is public and a self-hosted runner attached
+#     to a public repo can be reached by fork pull requests, which would execute
+#     untrusted code on the runner host. Therefore this workflow deliberately
+#     does NOT trigger on `pull_request`. It runs only on:
+#       - push to main  (requires write access)
+#       - manual workflow_dispatch
+#     Fork PRs, and any external contribution, run nothing here. Review fork
+#     changes locally (or with an approved run) before merging.
+#
+# Do not add a `pull_request` trigger while a self-hosted runner is attached to
+# this public repository. If the org billing lock is resolved, move the runner
+# to `ubuntu-latest` and delete the self-hosted registration instead.
 name: Workforce CI
 
 on:
-  pull_request:
   workflow_dispatch:
   push:
     branches: [main]
@@ -23,7 +34,7 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ovh-workforce]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
