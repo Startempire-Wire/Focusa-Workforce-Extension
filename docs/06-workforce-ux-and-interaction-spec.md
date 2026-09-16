@@ -1,676 +1,804 @@
 # Focusa Workforce — UX and Interaction Specification
 
-**Status:** product UX contract  
-**Goal:** make the workforce understandable and operable in seconds, without turning Focusa primitives into a generic dashboard or duplicating Wirebot/UIAI.
+**Status:** CURRENT redesign UX direction  
+**Depends on:** canonical Workforce spec, runtime/data contracts, ADLBOS ecosystem architecture, Wirebot App convergence.
+
+The UX goal is simple:
+
+> **My workforce is here, working, inspectable, steerable, collaborative and accountable.**
+
+The extension should not feel like a monitoring dashboard placed beside autonomous agents. It should feel like a shared work environment where the human, their Operating Partner, the Workstream Foreman and the execution workforce collaborate at the right altitude.
 
 ---
 
-## 0. Experience principle
+## 1. Core experience
 
-The user should feel:
-
-> **My workforce is here, working, inspectable, steerable, and accountable.**
-
-The interface should answer before it decorates.
+At any moment, the user should be able to answer:
 
 ```text
-Who is working?
-What are they doing?
-What needs me?
+What are we trying to accomplish?
+Who is responsible?
+What is happening now?
+What changed?
 What is blocked?
-What is proven?
-Where is work running?
-What should happen next?
+What genuinely needs me?
+What has been proven?
+Where is work executing?
+What can I direct next?
 ```
+
+The interface should prioritize **orientation, direction, intervention and confidence**.
+
+Anything that does not improve one of those should earn its place one layer down.
 
 ---
 
-## 1. Surface hierarchy
+## 2. Human-agent collaborative loop
 
-### Side Panel — ambient operations
-
-Primary high-frequency surface.
-
-Structure:
+Design the entire product around this loop:
 
 ```text
-[ Environment ]       [ health ]
-[ Project / Workstream selector ]
-
-Foreman
-  current objective
-  current Workpoint
-  status / attention
-
-Direction Bar
-  [ type or speak ]
-
-Needs You
-  approvals
-  blockers
-  auth/takeover
-
-Working Now
-  workers / assignments / runtimes
-
-Verified Recently
-  evidence-backed outcomes
-
-[ Open Workforce ] [ UIAI ]
+ORIENT
+  ↓
+DIRECT
+  ↓
+INTERPRET / PROPOSE
+  ↓
+DELEGATE
+  ↓
+WORK
+  ↓
+COLLABORATE / INTERVENE
+  ↓
+VERIFY
+  ↓
+CONTINUE / LEARN
 ```
 
-The side panel should not try to fit the full graph/audit system.
+### Orient
+
+Answer immediately:
+
+- current Workstream objective;
+- Foreman;
+- working agents;
+- meaningful blockers;
+- owner attention;
+- recent verification;
+- freshness/health.
+
+### Direct
+
+Human types or speaks natural intent into the current Workstream/Foreman scope.
+
+The UI shows exact resolved scope when ambiguity is material.
+
+### Interpret / Propose
+
+When useful, the Foreman may expose its concise understanding:
+
+```text
+Priority
+Fix login regression first.
+
+Approach
+Reproduce → patch → focused tests → independent verification.
+
+Workers
+Builder-2 · Verifier-1
+
+Proceeding
+```
+
+This is shared situational awareness, not a forced approval ceremony.
+
+### Delegate
+
+Show responsibility rather than spawned-process trivia:
+
+```text
+Login regression
+├─ Builder        Working
+├─ UIAI Browser   Reproducing
+└─ Verifier       Waiting on patch
+```
+
+### Work
+
+Show meaningful progression:
+
+```text
+Reproducing
+→ cause identified
+→ patch underway
+→ tests
+→ verification
+```
+
+Raw tool/model events live deeper in audit/debug views.
+
+### Collaborate / Intervene
+
+Human interaction should appear at the point of need:
+
+```text
+Foreman needs product truth
+Which behavior is intentional?
+[ Answer ]
+```
+
+```text
+UIAI needs authentication
+[ Take control ]
+```
+
+```text
+You: Keep this surgical. Do not rewrite auth.
+Foreman: Constraint updated.
+```
+
+### Verify
+
+Make proof visible and legible.
+
+### Continue / Learn
+
+After owner input/takeover/verification, the work should reconcile and continue without manual session archaeology.
+
+---
+
+## 3. Surface roles
+
+### Side Panel — collaborate now
+
+Best for:
+
+- orientation while browsing;
+- Workstream/Foreman status;
+- Direction;
+- Needs You;
+- Working Now;
+- quick verification;
+- page-context operations;
+- UIAI watch/takeover.
+
+Suggested structure:
+
+```text
+[ Operator / Environment ]    [ health ]
+[ Project / Workstream ]
+
+FOREMAN
+current objective
+current Workpoint / state
+
+[ Direct Foreman… ]
+
+NEEDS YOU
+1 approval · 1 clarification
+
+WORKING NOW
+Builder-2      Working
+Verifier-1     Waiting
+Browser        UIAI active
+
+VERIFIED RECENTLY
+Login repro confirmed
+
+[ Open Workforce ]  [ Watch ]
+```
 
 ### Full Workforce — deep operations
 
-Recommended desktop layout:
+Best for:
+
+- multi-Workstream navigation;
+- people/roles;
+- dependency/work graph;
+- all current attention;
+- Evidence;
+- detailed work history;
+- topology/fleet;
+- resource posture;
+- larger review/steering sessions.
+
+### Start Page — return to the organization
+
+A calm briefing, not a widget landfill.
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Environment · Workstream · Foreman           Search / Voice │
-├───────────────┬──────────────────────────────┬───────────────┤
-│ Workforce     │                              │ Attention     │
-│ roster        │        Work / graph          │ approvals     │
-│               │                              │ blockers      │
-│ Foremen       │                              │ evidence      │
-│ Managers      │                              │               │
-│ Workers       │                              │               │
-├───────────────┴──────────────────────────────┴───────────────┤
-│ Direction Bar / current selection / action context          │
-└──────────────────────────────────────────────────────────────┘
-```
+Good morning.
 
-Panels should be collapsible on Chromebook-sized screens.
-
-### Start Page — operational return point
-
-Optional, calm, sparse.
-
-```text
-Good afternoon
-
-3 agents working
-1 decision needs you
-2 verified outcomes since last visit
-
-[ Direction Bar ]
-
-Continue
-- Project A — Foreman waiting on verification
-- Project B — build running in cloud
+Current focus
+Customer-ready Workforce redesign
 
 Needs You
-- approve production deploy
+2
 
-Verified
-- login regression fixed and tests passed
-```
-
-No news-feed behavior.
-
----
-
-## 2. Navigation model
-
-Top-level mental model:
-
-```text
-Overview
-Workforce
-Work
-Evidence
-```
-
-Approvals and Audit should be accessible globally and contextually rather than necessarily consuming permanent primary-navigation slots.
-
-Topology is contextual from Workforce/Work and available as a dedicated diagnostic/operations view when needed.
-
-The user should rarely need to think about navigation to perform routine steering.
-
----
-
-## 3. Scope is always visible
-
-Every consequential action must make current scope obvious.
-
-Persistent scope strip:
-
-```text
-Environment: Private VPS
-Project: Focusa
-Workstream: Chrome Extension
-Foreman: Foreman / Chrome Extension
-```
-
-If scope changes, update visually before accepting consequential direction.
-
-Do not infer canonical scope from the active tab alone.
-
----
-
-## 4. Workforce roster
-
-### Agent card
-
-Each agent card should communicate in approximately this order:
-
-```text
-[status] Agent Name / Role
-Assignment
-Workstream
-Runtime / body
-Last meaningful action
-Evidence / blocker / attention
-```
-
-Expanded details:
-
-```text
-capabilities
-authority posture
-budget/spend
-runtime attachment
-session/execution reference
-worker parent/manager
-recent audit
-stop/pause/direct/open execution
-```
-
-### Status language
-
-Prefer human-operational wording:
-
-```text
 Working
-Waiting
-Needs approval
-Blocked
-Verifying
-Ready for review
-Completed — verified
-Failed
-Disconnected
-Unknown
+5 agents · 3 Workstreams
+
+Verified since last visit
+3 outcomes
 ```
 
-Avoid exposing internal enum names unless diagnostics are enabled.
+### Wall
 
-### Agent visual identity
-
-Use stable role/identity cues, but do not anthropomorphize state falsely.
-
-A pulsing avatar is not proof an agent is working.
+Read-only shared situational projection for a larger screen.
 
 ---
 
-## 5. Work graph
+## 4. Wirebot / Operating Partner convergence
 
-The graph should communicate execution dependencies without becoming an engineering diagram by default.
+Workforce must not feel like a disconnected second application.
 
-Default representation:
+The customer may know their partner as `Spock`, `Athena`, or another selected name.
+
+Workforce can project that identity quietly:
 
 ```text
-Current
-  Implement pairing       Working · Builder-2
-      ↓
-  Verify pairing          Waiting
-      ↓
-  Chromebook acceptance   Waiting
-
-Parallel
-  UI polish               Working · Designer-1
-  Docs                    Verified
+ACME OPERATOR
+Partner: Spock
+Private
 ```
 
-Users may switch to a detailed DAG when useful.
+But the central work actor inside a Workstream is the **Foreman**, not the partner.
 
-### Node interaction
-
-Selecting a node opens a detail panel containing:
+Wirebot App and Workforce show the same underlying work at different altitudes:
 
 ```text
+Wirebot
+“Focusa launch is drifting. The extension redesign is the blocker.”
+[ Follow in Workforce ]
+
+            ↓ exact handoff
+
+Workforce
+Focusa / Workforce Extension
+Foreman · workers · work · attention · Evidence
+```
+
+Handoff must preserve exact context.
+
+---
+
+## 5. Needs You
+
+`Needs You` is one of the product's defining experiences.
+
+Only include items requiring owner comparative advantage.
+
+Classes:
+
+```text
+approval
+clarification / owner truth
+authentication
+takeover
+budget/resource exception
+recovery decision
+meaningful blocker
+high-value opportunity/signal
+```
+
+Do not include routine worker starts, heartbeat noise or ordinary completions.
+
+Card requirements:
+
+- what needs the owner;
+- why now;
+- Workstream/work context;
+- consequence/reversibility when relevant;
+- recommended/available actions;
+- expiry if applicable;
+- freshness/source;
+- exact deep link.
+
+Same source item may appear in Wirebot's owner-wide `Needs You`; resolving it from either surface must resolve the same source object.
+
+---
+
+## 6. Foreman experience
+
+The Foreman should feel like the accountable project/workstream leader.
+
+Show:
+
+```text
+name / identity
+Workstream
 objective
-acceptance criteria
-assigned agent
-runtime
-dependencies
-status/blocker
-approvals
-Evidence
-recent activity
-Direction / reprioritize / pause / stop
+current Workpoint / phase
+current responsibility
+workers
+attention
+last meaningful Evidence
+health/freshness
 ```
+
+Foreman interaction should remain work-connected.
+
+Avoid endless chat transcript as primary UI.
+
+Useful actions:
+
+```text
+Direct
+Ask about current state
+Ask why this path
+Change priority/constraint
+Inspect delegation
+Inspect evidence
+Pause/resume supported work
+```
+
+Answers should cite current work/evidence refs when relevant.
 
 ---
 
-## 6. Direction Bar
+## 7. Roster / People
 
-The Direction Bar is the product's highest-value control.
-
-### Default state
-
-```text
-Direct Chrome Extension Foreman…
-```
-
-The placeholder itself reflects scope.
-
-### While typing
-
-Show lightweight resolution chips:
-
-```text
-To: Chrome Extension Foreman
-Scope: Focusa / Workforce Extension
-Execution: automatic within current grants
-```
-
-If the request implies a consequential operation, do not pretend it has already executed.
-
-### Result states
-
-```text
-Sent to Foreman
-Proposal prepared
-Needs approval
-Dispatched
-Blocked — missing capability
-Completed — awaiting verification
-Verified
-```
-
-Direction responses should not become an endless chat stream. Keep the interaction attached to work and outcomes.
-
----
-
-## 7. Voice
-
-Voice UI should be immediate and inspectable.
-
-```text
-[ mic ]
-Listening…
-"Move the build work to the cloud computer"
-
-To: Chrome Extension Foreman
-[ Cancel ] [ Send ]
-```
-
-For low-risk conversational direction, optional fast-send behavior may be added later according to Focusa voice contracts.
-
-Always make listening state obvious.
-
----
-
-## 8. Needs You / attention
-
-One unified attention stack, ordered by consequence and actionability.
-
-Possible items:
-
-```text
-Approval required
-Authentication/takeover required
-Blocked work requiring owner truth
-Budget/resource decision
-Failed recovery needing owner decision
-High-value Radar signal
-```
-
-Do not mix informational agent chatter into this list.
-
-Each attention item must have one obvious primary action.
-
----
-
-## 9. Approval experience
-
-Approval card example:
-
-```text
-Production deploy
-Builder-3 · Focusa / Workforce
-
-Will:
-• deploy release 0.3.4 to production
-• restart the service
-
-Evidence:
-✓ tests passed
-✓ verifier approved artifact
-
-Risk: external effect · reversible by rollback
-
-[ Deny ] [ Review details ] [ Approve deploy ]
-```
-
-Never present:
-
-```text
-Agent wants permission.
-[Approve] [Deny]
-```
-
-without consequences/target.
-
----
-
-## 10. Evidence experience
-
-Evidence should feel like the workforce showing its work.
-
-Evidence card:
-
-```text
-✓ Verified
-Pairing survives Chrome restart
-
-Source: acceptance run #...
-Verifier: QA-1
-Work: pairing persistence
-Captured: 3 min ago
-
-[ Inspect ]
-```
-
-Unverified example:
-
-```text
-○ Unverified claim
-Builder reports deployment succeeded
-No independent deployment evidence yet
-```
-
-This distinction must be visually obvious.
-
----
-
-## 11. Audit experience
-
-Audit is not a raw log dump by default.
-
-Readable timeline:
-
-```text
-2:14 PM  You
-         "Move build work to cloud"
-
-2:14 PM  Foreman
-         Selected Cloud Agent Computer A
-
-2:15 PM  Builder-2
-         Build started
-
-2:19 PM  Builder-2
-         Build artifact produced
-
-2:20 PM  Verifier-1
-         ✓ artifact verified
-```
-
-Advanced detail may expose operation IDs, receipts, refs and raw structured events.
-
----
-
-## 12. UIAI handoff
-
-When a worker is using UIAI:
-
-```text
-Browser execution
-UIAI · Chrome Context 7
-Working on Stripe dashboard
-
-[ Watch in Cockpit ]
-```
-
-If control is with the human:
-
-```text
-Operator has control
-Agent waiting for return/reconciliation
-```
-
-Do not duplicate the entire Cockpit inside Workforce.
-
----
-
-## 13. Topology and bodies
-
-Topology should be human-readable first.
-
-```text
-This Chromebook
-Interactive · Healthy
-Workforce UI / Voice
-Memory pressure: normal
-
-Cloud Agent Computer
-Heavy compute · 4 workers
-12 GB / 32 GB memory
-
-UIAI Browser Context
-1 active browser worker
-
-Phone
-Voice companion · connected
-```
-
-Future:
-
-```text
-Humanoid Body
-Physical presence · attached
-locomotion / manipulation available
-```
-
-Never imply body capability that has not been verified.
-
----
-
-## 14. Resource/offload UX
-
-The user should not manage infrastructure merely to stay responsive.
+Agent cards emphasize responsibility and state, not model branding.
 
 Example:
 
 ```text
-This build needs more memory than the Chromebook should use locally.
+Builder-2
+Implementation Specialist
 
-Recommended:
-Run on Cloud Agent Computer
-Estimated additional usage: within plan
+Working
+Login regression patch
 
-[ Run remotely ]
+Focusa / Workforce Extension
+UIAI Chrome · Context 7
+
+Last proof
+Focused tests 18/18
 ```
 
-Where current policy already authorizes automatic placement:
+Progressively reveal:
 
-```text
-Build moved to Cloud Agent Computer
-Chromebook remains interactive
-```
+- role/capabilities;
+- assignment;
+- authority posture;
+- model/runtime;
+- budget/spend;
+- body/execution location;
+- Evidence/history.
 
-Topology choice remains inspectable.
+Foremen/Managers/Workers/Verifiers should be visually distinguishable without cartoon gamification.
 
 ---
 
-## 15. Browser-context interaction
+## 8. Work and task graph
 
-Right-click/context actions should be terse:
+Use progressive abstraction.
 
-```text
-Focusa Workforce
-  Ask Foreman about page
-  Research page
-  Send page to Foreman
-  Capture selection
-  Open in UIAI
-```
-
-After action, use a small confirmation with exact scope:
+### Owner/human view
 
 ```text
-Sent to: Marketing Foreman
-Workstream: Q4 Launch
+Mission
+→ Current
+→ Parallel
+→ Next
 ```
+
+### Operations view
+
+Groups, dependencies, responsible actors, blockers and acceptance.
+
+### Technical view
+
+Exact DAG / attempts / sessions / leases / refs / receipts.
+
+A nontechnical owner should never need to understand graph theory to understand whether work is progressing.
 
 ---
 
-## 16. Empty states
+## 9. Evidence UX
 
-Empty states should teach the next useful action.
+Evidence should materially change how “done” feels.
 
-### No pairing
-
-```text
-Connect Focusa Workforce
-Pair this browser with the Focusa environment that owns your work.
-[ Add environment ]
-```
-
-### No active workforce
+Use confidence/state language consistently:
 
 ```text
-No agents are active in this Workstream.
-[ Direct Foreman ]
+Claimed
+Observed
+Supported
+Verified
+Settled
+Unknown
+Stale
 ```
 
-### No approvals
+Example verified card:
 
 ```text
-Nothing needs your approval.
-Your workforce can continue within its current authority.
+LOGIN REGRESSION
+
+Implementation       ✓
+Focused tests        ✓ 18/18
+Browser verification ✓ UIAI
+Independent review   ✓
+
+VERIFIED
+2 minutes ago
+[ Inspect Evidence ]
 ```
 
-### No Evidence
+Example unverified card:
 
 ```text
-No Evidence has been attached to this work yet.
-Completion should remain unverified.
+DEPLOYMENT
+
+Agent reports complete
+UNVERIFIED
+No external observation or settlement receipt yet.
 ```
+
+Do not decorate weak proof into certainty.
 
 ---
 
-## 17. Error/degraded states
+## 10. UIAI UX
 
-Errors must preserve truth and forward motion.
-
-Bad:
+Workforce should show computer activity in context:
 
 ```text
-Something went wrong.
+Builder-2
+Using UIAI
+Chrome · Context 7
+Stripe Dashboard
+● Working
+[ Watch ]
 ```
+
+`Watch` opens UIAI at exact execution context.
+
+`Take control` belongs to UIAI's governed takeover path.
+
+When control returns, Workforce should show that work is reconciling/re-observing before autonomous continuation if required.
+
+Do not embed a second full Cockpit into Workforce simply to avoid navigation.
+
+---
+
+## 11. Direction Bar
+
+Direction is persistent/contextual, not a separate chatbot destination.
+
+Placement:
+
+- visible in side panel;
+- sticky/contextual in full Workforce;
+- scoped explicitly to active Workstream/Foreman;
+- voice uses the same contract.
+
+Examples:
+
+```text
+Prioritize the login issue.
+Use another verifier.
+Don't deploy this yet.
+Move the build to cloud capacity if local pressure remains high.
+Explain why checkout is blocked.
+```
+
+The UI should show whether the direction was:
+
+```text
+accepted
+clarification required
+proposal created
+dispatched
+blocked/denied
+```
+
+without inventing state beyond Focusa.
+
+---
+
+## 12. Operator / sovereign UX
+
+Workforce may quietly show:
+
+```text
+Operator
+Acme Manufacturing
+
+Partner
+Spock
+
+Deployment
+Sovereign · Managed
+
+Network
+Private
+```
+
+or:
+
+```text
+Network
+Federated
+2 shared capabilities · 1 collaboration
+```
+
+This is posture, not a network dashboard.
+
+Broad network operations hand off to Wirebot/Startempire surfaces.
+
+---
+
+## 13. Fleet / topology UX
+
+Translate infrastructure into organizationally useful language.
+
+Prefer:
+
+```text
+Your Workforce
+
+This Chromebook
+Interactive surface
+
+Cloud Team
+4 workers · 2 busy
+
+Browser Team
+3 contexts · 1 active
+
+Build Computer
+Tests running
+```
+
+with technical detail available on demand:
+
+- node/runtime/body refs;
+- trust/enforcement posture;
+- resources;
+- spend;
+- health;
+- capabilities.
+
+Do not call this federation.
+
+---
+
+## 14. Capability / contextual expansion UX
+
+Expansion appears only where the current work reveals a useful adjacent capability.
+
+Examples:
+
+```text
+This task requires browser control.
+UIAI Engine can complete it without handing it back to you.
+[ Learn about UIAI ]
+```
+
+```text
+The current body is resource constrained.
+Cloud Agent Computer capacity can continue this work.
+[ Review capacity ]
+```
+
+```text
+This role is unfilled.
+Compatible Draftees are available.
+[ Explore candidates ]
+```
+
+Always distinguish current posture:
+
+```text
+Available
+Requires setup
+Not entitled
+Active
+Unavailable
+```
+
+Do not make the product feel like an upsell storefront.
+
+---
+
+## 15. Page-context actions
+
+Context menu / browser actions:
+
+```text
+Ask Foreman about this page
+Send page to Foreman
+Create work from selection
+Capture selection as Evidence candidate
+Open page in UIAI
+```
+
+Current-page data collection stays explicit and minimal.
+
+---
+
+## 16. Voice
+
+Voice should feel like speaking to the responsible work system, not activating a separate assistant.
+
+At Workstream scope, spoken direction routes to the same Foreman/Direction intent.
+
+At owner/portfolio scope, Wirebot App remains the appropriate broader conversation surface.
+
+The architecture should support future phone/earbuds/Ambient Operator surfaces using the same intent and attention semantics.
+
+---
+
+## 17. Degraded/offline states
+
+Never bluff freshness.
+
+States:
+
+```text
+Fresh
+Stale
+Unknown
+Unavailable
+Incompatible
+```
+
+Examples:
+
+```text
+Last confirmed 3m ago
+Connection lost — controls limited until refreshed
+```
+
+or:
+
+```text
+Work may still be running in Focusa.
+Workforce cannot currently confirm state.
+```
+
+The browser closing/offline state never implies workers stopped.
+
+---
+
+## 18. Notifications
+
+Notify for meaningful owner attention, not agent activity.
 
 Good:
 
 ```text
-Focusa disconnected 18s ago.
-Showing last-known state from 2:41 PM.
-No new directions can be safely submitted until scope is refreshed.
-[ Reconnect ]
+Deployment approval required
+UIAI needs takeover
+Foreman needs product clarification
+Recovery requires a choice
 ```
 
-If another environment remains healthy, keep it usable.
-
----
-
-## 18. Visual language
-
-The extension should be calm, premium and operational.
-
-Guidance:
-
-- generous whitespace;
-- strong typography hierarchy;
-- restrained motion;
-- status expressed with icon + text, not color alone;
-- minimal chrome;
-- dense information only when expanded;
-- project/role identity stable across surfaces;
-- Evidence and approvals visually stronger than decorative metrics;
-- no gamer-style agent swarm visualization by default.
-
-The product should feel suitable for a premium/luxury Agent Computer experience without requiring expensive visual effects.
-
----
-
-## 19. Chromebook responsive behavior
-
-At narrow widths:
-
-- roster collapses into drawer/list;
-- work detail takes center stage;
-- attention is reachable without horizontal scroll;
-- Direction Bar remains persistently reachable;
-- graph falls back to ordered dependency list;
-- large Evidence previews open separately;
-- touch targets support convertible/tablet use.
-
----
-
-## 20. Keyboard shortcuts
-
-Candidate shortcuts, subject to Chrome conflicts:
+Bad:
 
 ```text
-Open Workforce
-Open Direction Bar
-Push-to-talk
-Switch Workstream
-Open attention
-Open active execution/UIAI
+Worker started
+Worker ran tool
+Worker completed ordinary node
 ```
 
-Do not seize common browser/ChromeOS shortcuts without explicit user configuration.
+Notification content should be privacy-minimized and open exact context.
 
 ---
 
-## 21. First complete UI slice
+## 19. Visual system
 
-Build this before broadening:
+Target: **expensive calm**.
+
+Principles:
+
+- high-quality typography;
+- generous but efficient spacing;
+- clear hierarchy;
+- minimal borders/chrome;
+- restrained color;
+- subtle elevation/spatial grouping;
+- motion used for state change, not decoration;
+- crisp microinteractions;
+- excellent empty/loading/error states;
+- meaningful icons;
+- responsive Chromebook/desktop layouts;
+- strong dark/light modes if both are supported;
+- accessible contrast/focus/touch targets.
+
+Avoid:
 
 ```text
-Side Panel
-  scope
-  Foreman
-  Direction Bar
-  Needs You
-  Working Now
-  Verified Recently
-
-Full App
-  roster
-  work list/graph
-  approval detail
-  evidence detail
-  audit timeline
-```
-
-Then add:
-
-```text
-voice
-topology/resource posture
-multi-daemon lens
-context menus
-start page
-advanced graph
+gamer swarm dashboards
+neon AI aesthetic
+constant animation
+giant stat grids
+over-personified cartoon agents
+raw JSON/IDs as primary UI
+terminal cosplay
 ```
 
 ---
 
-## 22. UX acceptance test
+## 20. Navigation principle
 
-A first-time but authorized user should be able to open Workforce and, without documentation, correctly answer within roughly one minute:
+Favor contextual expansion over page hopping.
 
-1. which Workstream is selected;
-2. who the responsible Foreman is;
-3. what agents are actively working;
-4. what is blocked or needs approval;
-5. what was recently verified;
-6. where to give new direction;
-7. how to inspect a live UIAI execution;
-8. whether displayed state is current or stale.
+A user should be able to move:
 
-If those answers are unclear, visual polish is not yet the priority.
+```text
+Wirebot summary
+→ exact Workforce context
+→ exact UIAI execution
+→ back to same Workforce context
+→ owner outcome
+```
+
+without losing scope.
+
+---
+
+## 21. Acceptance journeys
+
+### A. Owner delegates through Wirebot
+
+```text
+Owner: “Get the extension ready for customer testing.”
+→ Wirebot delegates bounded desired outcome
+→ Focusa resolves Workstream/Foreman
+→ Workforce opens exact context
+→ workers execute
+→ owner sees proof/outcome
+```
+
+### B. Foreman needs truth
+
+```text
+Foreman blocked on intended product behavior
+→ Needs You
+→ owner answers in Wirebot or Workforce
+→ same attention source resolves
+→ work resumes
+```
+
+### C. UIAI takeover
+
+```text
+worker reaches MFA/auth boundary
+→ Needs You
+→ owner takes control in UIAI
+→ UIAI reconciles/re-observes
+→ worker continues
+→ Evidence records result
+```
+
+### D. Resource expansion
+
+```text
+local machine constrained
+→ Workforce shows truthful posture
+→ eligible cloud capacity suggested
+→ entitlement/authority/setup resolved by owners
+→ work moves
+→ same Workstream continuity retained
+```
+
+### E. Verified completion
+
+```text
+worker claims done
+→ Evidence inspected/verified
+→ Focusa settlement
+→ accepted outcome
+→ Wirebot/W.I.N.S. projection
+```
+
+---
+
+## 22. UX law
+
+> **The user should spend their attention on direction, judgment and meaningful intervention—not managing agent machinery.**
+
+Workforce succeeds when complex multi-agent execution becomes understandable and steerable without hiding uncertainty, proof, authority or ownership boundaries.
