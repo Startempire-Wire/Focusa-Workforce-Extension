@@ -2,6 +2,7 @@
 
 **Status:** EXECUTION READY  
 **Mission:** run the Workforce redesign to the accepted outcome without reopening settled product design.  
+**Architecting standard applied:** Focusa Spec 120A + `120A-SWE` software-engineering vertical profile.  
 **Do not modify:** Wirebot App documentation from this workstream.
 
 ## 1. Prime directive
@@ -69,6 +70,8 @@ baseline/deployment     → docs/07
 ```
 
 Consult ADLBOS/UIAI/Veragensia only when crossing those boundaries.
+
+Spec 120A/120A-SWE explain how this architecture package was produced. They are not required preload for ordinary build execution; consult them only if a genuine architecture ambiguity or refinement arises.
 
 ## 3. Autonomy boundary
 
@@ -141,6 +144,8 @@ operation genuinely missing
 → implement the smallest correct operation in Focusa
 → return to Workforce
 ```
+
+The known upstream blockers in `docs/14` are **implementation/contract-closure work**. They do not reopen settled Workforce product semantics. The required consumer behavior is already pinned by the Workforce package and owning Focusa/ADLBOS/UIAI/Veragensia contracts. If an owning contract is genuinely contradictory or semantically insufficient, stop only that affected node, surface the exact owner-level ambiguity, and continue independent ready work.
 
 Never fabricate a client-side canonical Foreman, Trajectory, approval, Evidence state, or convenient endpoint.
 
