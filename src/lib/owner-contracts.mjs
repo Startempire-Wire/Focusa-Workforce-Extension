@@ -50,7 +50,10 @@ export const OPERATIONS = Object.freeze({
   // Project (owner of the project boundary)
   projectIdentity: op('focusa.project.identity', 'GET', '/v1/project/identity', ['project_root'], 'base_focusa', 'docs/135a'),
   projectStatus: op('focusa.project.status', 'GET', '/v1/project/status', ['project_root'], 'base_focusa', 'docs/135a'),
-  projectDiscover: op('focusa.project.discover', 'GET', '/v1/project/discover', ['project_root'], 'base_focusa', 'docs/135a'),
+  projectList: op('focusa.project.list', 'GET', '/v1/project/list', [], 'base_focusa', 'docs/135a'),
+  projectDiscover: op('focusa.project.discover', 'GET', '/v1/project/discover', [], 'base_focusa', 'docs/135a'),
+  projectUse: op('focusa.project.use', 'POST', '/v1/project/use', [], 'base_focusa', 'docs/135a', true),
+  projectNew: op('focusa.project.new', 'POST', '/v1/project/new', [], 'base_focusa', 'docs/135a', true),
 
   // Trajectory / frontier (owner of trajectory truth)
   trajectoryView: op('focusa.trajectory.view', 'GET', '/v1/trajectory/view', ['project_root', 'continuity_id'], 'base_focusa', 'docs/14'),
@@ -103,8 +106,8 @@ export const SEMANTIC_RESOLUTION = Object.freeze({
   project: Object.freeze({
     requirement: 'project boundary resolution',
     resolution: Resolution.REAL,
-    operations: Object.freeze(['projectIdentity', 'projectStatus', 'projectDiscover']),
-    note: 'project_root is the project_folder_boundary identity axis',
+    operations: Object.freeze(['projectIdentity', 'projectStatus', 'projectList', 'projectDiscover', 'projectUse']),
+    note: 'project_root is the project_folder_boundary identity axis; the owner selects the project (project/use) and Workforce never invents one',
   }),
   workstream: Object.freeze({
     requirement: 'workstream listing/resolution',

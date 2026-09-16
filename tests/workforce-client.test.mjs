@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner } from '../src/lib/workforce-client.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../src/lib/workforce-client.mjs';
 import { workstreamRef } from '../src/lib/owner-contracts.mjs';
 
 /** Real owner response shapes captured from a live Focusa daemon (2026-09-16). */
@@ -174,4 +174,61 @@ test('trajectory normalisation keeps degraded truth and unknown fields null', ()
   assert.equal(view.degraded, true);
   assert.equal(view.hltRef, null);
   assert.equal(view.current, null);
+});
+
+test('project dashboard normalisation reads owner selection and registered projects', () => {
+  const view = projectsFromOwner({
+    schema: 'focusa.project_dashboard.v1', status: 'degraded', failure_class: 'project_root_selection_required',
+    selected: null, effective_project: null,
+    projects: [],
+  });
+  assert.equal(view.degraded, true);
+  assert.equal(view.failureClass, 'project_root_selection_required');
+  assert.equal(view.selected, null);
+  assert.deepEqual(view.projects, []);
+
+  const withProjects = projectsFromOwner({
+    status: 'ok',
+    selected: { project_root: '/home/verioussmith/src/focusa', project_id: 'focusa' },
+    projects: [{ project_id: 'focusa', canonical_name: 'Focusa', project_root: '/home/verioussmith/src/focusa', stack: 'rust-workspace', status: 'project-root-marker' }],
+  });
+  assert.equal(withProjects.selected.root, '/home/verioussmith/src/focusa');
+  assert.deepEqual(withProjects.projects.map((p) => p.name), ['Focusa']);
+});
+
+test('project discovery normalisation keeps only owner-reported fields', () => {
+  const found = discoveredFromOwner({
+    schema: 'focusa.project_discover.v1', count: 1,
+    projects: [{ schema: 'focusa.project_summary.v1', canonical_name: 'Focusa', has_git: true, has_marker: true, project_id: 'focusa', project_root: '/home/verioussmith/src/focusa', stack: 'rust-workspace', status: 'project-root-marker' }],
+  });
+  assert.deepEqual(found, [{ id: 'focusa', name: 'Focusa', root: '/home/verioussmith/src/focusa', stack: 'rust-workspace', hasMarker: true, hasGit: true }]);
+});
+
+test('project selection posts the owner project_root body through the owning operation', async () => {
+  const seen = [];
+  const client = createWorkforceClient({
+    baseUrl: 'http://127.0.0.1:8787',
+    fetchImpl: fakeFetch(seen, { '/v1/project/use': { status: 200, body: { ok: true } } }),
+  });
+  const result = await client.projectUse({ projectRoot: '/home/verioussmith/src/focusa' });
+  assert.equal(result.state, ResultState.OK);
+  assert.equal(seen[0].init.method, 'POST');
+  assert.deepEqual(JSON.parse(seen[0].init.body), {
+    project_root: '/home/verioussmith/src/focusa',
+    selected_by: 'focusa-workforce-chrome',
+  });
+});
+
+test('project discovery sends bounded owner query parameters', async () => {
+  const seen = [];
+  const client = createWorkforceClient({
+    baseUrl: 'http://127.0.0.1:8787',
+    fetchImpl: fakeFetch(seen, { '/v1/project/discover': { status: 200, body: { projects: [] } } }),
+  });
+  await client.projectDiscover({ from: '/home/verioussmith/src', maxDepth: 4, maxResults: 30, includeGitOnly: true });
+  const url = new URL(seen[0].url);
+  assert.equal(url.searchParams.get('from'), '/home/verioussmith/src');
+  assert.equal(url.searchParams.get('max_depth'), '4');
+  assert.equal(url.searchParams.get('max_results'), '30');
+  assert.equal(url.searchParams.get('include_git_only'), 'true');
 });

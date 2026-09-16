@@ -2,8 +2,24 @@ import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const root = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Build identity shown in the UI so a loaded build is never ambiguous:
+ * the unpacked manifest version is static, so the stamp carries the real identity.
+ */
+function buildStamp() {
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() ? '+' : '';
+    const when = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    return `${sha}${dirty} · ${when}Z`;
+  } catch {
+    return `dev · ${new Date().toISOString().slice(0, 16)}Z`;
+  }
+}
 
 /**
  * Minimal MV3-safe bundling for the Workforce full page.
@@ -17,6 +33,7 @@ export default defineConfig({
   root: resolve(root, 'src/workforce'),
   base: './',
   plugins: [svelte()],
+  define: { __WF_BUILD__: JSON.stringify(buildStamp()) },
   build: {
     outDir: resolve(root, 'dist'),
     emptyOutDir: false,

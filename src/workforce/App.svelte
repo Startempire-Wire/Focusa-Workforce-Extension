@@ -13,9 +13,13 @@
 
   const store = createWorkforceStore();
 
+  /** Build identity injected at bundle time (see vite.config.mjs). */
+  const buildStamp = typeof __WF_BUILD__ === 'string' ? __WF_BUILD__ : 'dev';
+
   let instruction = $state('');
   let selectedSessionId = $state('');
   let environmentError = $state('');
+  let scanFrom = $state('~/src');
 
   const selectedSession = $derived(store.roster.find((r) => r.id === selectedSessionId) ?? null);
   const steerTarget = $derived(
@@ -50,7 +54,7 @@
   <header class="app-head">
     <div>
       <h1>Focusa Workforce</h1>
-      <p class="sub">Workstream · Foreman · Direction</p>
+      <p class="sub">Workstream · Foreman · Direction <span class="stamp" title="loaded build">{buildStamp}</span></p>
     </div>
     <button type="button" onclick={() => store.refreshOwner()} disabled={!store.active}>Refresh</button>
   </header>
@@ -100,6 +104,45 @@
     <p class="muted tiny">
       Owner identity axes: project_root = project boundary · continuity_id = logical Workstream.
     </p>
+
+    {#if store.projectSelectionRequired}
+      <p class="gap">Owner requires a project selection before Workstream state is available.</p>
+    {/if}
+
+    {#if store.projectDashboard?.projects?.length}
+      <div class="row">
+        <select onchange={(e) => e.currentTarget.value && store.useProject(e.currentTarget.value)}>
+          <option value="">Select a project…</option>
+          {#each store.projectDashboard.projects as project (project.root)}
+            <option value={project.root} selected={project.root === store.selection.projectRoot}>
+              {project.name}{#if project.stack} · {project.stack}{/if}
+            </option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+
+    <div class="row">
+      <input type="text" placeholder="directory to scan" bind:value={scanFrom} />
+      <button type="button" onclick={() => store.discoverProjects(scanFrom)} disabled={store.projectBusy || !store.active}>
+        {store.projectBusy ? 'Asking owner…' : 'Scan for projects'}
+      </button>
+    </div>
+
+    {#if store.discovered.length}
+      <ul class="plain">
+        {#each store.discovered as project (project.root)}
+          <li>
+            <strong>{project.name}</strong> — <code>{project.root}</code>
+            {#if project.stack}<span class="muted tiny"> · {project.stack}</span>{/if}
+            <button type="button" onclick={() => store.useProject(project.root)} disabled={store.projectBusy}>Use</button>
+          </li>
+        {/each}
+      </ul>
+    {:else if store.resultOf('discover')}
+      <StateNote label="Discovery" result={store.resultOf('discover')} />
+    {/if}
+
     <div class="row">
       <input
         type="text"
@@ -117,8 +160,10 @@
     {#if store.workstream}
       <p class="muted">resolved: <code>{store.workstream.label}</code></p>
     {/if}
+    <StateNote label="Projects" result={store.resultOf('projects')} />
     <StateNote label="Project identity" result={store.resultOf('project')} />
     <StateNote label="Project status" result={store.resultOf('projectStatus')} />
+    <StateNote label="Project selection" result={store.resultOf('projectUse')} />
   </section>
 
   <!-- Foreman -->
@@ -219,6 +264,7 @@
   .app-head { display: flex; align-items: center; justify-content: space-between; }
   h1 { font-size: 18px; margin: 0; }
   .sub { margin: 2px 0 0; font-size: 12px; opacity: 0.65; }
+  .stamp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; opacity: 0.8; border: 1px solid #30363d; border-radius: 999px; padding: 1px 7px; }
   .card { border: 1px solid #30363d; border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 2px; opacity: 0.75; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -233,5 +279,6 @@
   .facts { display: grid; grid-template-columns: 90px 1fr; gap: 2px 10px; margin: 4px 0 0; font-size: 12px; }
   .facts dt { opacity: 0.6; }
   .facts dd { margin: 0; }
-  .plain { margin: 4px 0 0 16px; padding: 0; font-size: 12px; }
+  .plain { margin: 4px 0 0 16px; padding: 0; font-size: 12px; display: grid; gap: 4px; }
+  .plain button { padding: 3px 8px; font-size: 11px; margin-left: 6px; }
 </style>

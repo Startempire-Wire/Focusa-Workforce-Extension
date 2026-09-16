@@ -81,7 +81,9 @@ export function createWorkforceClient(config) {
     for (const [key, value] of Object.entries(opts.path ?? {})) {
       path = path.replace(`{${key}}`, encodeURIComponent(value));
     }
-    const query = scopeQuery({ ...opts.scope, ...(opts.query ?? {}) });
+    // Scope keys are owner identity axes; opts.query carries explicit operation
+    // parameters (e.g. discovery bounds). Both go on the query string.
+    const query = { ...scopeQuery(opts.scope ?? {}), ...(opts.query ?? {}) };
     const url = new URL(path, origin);
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
 
@@ -161,8 +163,32 @@ export function createWorkforceClient(config) {
     projectIdentity: (projectRoot) => call('projectIdentity', { scope: { projectRoot } }),
     /** @param {string} projectRoot */
     projectStatus: (projectRoot) => call('projectStatus', { scope: { projectRoot } }),
-    /** @param {string} projectRoot */
-    projectDiscover: (projectRoot) => call('projectDiscover', { scope: { projectRoot } }),
+    /** Owner project dashboard (selected project + registered projects). */
+    projectList: () => call('projectList'),
+    /**
+     * Owner project discovery. Scans for project roots; results are owner summaries.
+     * @param {{from?: string, maxDepth?: number, maxResults?: number, includeGitOnly?: boolean}} [input]
+     */
+    projectDiscover: (input = {}) => call('projectDiscover', {
+      query: {
+        ...(input.from ? { from: input.from } : {}),
+        ...(input.maxDepth ? { max_depth: String(input.maxDepth) } : {}),
+        ...(input.maxResults ? { max_results: String(input.maxResults) } : {}),
+        ...(input.includeGitOnly === undefined ? {} : { include_git_only: String(input.includeGitOnly) }),
+      },
+    }),
+    /**
+     * Select the active project in the owner (owner owns selection state).
+     * @param {{projectRoot: string, activeWorktreeRoot?: string, selectedBy?: string, note?: string}} input
+     */
+    projectUse: (input) => call('projectUse', {
+      body: {
+        project_root: input.projectRoot,
+        ...(input.activeWorktreeRoot ? { active_worktree_root: input.activeWorktreeRoot } : {}),
+        selected_by: input.selectedBy ?? 'focusa-workforce-chrome',
+        ...(input.note ? { note: input.note } : {}),
+      },
+    }),
 
     // ── workstream (project_root + continuity_id) ──────────────────────────
     /** @param {{projectRoot: string, continuityId: string}} ws */
@@ -193,6 +219,45 @@ export function createWorkforceClient(config) {
     eventsRecent: (projectRoot, limit = 20) =>
       call('eventsRecent', { scope: { projectRoot }, query: { limit: String(limit) } }),
   });
+}
+
+/**
+ * Normalize the owner project dashboard into what Workforce renders.
+ * @param {any} ownerData
+ */
+export function projectsFromOwner(ownerData) {
+  const body = ownerData?.data ?? ownerData ?? {};
+  const list = Array.isArray(body.projects) ? body.projects : [];
+  const selected = body.selected ?? body.effective_project ?? null;
+  return Object.freeze({
+    projects: Object.freeze(list.map((p) => Object.freeze({
+      id: p.project_id ?? null,
+      name: p.canonical_name ?? p.project_id ?? p.project_root ?? 'project',
+      root: p.project_root ?? null,
+      stack: p.stack ?? null,
+      status: p.status ?? null,
+    }))),
+    selected: selected ? Object.freeze({ root: selected.project_root ?? null, id: selected.project_id ?? null }) : null,
+    degraded: body.status === 'degraded' || body.degraded === true,
+    failureClass: body.failure_class ?? null,
+  });
+}
+
+/**
+ * Normalize owner project discovery output.
+ * @param {any} ownerData
+ */
+export function discoveredFromOwner(ownerData) {
+  const body = ownerData?.data ?? ownerData ?? {};
+  const list = Array.isArray(body.projects) ? body.projects : [];
+  return Object.freeze(list.map((p) => Object.freeze({
+    id: p.project_id ?? null,
+    name: p.canonical_name ?? p.project_id ?? p.project_root ?? 'project',
+    root: p.project_root ?? null,
+    stack: p.stack ?? null,
+    hasMarker: Boolean(p.has_marker),
+    hasGit: Boolean(p.has_git),
+  })));
 }
 
 /**

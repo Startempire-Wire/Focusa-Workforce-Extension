@@ -12,7 +12,7 @@
  * @module workforce/lib/workforce-store
  */
 import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
-import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner } from '../../lib/workforce-client.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
@@ -71,6 +71,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let directing = $state(false);
   let lastDirection = $state(/** @type {any} */ (null));
   let bootError = $state(/** @type {string|null} */ (null));
+  let discovered = $state(/** @type {any[]} */ ([]));
+  let projectBusy = $state(false);
 
   const active = $derived(environments.find((e) => e.id === activeId) ?? null);
   const workstream = $derived(
@@ -89,6 +91,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     ? trajectoryFromOwner(reads.trajectory.data) : null);
   const foremanProfiles = $derived(reads.roles?.state === ResultState.OK ? (reads.roles.data?.profiles ?? []) : []);
   const anyBlocked = $derived(Object.values(reads).some((r) => r.state === ResultState.ENTITLEMENT_BLOCKED));
+  const projectDashboard = $derived(reads.projects ? projectsFromOwner(reads.projects.data) : null);
+  const projectSelectionRequired = $derived(projectDashboard?.failureClass === 'project_root_selection_required');
 
   function record(name, r) {
     reads = { ...reads, [name]: { state: r.state, status: r.status, note: r.note ?? r.failureClass ?? null, data: r.data, at: new Date().toISOString() } };
@@ -153,6 +157,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     const c = client();
     record('health', await c.health());
     record('license', await c.licenseStatus());
+    record('projects', await c.projectList());
     if (selection.projectRoot) {
       record('project', await c.projectIdentity(selection.projectRoot));
       record('projectStatus', await c.projectStatus(selection.projectRoot));
@@ -164,6 +169,40 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('trajectory', await c.trajectory(workstream));
       record('workLoop', await c.workLoopStatus(workstream));
       record('roles', await c.roleProfiles(workstream));
+    }
+  }
+
+  /**
+   * Owner project discovery over a directory. Results are owner summaries.
+   * @param {string} from
+   */
+  async function discoverProjects(from) {
+    if (!active) return;
+    projectBusy = true;
+    try {
+      const r = await client().projectDiscover({ from: from || undefined, maxDepth: 4, maxResults: 30, includeGitOnly: true });
+      record('discover', r);
+      discovered = r.state === ResultState.OK ? discoveredFromOwner(r.data) : [];
+    } finally {
+      projectBusy = false;
+    }
+  }
+
+  /**
+   * Ask the owner to make a project active, then adopt it as the Workstream project axis.
+   * @param {string} projectRoot
+   */
+  async function useProject(projectRoot) {
+    if (!active) return;
+    projectBusy = true;
+    try {
+      const r = await client().projectUse({ projectRoot });
+      record('projectUse', r);
+      if (r.state === ResultState.OK || r.state === ResultState.DEGRADED) {
+        await setSelection({ projectRoot });
+      }
+    } finally {
+      projectBusy = false;
     }
   }
 
@@ -230,6 +269,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get foremanProfiles() { return foremanProfiles; },
     get ownerGaps() { return ownerGaps; },
     get anyBlocked() { return anyBlocked; },
+    get projectDashboard() { return projectDashboard; },
+    get projectSelectionRequired() { return projectSelectionRequired; },
+    get discovered() { return discovered; },
+    get projectBusy() { return projectBusy; },
     get directing() { return directing; },
     get lastDirection() { return lastDirection; },
     get bootError() { return bootError; },
@@ -238,6 +281,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     setEnvironment,
     setSelection,
     addLocalDaemon,
+    discoverProjects,
+    useProject,
     direct,
     resultOf: (name) => reads[name] ?? null,
   };

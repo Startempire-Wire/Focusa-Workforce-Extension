@@ -46,6 +46,9 @@ usage: wfx-deploy <target> [args]
 
   build [--public-newtab] [--brand NAME]   Build dist/ from this checkout.
   test                                     Run node --test tests/*.test.mjs.
+  dev brave|chrome [--watch]               Build + sync the channel dir + hot-reload the
+                                            extension in the running browser (no restart).
+                                            --watch rebuilds and reloads on every edit.
   gh [--snapshot FILE]                     Embed snapshot (optional), commit, push to GitHub (CI).
   brave | chrome                           Refresh the local browser channel dist from the build.
   veragensia [--snapshot FILE]             Push this checkout's HEAD to OVH lab via uiai-lab-push.
@@ -161,6 +164,10 @@ case "$TARGET" in
     ;;
   launch)
     shift; launch_browser "$@"
+    ;;
+  dev)
+    shift || true
+    "$NODE" "$REPO_ROOT/scripts/wfx-dev.mjs" "$@"
     ;;
   veragensia)
     shift || true
