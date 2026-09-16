@@ -23,6 +23,12 @@ function renderNotifications(){ elements.notifications.replaceChildren(); if(!no
 const INTENT_KEY = 'focusa.workforce.intents.v1';
 const intentStore = { async load(key) { return (await chrome.storage.local.get(INTENT_KEY))[INTENT_KEY]?.[key] ?? null; },
   async persist(record) { const current = (await chrome.storage.local.get(INTENT_KEY))[INTENT_KEY] ?? {}; await chrome.storage.local.set({ [INTENT_KEY]: { ...current, [record.idempotency_key]: record } }); } };
+// Deep-surface handoff: the side panel stays compact; the full page is where
+// workforce operations live. One shared runtime client serves both.
+document.getElementById('open-workforce')?.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('workforce.html') });
+});
+
 function safeError(error) { return String(error?.kind || error?.failure_class || error?.message || 'unknown failure').slice(0, 180); }
 function requestOptions() { if (!connection) throw new Error('paired connection required'); return { baseUrl: connection.base_url, token: connection.token }; }
 function randomKey(prefix) { return `${prefix}:${crypto.randomUUID()}`; }
