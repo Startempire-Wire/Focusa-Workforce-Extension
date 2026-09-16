@@ -1,0 +1,44 @@
+name: One-shot branch cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: [self-hosted, Linux, X64, ovh-workforce]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove accidental and merged temporary branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in \
+            noop-check \
+            temp-unused \
+            stabilize/pre-redesign-baseline \
+            branch-cleanup-temp \
+            branch-cleanup-temp-2 \
+            branch-cleanup-temp-3 \
+            branch-cleanup-temp-4 \
+            branch-cleanup-temp-5 \
+            branch-cleanup-temp-6
+          do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
+          done
+      - name: Remove this one-shot workflow from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Focusa Workforce Cleanup"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/branch-cleanup.yml
+          git commit -m "chore: remove one-shot branch cleanup workflow"
+          git push origin HEAD:main
