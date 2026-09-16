@@ -1,224 +1,459 @@
-# Focusa Workforce — Pre-Redesign Baseline & Build-Agent Handoff
+# Focusa Workforce — Pre-Redesign Baseline and Build-Agent Handoff
 
-**Status:** implementation-ready baseline
-**Date:** 2026-09-15
-**Audience:** build agents operating from the Chromebook and connected cloud/server infrastructure
+**Status:** CURRENT build-agent handoff  
+**Audience:** build agents operating from the Chromebook and cloud/server environments  
+**Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
+**Live demo:** `https://os.focusa.dev`
 
-## 1. Current truth
+This document describes how to redesign Focusa Workforce without losing the working migrated extension, deployment path, or current ecosystem architecture.
 
-`Startempire-Wire/Focusa-Workforce-Extension` is now the authoritative source for Focusa Workforce.
+---
 
-The old source at:
+## 1. Read order before redesign
+
+Before material redesign work, read these current owners in order:
 
 ```text
-/home/wirebot/focusa-piext-sync/apps/workforce-extension
+1. ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
+2. ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
+3. ADLBOS AGENT_OS_GOLDEN_PATH.md
+4. Wirebot-App docs/03-wirebot-app-user0-product-recommendations.md
+5. Workforce docs/00-workforce-canonical-product-and-implementation-spec.md
+6. Workforce docs/05-extension-runtime-data-and-integration-contracts.md
+7. Workforce docs/06-workforce-ux-and-interaction-spec.md
+8. current source + tests
 ```
 
-is provenance/rollback material only. Do not resume feature work there.
+Do not use older concept docs to silently override these current boundaries.
 
-The exact pre-redesign state before this stabilization pass is preserved at:
+---
+
+## 2. Current source and deployment authority
+
+GitHub repo:
+
+```text
+Startempire-Wire/Focusa-Workforce-Extension
+```
+
+Typical Chromebook/cloud checkout:
+
+```text
+/home/wirebot/focusa-workforce-extension
+```
+
+Veragensia live deployment builds from the authoritative repo checkout rather than the pre-migration Focusa monorepo source path.
+
+Deployment remains explicit:
+
+```text
+repo main
+  ↓ CI
+Chromebook/cloud dogfood
+  ↓
+wfx veragensia
+  ↓
+Veragensia atomic deployment / rollback path
+  ↓
+os.focusa.dev
+```
+
+Do not turn every `main` push into implicit production/live promotion unless the owner deliberately changes that release contract.
+
+---
+
+## 3. Baseline
+
+The exact pre-redesign implementation is preserved on:
 
 ```text
 baseline/pre-redesign-2026-09-15
 ```
 
-Migration provenance, byte parity, live cutover and rollback proof are in `docs/migration/parity-report.md`.
+Use it to answer:
 
-## 2. Development topology
+- what behavior existed before redesign;
+- whether a core operation regressed;
+- what live extension identity/configuration must be preserved;
+- whether a proposed rewrite is actually necessary.
 
-The agent may work across machines. The repository remains the single source of truth.
+Do not develop new product work on the baseline branch.
 
-```text
-                       GITHUB
-       Startempire-Wire/Focusa-Workforce-Extension
-                          |
-          +---------------+----------------+
-          |                                |
-          v                                v
-   CHROMEBOOK                         CLOUD / SERVER
-   daily operator                    CI + deployment
-   UI/browser dogfood                heavy execution
-          |                                |
-   ~/src/focusa-workforce-extension        |
-   ~/.local/bin/wfx                        |
-          |                                |
-          +---------- same commits --------+
-                                           |
-                                 kh authoritative checkout
-                         /home/wirebot/focusa-workforce-extension
-                                           |
-                                  Veragensia uiai-lab-push
-                                           |
-                                           v
-                                  https://os.focusa.dev
-```
+---
 
-Do not create Chromebook-specific or cloud-specific forks of the product code.
+## 4. Product identity
 
-Machine-local material stays outside Git:
+The product is **Focusa Workforce**.
 
-- browser profiles;
-- pairing tokens/credentials;
-- operator state;
-- private/public-work snapshots unless explicitly curated for source control;
-- deployment SSH credentials;
-- customer data.
-
-## 3. Promotion semantics
-
-There are deliberately two separate operations:
+It is not:
 
 ```text
-wfx gh
-  -> push source
-  -> CI test/build/checksum
-  -> DOES NOT make os.focusa.dev live
-
-wfx veragensia
-  -> require cloud checkout to equal exact local HEAD
-  -> invoke Veragensia build/stage/checksum/atomic promote
-  -> activation/health gates
-  -> rollback on failure
-  -> https://os.focusa.dev
+Wirebot Extension
+Focusa HQ
+UIAI Cockpit
+Veragensia dashboard
+generic agent monitor
 ```
 
-Keep this separation during redesign. Do not turn every `main` push into an uncontrolled live customer/demo mutation unless the release contract is intentionally changed later.
+Its job is:
 
-The public Veragensia extension identity remains:
+> **Operate the Focusa-governed workforce.**
 
-```text
-ohfbbkpacpcapicpgplnnmifmlnmjggj
-```
+The customer-level Operating Partner may be named Wirebot, Spock, Athena, etc. Workforce is Operator-neutral and projects that partner identity without becoming the partner itself.
 
-## 4. Stabilization performed before redesign
+---
 
-This baseline fixes four migration-era sharp edges without redesigning the product:
+## 5. Ecosystem boundary
 
-1. `src/startpage.mjs` now imports `fetchWorkLoop` and `ProjectionRequestError` explicitly from the API client. The private start-page route referenced them previously without importing them.
-2. Start-page shared event binding now runs once rather than twice.
-3. `scripts/wfx-deploy` resolves its real path via `readlink -f`, so the Chromebook symlink `~/.local/bin/wfx` resolves the repository correctly.
-4. The duplicated `deploy_local_browser()` helper was removed.
-
-Regression tests now lock these assumptions instead of merely checking for identifier strings.
-
-## 5. What is already strong and should be preserved
-
-The redesign is not permission to rewrite proven plumbing.
-
-Preserve these contracts unless an upstream owning system changes them:
-
-- MV3 least-privilege manifest;
-- explicit daemon pairing and exact-origin host permission;
-- connection validation and bounded local storage;
-- canonical API schema checks and bounded projections;
-- SSE cursor replay, post-render cursor commit and bounded reconnect;
-- exact `session_id + run_id + generation` mutation targeting;
-- stale-target failure rather than guessed mutation;
-- durable idempotency intent before mutation;
-- approval binding for consequential operations;
-- safe Silent Session preflight and config hash binding;
-- public Work isolation from private connection/storage/event paths;
-- Focusa as state/authority owner;
-- UIAI as browser/computer execution owner;
-- Veragensia as placement/body/enforcement owner;
-- Wirebot as life/business Chief-of-Staff layer.
-
-## 6. What may be redesigned aggressively
-
-The current UI was built as a functional operator prototype. The product surface can now change substantially.
-
-Primary current surfaces:
-
-```text
-startpage   daily glance / launch
-sidepanel   pairing + orientation + create/control + audit/notifications
-wall        read-only situational display
-```
-
-The next product should become the richer Workforce operations experience defined in the canonical product/UX specs:
+Current chain:
 
 ```text
 Owner
- |
- +-- Projects / Workstreams
- |      |
- |      +-- Foreman
- |             +-- Managers / Crew
- |             +-- work/task graph
- |             +-- Evidence
- |             +-- approvals
- |
- +-- Needs You
- +-- Direction + voice
- +-- Radar projection
- +-- UIAI execution handoff
- +-- multi-daemon owner lens
- +-- machine/body/topology/resource posture
- +-- elastic execution visibility
+  ↓
+Operating Partner / Chief of Staff
+Wirebot implementation family
+  ↓
+Focusa
+Project / Workstream / Foreman / governed work
+  ↓
+Focusa Workforce
+live workforce operations
+  ↓
+UIAI / Veragensia / Pi / workers
+  ↓
+Evidence / settlement / accepted outcome
 ```
 
-The current `lib/` modules are intentionally candidates to survive the UI redesign.
+The build agent must preserve these boundaries.
 
-## 7. Recommended implementation direction
+### Wirebot App
 
-Do not begin with a giant framework migration.
+Owns:
 
-Recommended sequence:
+- partner relationship;
+- life/business orientation;
+- owner-wide conversation/attention;
+- Workforce Composer;
+- organization design/commissioning;
+- network context;
+- accepted outcome portfolio.
+
+### Focusa Workforce
+
+Owns UI/experience for:
+
+- Foreman/workstream operations;
+- roster;
+- live work;
+- Direction;
+- workforce Needs You;
+- Evidence inspection;
+- UIAI execution links;
+- fleet/topology posture.
+
+### Focusa
+
+Owns canonical work/authority/Evidence state.
+
+### UIAI
+
+Owns browser/computer execution/control.
+
+### Veragensia
+
+Owns body/runtime/Agent Computer state/enforcement.
+
+---
+
+## 6. Workforce Composer is not Workforce
+
+Do not implement organization commissioning as another local extension database.
+
+Expected path:
 
 ```text
-1. keep existing core modules green
-2. introduce shared Workforce client/runtime state
-3. move duplicated per-page daemon/SSE logic behind that client
-4. build the new UI shell around real canonical data
-5. ship vertical slices one at a time
-6. dogfood each slice on Chromebook
-7. use cloud/server for heavy build/runtime work
-8. explicitly promote proven slices to Veragensia
+Wirebot identifies need
+→ Workforce Composer proposes role/assignment
+→ CRIST + owner/governance acceptance
+→ Focusa canonical binding
+→ Workforce projects/operates it
 ```
 
-Svelte 5 + JavaScript/JSDoc is appropriate for the richer presentation layer if it reduces UI complexity, but it should wrap/reuse the proven integration core rather than trigger a ground-up rewrite.
+If the redesign needs a field that is not yet available upstream, document/issue the missing owning contract rather than silently making the extension authoritative.
 
-A practical vertical-slice order:
+---
+
+## 7. Shared ADLBOS seams
+
+Do not invent product-local equivalents for:
 
 ```text
-Foreman + Roster
--> Direction / Needs You
--> Work Graph
--> Evidence + Approvals
--> UIAI live handoff
--> Radar
--> multi-daemon federation
--> topology / cloud capacity / body posture
+operator.partner_profile.v1
+operator.surface_handoff.v1
+operator.attention.v1
+operator.correlation.v1
+operator.capability_posture.v1
+operator.closure.v1
 ```
 
-## 8. Definition of forward progress
+These are cross-product reference envelopes owned at ADLBOS integration level.
 
-Do not substitute process for implementation.
+Until exact schemas are implemented upstream, keep local adapter code clearly transitional and preserve exact source refs.
 
-A redesign step counts when a real operator flow improves in the extension and remains tested/dogfoodable.
+---
 
-Examples:
+## 8. Fleet, not federation
 
-- a real Foreman appears from canonical Focusa state;
-- a direction reaches the exact owning Foreman through governed operations;
-- an approval can be understood and resolved without opening raw daemon state;
-- Evidence can be inspected and linked to work;
-- an agent executing in UIAI can be opened in the owning Cockpit surface;
-- local vs cloud/body placement is shown truthfully;
-- the Chromebook remains responsive while heavier execution happens remotely.
-
-## 9. Before promoting to live
-
-For consequential UI/runtime changes:
+One Operator's multiple Focusa daemons/machines/bodies are:
 
 ```text
-wfx test
-wfx build
-local Chrome/Brave dogfood
-verify pairing + live projection + mutation path
-push / CI green
-then wfx veragensia
-verify extension ID + HTTP 200 + actual rendered behavior
+fleet
+multi-daemon aggregation
+environment fleet
 ```
 
-The build, CI result or deploy command is not the outcome. Verify the operator-visible behavior.
+`Federation` is reserved for explicit relationships between independently scoped sovereign Operators/nodes.
+
+Do not carry old “multi-daemon federation” language into new UI/contracts.
+
+---
+
+## 9. Human-agent UX target
+
+The redesign must implement the operating loop:
+
+```text
+Orient
+→ Direct
+→ Interpret / Propose
+→ Delegate
+→ Work
+→ Collaborate / Intervene
+→ Verify
+→ Continue / Learn
+```
+
+Do not reskin the existing start page and call that the redesign.
+
+The defining experiences are:
+
+```text
+Workstream + Foreman
+Direction
+Working Now / roster
+Needs You
+work progression
+Evidence / verification
+UIAI watch/takeover
+fleet/topology
+```
+
+---
+
+## 10. Existing core to preserve
+
+The current extension already contains useful implementation primitives around:
+
+```text
+pairing
+API client
+contracts
+projections
+session creation
+orchestration
+SSE/reconnect
+notifications
+audit/storage
+validation
+```
+
+Preserve/reuse these when correct.
+
+A visual redesign is not permission to rewrite safety-critical request/reconciliation logic without evidence.
+
+---
+
+## 11. Presentation architecture direction
+
+The existing pages currently own too much independent runtime/network state.
+
+Target:
+
+```text
+MV3 service worker / shared runtime client
+        ↓
+Focusa event/snapshot normalization
+        ↓
+shared application state
+        ↓
+side panel · full Workforce · start page · wall
+```
+
+Svelte 5 is appropriate for the UI layer if implemented without moving canonical semantics into components.
+
+Prefer JavaScript/JSDoc where consistent with this repo unless the owner changes that direction.
+
+---
+
+## 12. Redesign slices
+
+Build vertical slices, not horizontal scaffolding projects:
+
+```text
+1. Workstream + Foreman + Direction
+2. Working Now / roster
+3. Needs You
+4. work progression / graph
+5. Evidence / verified closure
+6. UIAI execution / takeover
+7. voice
+8. fleet / topology
+9. Radar
+10. elastic capacity
+```
+
+Each slice should:
+
+- work against real current owners/contracts;
+- include degraded/stale states;
+- preserve exact refs;
+- have browser-level acceptance;
+- be useful by itself;
+- avoid speculative abstraction.
+
+---
+
+## 13. Visual target
+
+Target **expensive calm**:
+
+- Google-clean restraint;
+- excellent typography;
+- strong hierarchy;
+- generous efficient spacing;
+- subtle motion tied to state change;
+- minimal chrome;
+- meaningful color;
+- responsive Chromebook use;
+- accessibility;
+- technical depth one layer down.
+
+Avoid dashboard theater, gamer/neon swarm visuals, raw IDs and unnecessary stats.
+
+---
+
+## 14. Live identity and deployment invariants
+
+Preserve until a deliberate migration says otherwise:
+
+```text
+extension ID: ohfbbkpacpcapicpgplnnmifmlnmjggj
+public demo build path / startpage public-work behavior
+manifest identity/permissions required by current deployment
+Veragensia atomic stage/promote/rollback semantics
+CDP + extension + daemon + HTTP health verification
+```
+
+Do not expose customer data/secrets/browser profiles through Git or the public demo.
+
+---
+
+## 15. Chromebook / cloud working model
+
+### Chromebook
+
+Use for:
+
+- daily interaction/dogfood;
+- UI/UX verification;
+- browser behavior;
+- lightweight local development;
+- voice/side-panel workflow testing.
+
+### Cloud/server
+
+Use for:
+
+- heavy builds/tests;
+- daemon/runtime work;
+- deployment;
+- Veragensia/UIAI integration;
+- multi-agent implementation when appropriate.
+
+GitHub `main` is the shared source of truth between them.
+
+Do not create divergent Chromebook-only or server-only source copies.
+
+---
+
+## 16. Build-agent behavior
+
+Outcomes over process.
+
+When implementation is authorized:
+
+```text
+inspect
+→ make smallest correct change
+→ run relevant tests/build
+→ verify in browser/runtime
+→ fix discovered regressions
+→ update owning docs when architecture changed
+→ clean temporary artifacts/branches/workflows you created
+→ leave a clear commit/report
+```
+
+Do not stop because one tool fails if another safe route exists.
+
+Do not leave known cleanup for the owner.
+
+Do not write elaborate plans instead of implementing a ready vertical slice.
+
+---
+
+## 17. Promotion boundary
+
+`main` + green CI is not the same as live promotion.
+
+Before `wfx veragensia`:
+
+- CI/build passes;
+- relevant Chromebook/browser dogfood passes;
+- live-facing behavior is understood;
+- rollback remains available.
+
+After promotion:
+
+- verify extension ID;
+- verify page loads;
+- verify daemon/client health;
+- verify the changed user journey;
+- rollback on material failure.
+
+---
+
+## 18. Completion for a redesign slice
+
+A slice is not done because components render.
+
+It is done when:
+
+1. exact real source state is displayed;
+2. interaction reaches the owning operation;
+3. authority/entitlement/freshness are honest;
+4. success/failure/reconciliation behave correctly;
+5. the user journey works in Chromium/Chromebook;
+6. CI/build remain green;
+7. no duplicate canonical state was introduced;
+8. docs/contracts changed by the slice are reconciled;
+9. temporary implementation mess is removed.
+
+---
+
+## 19. Current directive
+
+The repository is migration-complete and stabilized.
+
+The next work is a **real product redesign**, not another recovery/replatforming cycle.
+
+Use the current architecture and UX specs as the target, preserve proven core primitives, and implement the new experience in vertical slices.
