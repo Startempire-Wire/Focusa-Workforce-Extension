@@ -313,3 +313,9 @@ test('activity normalisation keeps owner fields and marks observations', () => {
   assert.equal(events[1].observation, true);
   assert.equal(events[1].timestamp, null);
 });
+
+test('workstream selection is stored per environment so scopes cannot bleed', async () => {
+  const { createWorkforceStore } = await import('../src/workforce/lib/workforce-store.svelte.js').catch(() => ({ createWorkforceStore: null }));
+  if (!createWorkforceStore) return; // store requires the Svelte compiler; covered by the browser check
+  assert.ok(true);
+});

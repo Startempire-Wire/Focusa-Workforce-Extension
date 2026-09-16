@@ -40,10 +40,13 @@ function intentStore(chromeApi) {
 function randomKey(prefix) { return `${prefix}:${crypto.randomUUID()}`; }
 
 /** @param {any} chromeApi */
-async function loadSelection(chromeApi) {
+async function loadSelection(chromeApi, environmentId) {
   try {
     const raw = await chromeApi?.storage?.local?.get(SELECTION_KEY);
-    const value = raw?.[SELECTION_KEY];
+    const all = raw?.[SELECTION_KEY];
+    // Per-environment restore (WP-1.1.3): one browser may pair with several
+    // environments, and a Workstream selection must not bleed between them.
+    const value = environmentId ? all?.[environmentId] : null;
     if (value && typeof value === 'object') {
       return {
         projectRoot: typeof value.project_root === 'string' ? value.project_root : '',
@@ -55,10 +58,16 @@ async function loadSelection(chromeApi) {
 }
 
 /** @param {any} chromeApi @param {{projectRoot: string, continuityId: string}} selection */
-async function persistSelection(chromeApi, selection) {
+async function persistSelection(chromeApi, environmentId, selection) {
+  if (!environmentId) return;
   try {
-    await chromeApi?.storage?.local?.set({
-      [SELECTION_KEY]: { project_root: selection.projectRoot, continuity_id: selection.continuityId, updated_at: new Date().toISOString() },
+    const raw = await chromeApi?.storage?.local?.get(SELECTION_KEY);
+    const all = raw?.[SELECTION_KEY] ?? {};
+    await chromeApi.storage.local.set({
+      [SELECTION_KEY]: {
+        ...all,
+        [environmentId]: { project_root: selection.projectRoot, continuity_id: selection.continuityId, updated_at: new Date().toISOString() },
+      },
     });
   } catch { /* non-fatal */ }
 }
@@ -161,8 +170,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       environments = [...local, ...paired];
       if (!activeId && environments.length) activeId = environments[0].id;
       if (!selection.projectRoot) {
-        const stored = await loadSelection(chromeApi);
-        if (stored.projectRoot) selection = stored;
+        const stored = await loadSelection(chromeApi, activeId || environments[0]?.id);
+        if (stored.projectRoot || stored.continuityId) selection = stored;
       }
     } catch (error) {
       bootError = error instanceof Error ? error.message : String(error);
@@ -292,6 +301,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   async function setEnvironment(id) {
     activeId = id;
+    // Restore this environment's own Workstream selection before reading it.
+    selection = await loadSelection(chromeApi, id);
     await refreshOwner();
     await loadBoundTarget();
     await startStream();
@@ -468,7 +479,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       projectRoot: projectRoot ?? selection.projectRoot,
       continuityId: continuityId ?? selection.continuityId,
     };
-    await persistSelection(chromeApi, selection);
+    await persistSelection(chromeApi, activeId, selection);
     await refreshOwner();
   }
 
