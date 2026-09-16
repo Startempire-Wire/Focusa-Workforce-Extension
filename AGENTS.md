@@ -8,7 +8,7 @@
 
 > **Focusa Workforce operates the workforce.**
 
-The redesign package is now sufficiently specified that build agents are expected to execute it, not redesign it during implementation.
+The redesign package is sufficiently specified. Build agents are expected to execute it, not redesign it during implementation.
 
 ## Read order
 
@@ -39,6 +39,32 @@ current owning Focusa contracts for the active trajectory node
 ```
 
 Wirebot App is a read-only product/architecture dependency from this workstream. **Do not rewrite Wirebot App documentation.**
+
+## Outcomes over process — controlling execution law
+
+**True working product progress outranks planning, reporting, proof collection, documentation ceremony and process completion.**
+
+The trajectory, requirement IDs and acceptance notes exist to keep implementation aimed at the correct outcome. They are not a second job.
+
+Rules:
+
+```text
+implement before elaborating
+reuse valid evidence before creating more
+verify the material risk, not every imaginable assertion
+one check may satisfy many requirements
+never create proof artifacts merely to say proof exists
+do not repeat unchanged tests/builds without a concrete reason
+do not stop ready work for status reports, matrices or documentation updates
+continue independent ready work when one node is blocked
+update docs only when source truth or architecture materially changed
+```
+
+Do **not** spend hours making the trajectory look complete while the product is incomplete.
+
+Do **not** turn requirement IDs into ticket bureaucracy. Use them to preserve coverage and traceability for substantive work; do not annotate every line edit, refactor or obvious implementation step.
+
+Verification is sufficient when removing the check would leave an applicable acceptance condition or material failure risk unverified. Once that is true, advance.
 
 ## Do not improvise
 
@@ -86,7 +112,7 @@ real equivalent exists
 
 owning operation genuinely missing
 → implement the smallest owning Focusa operation first
-→ prove it
+→ verify the owning behavior
 → return to Workforce
 ```
 
@@ -177,7 +203,7 @@ and separate from lifecycle stage.
 
 Never infer whole-project completion from current Workpoint or branch completion.
 
-Run `docs/14-workforce-full-trajectory.md` continuously through ready authorized work.
+Run `docs/14-workforce-full-trajectory.md` continuously through ready authorized work. Do not pause after each Workpoint for ceremony or permission when the next node is already authorized and ready.
 
 ## Shared ecosystem seams
 
@@ -220,15 +246,17 @@ successful command = product completion
 one deployed branch = full trajectory completion
 ```
 
-Preserve:
+Preserve the owning closure path where applicable:
 
 ```text
 activity
 → Focusa Evidence
 → verification
 → settlement / Receipt
-→ accepted outcome / W.I.N.S. where applicable
+→ accepted outcome / W.I.N.S.
 ```
+
+Do not manufacture extra Evidence objects when an existing test, receipt, source revision, browser observation or owning-system result already proves the applicable acceptance condition.
 
 ## Security
 
@@ -252,20 +280,25 @@ Implement `docs/13-workforce-visual-system-and-reference-surfaces.md`.
 
 Canonical redesign is light-first, restrained and operational. Do not substitute a new dashboard/theme/component-library aesthetic during build.
 
-## Tests
+## Verification
 
-For changed requirements use the smallest sufficient proof set:
+Use the **minimum sufficient verification** for the changed behavior.
+
+Typical available checks include:
 
 ```text
-unit/contract
-build
-MV3/manifest
+focused unit/contract test
+build/MV3 validation
 real browser journey
 stale/degraded path
-negative authority/source case where material
+negative authority/source case when materially relevant
 ```
 
-Visual slices additionally verify 320px Side Panel, 1024px Chromebook, 1440px desktop, keyboard, visible focus, WCAG 2.2 AA and reduced motion.
+Do not automatically run all of them for every edit. Choose the smallest combination that proves the changed acceptance condition and material regression risk.
+
+Reuse still-valid results. Do not rebuild unchanged artifacts or rerun expensive browser journeys solely for ritual completeness.
+
+For major visual/surface acceptance, verify representative target sizes and accessibility obligations that the change actually affects. Do not turn every component edit into a full responsive/accessibility certification pass.
 
 ## Deployment
 
@@ -279,34 +312,33 @@ main + CI
 
 Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, rollback and health gates unless a deliberate migration changes them.
 
-## Outcomes over process
+## Execution loop
 
 ```text
-orient
-→ implement the current trajectory Workpoint
-→ test
-→ verify real behavior
-→ reconcile/refine affected nodes
-→ continue ready work
-→ clean artifacts you created
+orient once enough to act
+→ implement the current ready Workpoint
+→ verify the material behavior
+→ reconcile only what changed
+→ immediately continue the next ready authorized work
+→ clean artifacts you created as you go
 ```
 
 Tool failure is route failure when another safe route exists.
 
 Do not leave temporary branches, helper workflows, debug files or routine cleanup for the owner.
 
-## Completion
+## Completion reporting
 
-Report substantive progress as:
+Reporting is terse and does not interrupt execution. At a meaningful milestone or genuine blocker report:
 
 ```text
-Trajectory nodes completed
-Requirement IDs satisfied
-Owning operations consumed/added
-Proof/tests
-Blocked nodes
-Current Short frontier
-Live promotion status
+what now works
+what materially remains
+actual blocker, if any
+current frontier
+live promotion status, if relevant
 ```
+
+Requirement IDs, tests and source refs may be included when they materially help handoff/debugging; they are not mandatory ceremony for every change.
 
 Do not substitute process narrative for delivery.
