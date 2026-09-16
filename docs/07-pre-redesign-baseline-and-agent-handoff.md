@@ -16,12 +16,15 @@ Before material redesign work, read these current owners in order:
 ```text
 1. ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
 2. ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
-3. ADLBOS AGENT_OS_GOLDEN_PATH.md
-4. Wirebot-App docs/03-wirebot-app-user0-product-recommendations.md
-5. Workforce docs/00-workforce-canonical-product-and-implementation-spec.md
-6. Workforce docs/05-extension-runtime-data-and-integration-contracts.md
-7. Workforce docs/06-workforce-ux-and-interaction-spec.md
-8. current source + tests
+3. ADLBOS CROSS_PRODUCT_SEAM_CONTRACT.md
+4. ADLBOS AGENT_OS_GOLDEN_PATH.md
+5. Wirebot-App current product/convergence docs (read-only dependency; do not rewrite them from this work)
+6. Workforce docs/00-workforce-canonical-product-and-implementation-spec.md
+7. Workforce docs/05-extension-runtime-data-and-integration-contracts.md
+8. Workforce docs/06-workforce-ux-and-interaction-spec.md
+9. Workforce docs/08-workforce-redesign-blueprint.md
+10. Workforce docs/09-slice-1-workstream-foreman-direction-implementation.md
+11. current source + tests
 ```
 
 Do not use older concept docs to silently override these current boundaries.
@@ -108,7 +111,8 @@ The customer-level Operating Partner may be named Wirebot, Spock, Athena, etc. W
 Current chain:
 
 ```text
-Owner
+Canonical owner
+  +-- bounded delegated human operators where granted
   ↓
 Operating Partner / Chief of Staff
 Wirebot implementation family
@@ -137,6 +141,8 @@ Owns:
 - organization design/commissioning;
 - network context;
 - accepted outcome portfolio.
+
+Treat Wirebot App as a read-only integration dependency from this repo. Do not rewrite its docs as part of Workforce implementation.
 
 ### Focusa Workforce
 
@@ -194,9 +200,12 @@ operator.attention.v1
 operator.correlation.v1
 operator.capability_posture.v1
 operator.closure.v1
+operator.credential_use_ref.v1
 ```
 
-These are cross-product reference envelopes owned at ADLBOS integration level.
+Use ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md` for typed/source-qualified refs, contract/version compatibility, freshness, clock-skew/causal-order rules, replay/idempotency and credential-use references.
+
+These are cross-product reference envelopes, not another backend.
 
 Until exact schemas are implemented upstream, keep local adapter code clearly transitional and preserve exact source refs.
 
@@ -248,6 +257,8 @@ UIAI watch/takeover
 fleet/topology
 ```
 
+The current whole-product implementation blueprint is `docs/08-workforce-redesign-blueprint.md`.
+
 ---
 
 ## 10. Existing core to preserve
@@ -280,7 +291,7 @@ The existing pages currently own too much independent runtime/network state.
 Target:
 
 ```text
-MV3 service worker / shared runtime client
+shared Workforce runtime client
         ↓
 Focusa event/snapshot normalization
         ↓
@@ -288,6 +299,8 @@ shared application state
         ↓
 side panel · full Workforce · start page · wall
 ```
+
+MV3 service workers may suspend. Do not make canonical state, work continuity, or a long-lived stream depend on keeping the background worker alive.
 
 Svelte 5 is appropriate for the UI layer if implemented without moving canonical semantics into components.
 
@@ -312,11 +325,17 @@ Build vertical slices, not horizontal scaffolding projects:
 10. elastic capacity
 ```
 
+Slice 1 implementation details are canonical for current build work in:
+
+```text
+docs/09-slice-1-workstream-foreman-direction-implementation.md
+```
+
 Each slice should:
 
 - work against real current owners/contracts;
 - include degraded/stale states;
-- preserve exact refs;
+- preserve typed/source-qualified refs;
 - have browser-level acceptance;
 - be useful by itself;
 - avoid speculative abstraction.
@@ -454,6 +473,13 @@ It is done when:
 
 The repository is migration-complete and stabilized.
 
-The next work is a **real product redesign**, not another recovery/replatforming cycle.
+The current implementation target is:
 
-Use the current architecture and UX specs as the target, preserve proven core primitives, and implement the new experience in vertical slices.
+```text
+08 — whole-product redesign blueprint
+09 — Slice 1: Workstream + Foreman + Direction
+```
+
+Do not begin another recovery/replatforming or broad architecture cycle.
+
+Implement the new experience through Slice 1, preserve proven core primitives, expose missing Focusa owning operations honestly, and keep Wirebot App documentation unchanged from this workstream.
