@@ -17,7 +17,7 @@
   const buildStamp = typeof __WF_BUILD__ === 'string' ? __WF_BUILD__ : 'dev';
 
   let instruction = $state('');
-  let selectedSessionId = $state('');
+
   let environmentError = $state('');
   const liveMessage = $derived(
     store.streamState ? `owner stream ${store.streamState.phase}${store.lastEventAt ? ', last event ' + store.lastEventAt : ''}` : 'owner stream idle',
@@ -353,9 +353,10 @@
     <RosterList
       roster={store.roster}
       result={store.resultOf('sessions')}
-      selectedId={selectedSessionId}
-      onSelect={(entry) => { selectedSessionId = entry.id ?? ''; }}
+      selectedId={store.selectedSessionId}
+      onSelect={(entry) => store.selectSession(entry.id ?? '')}
     />
+    <StateNote label="Selected person" result={store.resultOf('sessionStatus')} />
     <StateNote label="Session profiles" result={store.resultOf('profiles')} />
     {#if store.sessionProfiles.length || store.sessionPresets.length}
       <details class="capability">

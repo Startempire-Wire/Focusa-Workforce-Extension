@@ -89,6 +89,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // roster wins the moment it reports one). Stopgap for the missing session.
   let boundTarget = $state(/** @type {any} */ (null));
   // In-page pairing (the side panel's proven flow, available on the full page).
+  let selectedSessionId = $state('');
   let pairing = $state(/** @type {any} */ (null));
   let pairingBusy = $state(false);
   let pairingError = $state('');
@@ -337,6 +338,22 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     pairingError = '';
   }
 
+  /**
+   * Select a person and read its owner-reported status.
+   * The owner decides what it reports; Workforce adds nothing.
+   * @param {string} sessionId
+   */
+  async function selectSession(sessionId) {
+    selectedSessionId = sessionId;
+    if (!active || !sessionId) return;
+    try {
+      record('sessionStatus', await createWorkforceClient({ baseUrl: active.baseUrl, token: active.token })
+        .sessionStatus(sessionId, selection.projectRoot ? { projectRoot: selection.projectRoot } : {}));
+    } catch (error) {
+      record('sessionStatus', { state: 'invalid', status: null, note: error?.message ?? 'status read failed', data: null });
+    }
+  }
+
   async function loadBoundTarget() {
     try {
       const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
@@ -453,6 +470,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
+    get selectedSessionId() { return selectedSessionId; },
     get pairing() { return pairing; },
     get pairingBusy() { return pairingBusy; },
     get pairingError() { return pairingError; },
@@ -481,6 +499,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     clearBoundTarget,
     beginPairing,
     cancelPairing,
+    selectSession,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,
