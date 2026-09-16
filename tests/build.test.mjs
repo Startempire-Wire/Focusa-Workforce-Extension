@@ -61,3 +61,22 @@ test('the Workforce full page is bundled and its Svelte sources do not ship', as
   const manifest = JSON.parse(await readFile(resolve(root, 'dist', 'manifest.json'), 'utf8'));
   assert.equal(manifest.commands['open-workforce'].suggested_key.default, 'Alt+Shift+K');
 });
+
+test('workforce surface consumes the docs/13 token contract', async () => {
+  const tokens = await readFile(resolve(root, 'src/workforce/tokens.css'), 'utf8');
+  for (const token of [
+    '--bg-app', '--bg-surface', '--bg-subtle', '--text-primary', '--text-secondary', '--text-muted',
+    '--border-default', '--border-focus', '--accent', '--success', '--warning', '--danger', '--info',
+    '--violet', '--settled', '--radius-sm', '--radius-md', '--radius-pill', '--space-tight',
+    '--space-standard', '--text-body', '--text-small', '--text-micro', '--page-gutter',
+  ]) {
+    assert.ok(tokens.includes(token), `docs/13 token ${token} is declared`);
+  }
+  const page = await readFile(resolve(root, 'src/workforce/workforce.css'), 'utf8');
+  assert.match(page, /@import '\.\/tokens\.css'/, 'page base imports the token layer');
+  assert.match(page, /prefers-reduced-motion/, 'reduced motion is respected');
+  assert.match(page, /:focus-visible/, 'focus is visible');
+  // the shipped theme must not hardcode the previous dark palette
+  const app = await readFile(resolve(root, 'src/workforce/App.svelte'), 'utf8');
+  assert.ok(!/#0d1117|#30363d/.test(app), 'no legacy hardcoded dark colours remain in the page');
+});

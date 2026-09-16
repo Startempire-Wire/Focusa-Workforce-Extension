@@ -2,6 +2,7 @@
   /**
    * Honest owner-state note. Renders exactly what the owner reported:
    * result state, owner failure class, and owner recovery action when present.
+   * Meaning is carried by text + outline weight, not colour alone.
    */
   let { label = 'Owner', result = null } = $props();
 
@@ -17,7 +18,7 @@
 </script>
 
 {#if result}
-  <p class="state-note {tone}" title={result.status ? `HTTP ${result.status}` : ''}>
+  <p class="state-note {tone}" role="status" title={result.status ? `HTTP ${result.status}` : ''}>
     <span class="pill">{label}: {result.state}</span>
     {#if result.note}<span class="detail">{result.note}</span>{/if}
     {#if result.code}<code>{result.code}</code>{/if}
@@ -26,13 +27,20 @@
 {/if}
 
 <style>
-  .state-note { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
-  .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
-  .detail { opacity: 0.75; }
-  code { opacity: 0.85; }
-  .ok { color: #3fb950; }
-  .warn { color: #d29922; }
-  .blocked { color: #f85149; }
-  .error { color: #f85149; }
-  .idle { color: #8b949e; }
+  .state-note {
+    display: flex; flex-wrap: wrap; gap: var(--space-tight); align-items: center;
+    margin: var(--space-micro) 0; font-size: var(--text-small); color: var(--text-secondary);
+  }
+  .pill {
+    padding: 2px var(--space-tight);
+    border-radius: var(--radius-pill);
+    border: 1px solid currentColor;
+    font-weight: var(--weight-medium);
+  }
+  .detail { color: var(--text-secondary); }
+  code { color: var(--text-muted); }
+  .ok { color: var(--success); }
+  .warn { color: var(--warning); }
+  .blocked, .error { color: var(--danger); }
+  .idle { color: var(--text-muted); }
 </style>

@@ -5,3 +5,4 @@ dist.rollback/
 SHA256SUMS
 node_modules/
 *.log
+.beads/

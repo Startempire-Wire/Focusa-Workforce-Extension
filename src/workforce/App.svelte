@@ -19,6 +19,9 @@
   let instruction = $state('');
   let selectedSessionId = $state('');
   let environmentError = $state('');
+  const liveMessage = $derived(
+    store.streamState ? `owner stream ${store.streamState.phase}${store.lastEventAt ? ', last event ' + store.lastEventAt : ''}` : 'owner stream idle',
+  );
   let scanFrom = $state('~/src');
 
   const selectedSession = $derived(store.roster.find((r) => r.id === selectedSessionId) ?? null);
@@ -57,6 +60,8 @@
 </script>
 
 <main>
+  <a class="skip" href="#wf-workstream">Skip to Workstream</a>
+  <div class="sr-only" role="status" aria-live="polite">{liveMessage}</div>
   <header class="app-head">
     <div>
       <h1>Focusa Workforce</h1>
@@ -70,7 +75,7 @@
         {/if}
       </p>
     </div>
-    <button type="button" onclick={() => store.refreshOwner()} disabled={!store.active}>Refresh</button>
+    <button type="button" class="wf-btn" onclick={() => store.refreshOwner()} disabled={!store.active}>Refresh</button>
   </header>
 
   {#if store.bootError}
@@ -78,8 +83,8 @@
   {/if}
 
   <!-- Environment -->
-  <section class="card">
-    <h2>Environment</h2>
+  <section class="card" aria-labelledby="wf-env">
+    <h2 id="wf-env">Environment</h2>
     {#if store.environments.length === 0}
       <p class="muted">No paired Focusa environment.</p>
     {:else}
@@ -113,8 +118,8 @@
   </section>
 
   <!-- Workstream scope -->
-  <section class="card">
-    <h2>Workstream</h2>
+  <section class="card" id="wf-workstream" aria-labelledby="wf-workstream-h">
+    <h2 id="wf-workstream-h">Workstream</h2>
     <p class="muted tiny">
       Owner identity axes: project_root = project boundary · continuity_id = logical Workstream.
     </p>
@@ -137,7 +142,7 @@
     {/if}
 
     <div class="row">
-      <input type="text" placeholder="directory to scan" bind:value={scanFrom} />
+      <input type="text" aria-label="Directory to scan for projects" placeholder="directory to scan" bind:value={scanFrom} />
       <button type="button" onclick={() => store.discoverProjects(scanFrom)} disabled={store.projectBusy || !store.active}>
         {store.projectBusy ? 'Asking owner…' : 'Scan for projects'}
       </button>
@@ -160,12 +165,14 @@
     <div class="row">
       <input
         type="text"
+        aria-label="Project root"
         placeholder="/absolute/project/root"
         value={store.selection.projectRoot}
         onchange={(e) => store.setSelection({ projectRoot: e.currentTarget.value.trim() })}
       />
       <input
         type="text"
+        aria-label="Continuity id (Workstream)"
         placeholder="continuity id (Workstream)"
         value={store.selection.continuityId}
         onchange={(e) => store.setSelection({ continuityId: e.currentTarget.value.trim() })}
@@ -181,8 +188,8 @@
   </section>
 
   <!-- Foreman -->
-  <section class="card">
-    <h2>Foreman</h2>
+  <section class="card" aria-labelledby="wf-foreman">
+    <h2 id="wf-foreman">Foreman</h2>
     {#if store.ownerGaps.includes('foreman')}
       <p class="gap">
         Owner gap: Focusa Spec 182 Project Foreman has no daemon operation yet (UP-01).
@@ -202,8 +209,8 @@
   </section>
 
   <!-- Frontier / trajectory -->
-  <section class="card">
-    <h2>Frontier</h2>
+  <section class="card" aria-labelledby="wf-frontier">
+    <h2 id="wf-frontier">Frontier</h2>
     <StateNote label="Trajectory" result={store.resultOf('trajectory')} />
     {#if store.trajectory}
       <dl class="facts">
@@ -218,8 +225,8 @@
   </section>
 
   <!-- Direction -->
-  <section class="card">
-    <h2>Direction</h2>
+  <section class="card" aria-labelledby="wf-direction">
+    <h2 id="wf-direction">Direction</h2>
     {#if !selectedSession}
       <p class="muted">Select a person (silent session) to address exact Direction.</p>
     {:else if !steerTarget}
@@ -234,6 +241,7 @@
       <form onsubmit={submitDirection}>
         <textarea
           rows="3"
+          aria-label="Direction instruction"
           placeholder="Direct this Foreman…"
           bind:value={instruction}
           disabled={store.directing}
@@ -255,7 +263,8 @@
   </section>
 
   <!-- People -->
-  <section class="card">
+  <section class="card" aria-labelledby="wf-people-h">
+    <h2 id="wf-people-h" class="wf-section-label">People</h2>
     <RosterList
       roster={store.roster}
       result={store.resultOf('sessions')}
@@ -294,31 +303,98 @@
 </main>
 
 <style>
-  main { max-width: 880px; margin: 0 auto; padding: 24px 20px 48px; display: grid; gap: 14px; }
-  .app-head { display: flex; align-items: center; justify-content: space-between; }
-  h1 { font-size: 18px; margin: 0; }
-  .sub { margin: 2px 0 0; font-size: 12px; opacity: 0.65; }
-  .stamp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; opacity: 0.8; border: 1px solid #30363d; border-radius: 999px; padding: 1px 7px; }
-  .live { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 999px; padding: 1px 7px; border: 1px solid currentColor; }
-  .live.live { color: #3fb950; }
-  .live.replaying { color: #d29922; }
-  .live.unavailable, .live.unauthorized { color: #f85149; }
-  .card { border: 1px solid #30363d; border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 2px; opacity: 0.75; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  input, select, textarea { background: #0d1117; color: inherit; border: 1px solid #30363d; border-radius: 8px; padding: 7px 9px; font: inherit; min-width: 0; }
+  .skip {
+    position: absolute; left: -9999px; top: 0; background: var(--bg-surface);
+    padding: var(--space-tight) var(--space-compact); border-radius: var(--radius-sm); z-index: 10;
+  }
+  .skip:focus { left: var(--space-compact); top: var(--space-tight); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: var(--space-section) var(--page-gutter) var(--space-page);
+    display: grid;
+    gap: var(--space-compact);
+  }
+
+  .app-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-standard); flex-wrap: wrap; }
+  h1 { font-size: var(--text-page-title); line-height: var(--leading-page-title); font-weight: var(--weight-bold); margin: 0; }
+  .sub { margin: var(--space-micro) 0 0; font-size: var(--text-small); color: var(--text-secondary); display: flex; gap: var(--space-tight); align-items: center; flex-wrap: wrap; }
+  .stamp { font-family: var(--font-mono); font-size: var(--text-micro); color: var(--text-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-pill); padding: 1px var(--space-tight); }
+  .live { font-size: var(--text-micro); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.06em; border-radius: var(--radius-pill); padding: 1px var(--space-tight); border: 1px solid currentColor; }
+  .live.live { color: var(--success); }
+  .live.replaying { color: var(--warning); }
+  .live.unavailable, .live.unauthorized { color: var(--danger); }
+
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-roomy);
+    display: grid;
+    gap: var(--space-tight);
+    box-shadow: var(--elevation-card);
+  }
+  h2 {
+    font-size: var(--text-micro);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .row { display: flex; gap: var(--space-tight); align-items: center; flex-wrap: wrap; }
+  input, select, textarea {
+    font: inherit; font-size: var(--text-small); color: var(--text-primary);
+    background: var(--bg-surface); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: var(--space-tight) var(--space-compact);
+    min-height: 32px; min-width: 0;
+  }
+  input::placeholder, textarea::placeholder { color: var(--text-muted); }
   input { flex: 1 1 240px; }
-  textarea { width: 100%; resize: vertical; margin-bottom: 8px; }
-  button { background: #21262d; color: inherit; border: 1px solid #30363d; border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .muted { font-size: 12px; opacity: 0.72; margin: 0; }
-  .tiny { font-size: 11px; }
-  .gap { border-left: 3px solid #d29922; padding: 6px 10px; background: rgba(210,153,34,0.08); font-size: 12px; border-radius: 6px; }
-  .facts { display: grid; grid-template-columns: 90px 1fr; gap: 2px 10px; margin: 4px 0 0; font-size: 12px; }
-  .facts dt { opacity: 0.6; }
-  .facts dd { margin: 0; }
-  .plain { margin: 4px 0 0 16px; padding: 0; font-size: 12px; display: grid; gap: 4px; }
-  .capability { font-size: 12px; }
-  .capability summary { cursor: pointer; opacity: 0.8; }
-  .plain button { padding: 3px 8px; font-size: 11px; margin-left: 6px; }
+  textarea { width: 100%; resize: vertical; margin-bottom: var(--space-tight); line-height: var(--leading-body); }
+  button {
+    font: inherit; font-size: var(--text-small); font-weight: var(--weight-medium);
+    color: var(--text-primary); background: var(--bg-surface);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    padding: var(--space-tight) var(--space-compact); min-height: 32px; cursor: pointer;
+  }
+  button:hover { background: var(--bg-hover); }
+  button:disabled { color: var(--text-disabled); background: var(--bg-subtle); cursor: default; }
+  form button[type='submit'] { background: var(--accent); border-color: var(--accent); color: var(--text-inverse); }
+  form button[type='submit']:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  form button[type='submit']:disabled { background: var(--bg-subtle); border-color: var(--border-default); }
+
+  .muted { font-size: var(--text-small); color: var(--text-secondary); margin: 0; }
+  .tiny { font-size: var(--text-micro); }
+  .gap {
+    border-left: 3px solid var(--warning);
+    background: var(--warning-subtle);
+    color: var(--text-primary);
+    padding: var(--space-tight) var(--space-compact);
+    font-size: var(--text-small);
+    border-radius: var(--radius-sm);
+    margin: 0;
+  }
+  .facts { display: grid; grid-template-columns: 96px 1fr; gap: 2px var(--space-tight); margin: var(--space-micro) 0 0; font-size: var(--text-small); }
+  .facts dt { color: var(--text-muted); }
+  .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .plain { margin: var(--space-micro) 0 0 var(--space-standard); padding: 0; font-size: var(--text-small); display: grid; gap: var(--space-micro); }
+  .plain button { padding: 3px var(--space-tight); font-size: var(--text-micro); margin-left: var(--space-tight); min-height: 24px; }
+  .capability { font-size: var(--text-small); }
+  .capability summary { cursor: pointer; color: var(--text-secondary); }
+
+  @media (max-width: 479px) {
+    main { padding: var(--space-roomy) var(--page-gutter) var(--space-section); }
+    h1 { font-size: var(--text-display); line-height: var(--leading-display); }
+    .card { padding: var(--space-standard); }
+    .app-head { align-items: stretch; }
+    .app-head > button { width: 100%; }
+    .facts { grid-template-columns: 1fr; gap: 0; }
+  }
 </style>

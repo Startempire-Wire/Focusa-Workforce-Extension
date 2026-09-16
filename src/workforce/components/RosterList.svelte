@@ -8,14 +8,14 @@
 
 <section class="roster">
   <header>
-    <h2>People</h2>
+    <h2 class="wf-section-label">People</h2>
     <span class="count">{roster.length}</span>
   </header>
 
   {#if result && result.state !== 'ok'}
-    <p class="muted">Owner roster unavailable ({result.state}).</p>
+    <p class="wf-muted">Owner roster unavailable ({result.state}).</p>
   {:else if roster.length === 0}
-    <p class="muted">No owner-reported sessions in this Workstream scope.</p>
+    <p class="wf-muted">No owner-reported sessions in this Workstream scope.</p>
   {:else}
     <ul>
       {#each roster as entry (entry.id ?? entry.label)}
@@ -23,6 +23,7 @@
           <button
             type="button"
             class:selected={selectedId === entry.id}
+            aria-pressed={selectedId === entry.id}
             disabled={!onSelect}
             onclick={() => onSelect?.(entry)}
           >
@@ -40,15 +41,21 @@
 </section>
 
 <style>
-  .roster header { display: flex; align-items: baseline; gap: 8px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; opacity: 0.8; }
-  .count { font-size: 12px; opacity: 0.6; }
-  ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
-  button { width: 100%; text-align: left; background: transparent; border: 1px solid #30363d; border-radius: 8px; padding: 8px 10px; color: inherit; cursor: pointer; display: grid; gap: 2px; }
+  .roster header { display: flex; align-items: baseline; gap: var(--space-tight); }
+  h2 { margin: 0; }
+  .count { font-size: var(--text-small); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  ul { list-style: none; margin: var(--space-tight) 0 0; padding: 0; display: grid; gap: var(--space-tight); }
+  button {
+    width: 100%; text-align: left; background: var(--bg-surface);
+    border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+    padding: var(--space-tight) var(--space-compact); color: inherit; cursor: pointer;
+    display: grid; gap: 2px; min-height: 44px;
+  }
+  button:hover { background: var(--bg-hover); }
   button:disabled { cursor: default; }
-  button.selected { border-color: #58a6ff; }
-  .name { font-weight: 600; font-size: 13px; }
-  .meta { display: flex; gap: 8px; font-size: 11px; opacity: 0.7; }
-  .role { text-transform: uppercase; letter-spacing: 0.04em; }
-  .muted { font-size: 12px; opacity: 0.6; }
+  button.selected { border-color: var(--accent); background: var(--bg-selected); }
+  .name { font-weight: var(--weight-semibold); font-size: var(--text-body); }
+  .meta { display: flex; gap: var(--space-tight); font-size: var(--text-micro); color: var(--text-muted); flex-wrap: wrap; }
+  .role { text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--weight-semibold); }
+  @media (max-width: 479px) { .meta { font-size: var(--text-small); } }
 </style>
