@@ -232,6 +232,8 @@ export function createWorkforceClient(config) {
     sessions: (projectRoot) => call('silentSessions', { scope: { projectRoot } }),
     /** @param {string} projectRoot */
     sessionProfiles: (projectRoot) => call('silentSessionProfiles', { scope: { projectRoot } }),
+    /** @param {string} projectRoot */
+    sessionPresets: (projectRoot) => call('silentSessionPresets', { scope: { projectRoot } }),
     /** @param {string} sessionId */
     sessionStatus: (sessionId, scope) => call('silentSessionStatus', { path: { session_id: sessionId }, scope }),
 

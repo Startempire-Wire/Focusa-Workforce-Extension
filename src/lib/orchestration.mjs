@@ -19,8 +19,14 @@ function exactTarget(target) {
   return Object.freeze({ session_id: target.session_id, run_id: target.run_id, generation: target.generation });
 }
 function headers(token, permission, json = false) {
-  if (typeof token !== 'string' || !token) throw new TypeError('paired-device token is required');
-  return { accept: 'application/json', authorization: `Bearer ${token}`, 'x-focusa-permissions': permission, ...(json ? { 'content-type': 'application/json' } : {}) };
+  // Local (loopback) environments are authenticated by the owner as the device
+  // principal and carry no token; paired environments always send one.
+  return {
+    accept: 'application/json',
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    'x-focusa-permissions': permission,
+    ...(json ? { 'content-type': 'application/json' } : {}),
+  };
 }
 async function request(path, { baseUrl, token, fetchImpl, method = 'GET', body, signal, permission = 'write:*' }) {
   const response = await fetchImpl(new URL(path, normalizeDaemonOrigin(baseUrl)), { method, signal, headers: headers(token, permission, body !== undefined), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });

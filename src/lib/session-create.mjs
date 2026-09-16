@@ -51,9 +51,13 @@ export function buildSafeSessionConfig({ packet, display_name, provider, model, 
 }
 
 async function post(path, body, { baseUrl, token, fetchImpl = globalThis.fetch, signal }) {
+  // A local (loopback) environment has no device token: the owner authenticates
+  // the device itself as principal:local-loopback. Paired environments always
+  // send the token.
   const response = await fetchImpl(new URL(path, normalizeDaemonOrigin(baseUrl)), {
     method: 'POST', signal, headers: { accept: 'application/json', 'content-type': 'application/json',
-      authorization: `Bearer ${required(token, 'token')}`, 'x-focusa-permissions': 'write:*' }, body: JSON.stringify(body),
+      ...(token ? { authorization: `Bearer ${required(token, 'token')}` } : {}),
+      'x-focusa-permissions': 'write:*' }, body: JSON.stringify(body),
   });
   let envelope = null;
   try { envelope = await response.json(); } catch { throw new SessionCreateError('invalid_envelope', 'daemon response is not JSON', response.status); }

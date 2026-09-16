@@ -16,6 +16,7 @@ import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwne
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
+import { preflightSafeSession, createPreflightedSession } from '../../lib/session-create.mjs';
 
 const SELECTION_KEY = 'focusa.workforce.selection.v1';
 const INTENT_KEY = 'focusa.workforce.intents.v1';
@@ -98,6 +99,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   const foremanProfiles = $derived(reads.roles?.state === ResultState.OK ? (reads.roles.data?.profiles ?? []) : []);
   const anyBlocked = $derived(Object.values(reads).some((r) => r.state === ResultState.ENTITLEMENT_BLOCKED));
   const projectDashboard = $derived(reads.projects ? projectsFromOwner(reads.projects.data) : null);
+  const sessionProfiles = $derived(reads.profiles?.state === ResultState.OK ? (reads.profiles.data?.data?.profiles ?? []) : []);
+  const sessionPresets = $derived(reads.presets?.state === ResultState.OK ? (reads.presets.data?.data?.presets ?? []) : []);
   const projectSelectionRequired = $derived(projectDashboard?.failureClass === 'project_root_selection_required');
 
   function record(name, r) {
@@ -208,6 +211,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('workpoint', await c.workpointCurrent(selection.projectRoot));
       record('sessions', await c.sessions(selection.projectRoot));
       record('profiles', await c.sessionProfiles(selection.projectRoot));
+      record('presets', await c.sessionPresets(selection.projectRoot));
     }
     if (workstream) {
       record('trajectory', await c.trajectory(workstream));
@@ -266,6 +270,30 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   }
 
   /**
+   * Owner session control (start/pause/resume/cancel) on an exact target,
+   * through the proven governed orchestration path.
+   * @param {{action: 'start'|'pause'|'resume'|'cancel', target: object}} input
+   */
+  async function controlSession({ action, target }) {
+    if (!active) throw new Error('no active environment selected');
+    directing = true;
+    lastDirection = null;
+    try {
+      const outcome = await orchestrateAction({
+        action, target, idempotency_key: randomKey(action),
+        idempotencyStore: intentStore(chromeApi),
+        requestOptions: { baseUrl: active.baseUrl, token: active.token },
+      });
+      lastDirection = { ok: true, action, status: outcome.mutation_status ?? null, approval: outcome.approval?.approval_id ?? null };
+    } catch (error) {
+      lastDirection = { ok: false, kind: error?.kind ?? 'error', message: error instanceof Error ? error.message : String(error) };
+    } finally {
+      directing = false;
+      await refreshOwner();
+    }
+  }
+
+  /**
    * Submit Direction to one exact owner target (silent session/run/generation).
    * Uses the proven governed orchestration path: durable idempotency intent,
    * owner approval when the action requires it, exact-target refresh, canonical re-read.
@@ -310,6 +338,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get entitlement() { return entitlement; },
     get entitlementState() { return entitlementState; },
     get roster() { return roster; },
+    get sessionProfiles() { return sessionProfiles; },
+    get sessionPresets() { return sessionPresets; },
     get trajectory() { return trajectory; },
     get foremanProfiles() { return foremanProfiles; },
     get ownerGaps() { return ownerGaps; },
@@ -332,6 +362,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     useProject,
     startStream,
     stopStream,
+    controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,
   };
