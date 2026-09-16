@@ -1,7 +1,7 @@
 # Focusa Workforce — Extension Runtime, Data, and Integration Contracts
 
-**Status:** implementation contract  
-**Depends on:** docs/00, Focusa Specs 151/156/164/174/175/181/182/183, Veragensia Docs 191/193/194/195/201
+**Status:** CURRENT implementation contract  
+**Depends on:** Workforce canonical product spec, Focusa generated contracts, ADLBOS shared seam contracts, Wirebot App convergence, UIAI/Veragensia owning contracts.
 
 ---
 
@@ -9,49 +9,71 @@
 
 The extension is a **projection and intent client**.
 
-It may cache bounded state for responsiveness, but it does not become the canonical owner of Workstreams, Foremen, worker state, Evidence, approvals, topology, or conversation truth.
+It may cache bounded state for responsiveness, but it does not become the canonical owner of:
+
+```text
+Workstreams
+Foremen
+worker/task state
+approvals
+Evidence
+credentials
+authority/budgets
+conversation truth
+runtime/body state
+entitlements
+federation state
+Operating Partner identity
+```
+
+Every consequential operation resolves through its owning product contract.
 
 ---
 
 ## 1. MV3 process model
+
+Target runtime shape:
 
 ```text
 Manifest V3 Extension
 
 service worker
   ├─ environment/pairing registry
-  ├─ auth token broker (scoped extension credential)
-  ├─ Focusa clients
+  ├─ scoped auth handles
+  ├─ shared Workforce runtime client
   ├─ event stream coordinator
-  ├─ snapshot cache
-  ├─ notification broker
+  ├─ normalized snapshot/cache
+  ├─ notification/attention broker
   ├─ command/context-menu router
-  ├─ UIAI deep-link router
+  ├─ surface-handoff router
   └─ migration/version coordinator
 
 side panel
-  └─ compact workforce projection + Direction Bar
+  └─ compact live collaboration
 
-full app page
-  └─ full roster/work/approvals/evidence/audit/topology
+full app
+  └─ deep workforce operations
 
-start page (optional)
-  └─ operational briefing / quick direction
+start page
+  └─ optional orientation / return surface
+
+wall
+  └─ optional read-only situational projection
 
 options/settings
-  └─ pairing / channels / preferences / diagnostics
+  └─ pairing / preferences / diagnostics
 
-content script (minimal)
-  └─ current page metadata and explicit capture/context actions
+content script
+  └─ minimal explicit page-context capture/actions
 ```
 
-The service worker must tolerate suspension/restart. Durable work cannot depend on keeping it alive.
+The service worker may be suspended/restarted. Durable work never depends on keeping it alive.
+
+The redesign should move daemon/event/snapshot coordination toward the shared runtime client instead of having every page independently reinvent connectivity/state.
 
 ---
 
 ## 2. Local extension state
-
-### 2.1 `WorkforceLocalState`
 
 ```ts
 WorkforceLocalState {
@@ -59,45 +81,48 @@ WorkforceLocalState {
   activeEnvironmentId
   activeProjectRef?
   activeWorkstreamRef?
+  activeForemanRef?
   environments[]
   preferences
   projectionCache
   eventCursors
   uiState
+  partnerPresentationCache?
 }
 ```
 
-### 2.2 Allowed local state
+Allowed local state:
 
 ```text
 paired environment metadata
-scoped extension auth handle/material
+scoped extension auth material/handles
 UI preferences
-last selected project/workstream
-last known bounded projection
-last event cursor/epoch
+selected project/workstream
+last known bounded projections
+last stream cursor/epoch
 release/build diagnostics
+bounded partner presentation cache
 ```
 
-### 2.3 Forbidden local authority
-
-Do not use browser storage as canonical storage for:
+Forbidden local canonical authority:
 
 ```text
-Workpoint state
-agent/task state
-approval state
+Workpoint/work/task reducer state
+worker employment/assignment authority
+approval truth
 Evidence truth
 credential grants
 budget authority
-Foreman memory
+Foreman/partner memory
 Conversation Ledger
 TopologyGrant
+entitlement grants
+federation grants
 ```
 
 ---
 
-## 3. Environment model
+## 3. Environment and fleet model
 
 ```ts
 WorkforceEnvironment {
@@ -107,6 +132,8 @@ WorkforceEnvironment {
   environmentClass: 'local' | 'private' | 'cloud_agent_computer' | 'public_demo'
   nodeRef?
   daemonRef?
+  ownerRef?
+  deploymentRef?
   pairingState
   authRef?
   focusaVersion?
@@ -118,15 +145,21 @@ WorkforceEnvironment {
 }
 ```
 
-One browser may pair with multiple environments.
+One browser may pair with multiple environments belonging to the same authorized owner/Operator context.
 
-Every projected item must retain its source environment/daemon identity.
+Every projected entity retains source environment/daemon identity.
+
+Call this **fleet / multi-daemon aggregation**.
+
+Do not call it sovereign federation.
+
+Cross-Operator federation is a separate Startempire/network trust boundary and is projected only through the owning federation contracts.
 
 ---
 
-## 4. Pairing contract
+## 4. Pairing
 
-Conceptual request:
+Conceptual client requirements:
 
 ```ts
 PairingRequest {
@@ -137,8 +170,6 @@ PairingRequest {
   nonce
 }
 ```
-
-Conceptual response:
 
 ```ts
 PairingResult {
@@ -154,13 +185,51 @@ PairingResult {
 }
 ```
 
-The exact wire schema must be taken from current Focusa pairing contracts. These shapes define client needs, not permission to invent parallel server APIs.
+These shapes are client requirements only. Exact wire schemas come from the current Focusa/generated pairing registry.
+
+Rules:
+
+- discovery is not authentication;
+- browser permission is not Focusa authority;
+- each client device has scoped/revocable identity;
+- pairing one environment does not authorize another;
+- pairing does not merge reducer state;
+- credentials never travel in handoff URLs.
 
 ---
 
-## 5. Snapshot model
+## 5. Operating Partner projection
 
-The UI consumes a normalized projection rather than arbitrary raw API responses.
+Workforce is Operator-neutral and may display a customer-selected partner presentation.
+
+Use the ADLBOS `operator.partner_profile.v1` family.
+
+Conceptual projection:
+
+```ts
+OperatingPartnerProjection {
+  ownerRef
+  partnerRef
+  implementationFamily
+  displayName
+  avatarRef?
+  voiceProfileRef?
+  brandRef?
+  deploymentRef?
+  networkPresentationRef?
+  freshness
+}
+```
+
+This is presentation/relationship context, not an architecture-authority claim.
+
+Changing `displayName` does not create a new `partnerRef`.
+
+---
+
+## 6. Workforce snapshot
+
+The UI consumes normalized bounded projections rather than arbitrary raw API responses.
 
 ```ts
 WorkforceSnapshot {
@@ -168,28 +237,36 @@ WorkforceSnapshot {
   revision
   generatedAt
   freshness
+
   owner
+  operatingPartner?
+
   projects[]
   workstreams[]
   foremen[]
   agents[]
   work[]
-  approvals[]
+  attention[]
   evidence[]
   auditTail[]
   topology[]
+
   radarSummary?
   resourcePosture?
+  federationPosture?
+  capabilityPosture?
 }
 ```
 
 Each entity keeps upstream refs intact.
 
+`attention[]` replaces any temptation to invent a parallel generic approval store in the client.
+
 ---
 
-## 6. Core projected entities
+## 7. Core projected entities
 
-### 6.1 Foreman
+### 7.1 Foreman
 
 ```ts
 ForemanProjection {
@@ -199,17 +276,17 @@ ForemanProjection {
   displayName
   roleRef
   status
-  runtimeAttachment
+  runtimeAttachment?
   currentWorkpointRef?
   workerRefs[]
-  attention[]
+  attentionRefs[]
   lastEvidenceRef?
   health
   freshness
 }
 ```
 
-### 6.2 Agent/worker
+### 7.2 Agent / worker
 
 ```ts
 AgentProjection {
@@ -231,7 +308,7 @@ AgentProjection {
 }
 ```
 
-### 6.3 Work item
+### 7.3 Work
 
 ```ts
 WorkProjection {
@@ -245,34 +322,16 @@ WorkProjection {
   acceptanceRefs[]
   state
   blockedReason?
-  approvalRef?
+  attentionRef?
   evidenceRefs[]
   executionRef?
+  correlationRef?
   startedAt?
   updatedAt
 }
 ```
 
-### 6.4 Approval
-
-```ts
-ApprovalProjection {
-  approvalRef
-  actorRef
-  operationRef
-  targetRefs[]
-  workstreamRef
-  consequenceClass
-  summary
-  materialEffects[]
-  reversibility
-  evidenceRefs[]
-  state
-  expiresAt?
-}
-```
-
-### 6.5 Evidence
+### 7.4 Evidence
 
 ```ts
 EvidenceProjection {
@@ -287,11 +346,12 @@ EvidenceProjection {
   artifactRef?
   previewRef?
   receiptRef?
+  closureRef?
   capturedAt
 }
 ```
 
-### 6.6 Topology/body
+### 7.5 Topology
 
 ```ts
 TopologyProjection {
@@ -313,9 +373,52 @@ TopologyProjection {
 
 ---
 
-## 7. Event envelope
+## 8. Shared attention / Needs You
 
-The normalized client event envelope should preserve upstream identity:
+Workforce consumes ADLBOS `operator.attention.v1`.
+
+Conceptual projection:
+
+```ts
+AttentionProjection {
+  attentionRef
+  sourceOwner
+  sourceRef
+  ownerRef
+  projectRef?
+  workstreamRef?
+  workRef?
+
+  class:
+    | 'approval'
+    | 'owner_truth'
+    | 'authentication'
+    | 'takeover'
+    | 'blocker'
+    | 'budget_resource'
+    | 'recovery'
+    | 'opportunity'
+
+  summary
+  consequence?
+  urgency?
+  expiresAt?
+  primaryActionRef?
+  freshness
+}
+```
+
+Rules:
+
+1. The source product owns the underlying decision/state.
+2. Workforce may render and route it.
+3. Wirebot may render the same source item at owner-wide altitude.
+4. Resolution must be correlated back to the source object.
+5. Do not create a second approval merely because Workforce needs a card.
+
+---
+
+## 9. Event envelope
 
 ```ts
 WorkforceEvent {
@@ -328,26 +431,29 @@ WorkforceEvent {
   occurredAt
   receivedAt
   entityRef?
+  projectRef?
   workstreamRef?
   revision?
+  correlationRef?
   payload
 }
 ```
 
-Event handling laws:
+Rules:
 
-1. Ignore duplicate `eventId`/sequence where semantics allow.
-2. Detect sequence gaps.
-3. Mark affected projections stale after a gap.
-4. Resnapshot rather than guessing missing mutations.
-5. A service-worker restart may lose in-memory state; resume using persisted cursor only if upstream contract supports it.
-6. Never replay mutation requests from event history.
+- deduplicate where upstream semantics permit;
+- detect sequence gaps;
+- mark affected projection stale;
+- resnapshot rather than invent missing state;
+- persist cursor only where upstream supports replay safely;
+- never replay mutations from event history;
+- restart/suspension must not create duplicate work.
 
 ---
 
-## 8. Freshness model
+## 10. Freshness
 
-Every remote projection should resolve to one of:
+Remote projections resolve to:
 
 ```text
 fresh
@@ -357,24 +463,24 @@ unavailable
 incompatible
 ```
 
-UI rules:
+`fresh` does not itself mean authorized.
 
-- `fresh`: normal actions according to authority.
-- `stale`: show stale marker; mutation may require resnapshot/preflight.
-- `unknown`: do not claim current state.
-- `unavailable`: dependency/source offline.
-- `incompatible`: version/contract mismatch; explain upgrade path.
+A fresh cache of old source data does not make the source fresh.
+
+Mutations against stale consequential state should preflight/resnapshot according to owning operation contracts.
 
 ---
 
-## 9. Direction request
+## 11. Direction intent
 
-The extension creates a typed **intent request**, not an execution grant.
+Workforce submits typed intent, not an execution grant.
 
 ```ts
 DirectionIntent {
   requestId
   environmentId
+  ownerRef?
+  partnerRef?
   projectRef
   workstreamRef
   foremanRef?
@@ -382,19 +488,20 @@ DirectionIntent {
   source: 'typed' | 'voice' | 'context_menu' | 'page_selection'
   browserContextRef?
   utteranceRef?
+  correlationRef?
   submittedAt
 }
 ```
 
-Server/Focusa resolves this into proposal/operation/work according to current contracts.
+Focusa resolves intent to proposal/work/operation according to current authority and work contracts.
 
-The UI must display resolved scope before consequential dispatch where ambiguity exists.
+Where scope is ambiguous and material, show the resolved scope before consequential dispatch.
+
+Do not add confirmation merely for ceremony when current authority and scope are already unambiguous.
 
 ---
 
-## 10. Mutation envelope
-
-Every extension-originated mutation needs:
+## 12. Mutation intent
 
 ```ts
 MutationIntent {
@@ -405,21 +512,25 @@ MutationIntent {
   targetRefs[]
   expectedRevision?
   idempotencyKey?
+  correlationRef?
   params
 }
 ```
 
-Client rules:
+Rules:
 
 - use operation registry/generated schemas;
-- validate locally for UX, server remains authority;
-- preserve `clientRequestId` for reconciliation;
-- automatic retry only if operation contract proves idempotency or safe retry;
-- ambiguous response -> reconcile current state before another mutation.
+- local validation is UX, server remains authority;
+- preserve client request ID/correlation for reconciliation;
+- retry only if operation semantics prove safe/idempotent;
+- ambiguous result → inspect current state before replay;
+- do not widen authority to make an operation succeed.
 
 ---
 
-## 11. Approval decision
+## 13. Attention decision / approval response
+
+When the source item is a Focusa approval, the owning operation may accept a shape such as:
 
 ```ts
 ApprovalDecisionIntent {
@@ -428,196 +539,278 @@ ApprovalDecisionIntent {
   decision: 'approve' | 'deny' | 'defer'
   expectedRevision?
   operatorComment?
+  correlationRef?
 }
 ```
 
-The extension never manufactures an approval because an action looks risky. It renders/answers the owning authority decision flow.
+The extension does not manufacture approval state.
+
+For non-approval attention classes, use the owning product's typed operation through the source reference.
 
 ---
 
-## 12. UIAI link contract
+## 14. Exact surface handoff
 
-Workforce needs an exact, typed pointer:
+Use ADLBOS `operator.surface_handoff.v1`.
+
+Conceptual shape:
+
+```ts
+SurfaceHandoff {
+  schema
+  sourceSurface
+  targetSurface
+
+  ownerRef
+  partnerRef?
+  environmentRef?
+  projectRef?
+  workstreamRef?
+  foremanRef?
+  workRef?
+  agentRef?
+  attentionRef?
+  evidenceRef?
+  executionRef?
+  runtimeRef?
+  bodyRef?
+
+  intent:
+    | 'inspect'
+    | 'direct'
+    | 'review'
+    | 'approve'
+    | 'watch'
+    | 'intervene'
+
+  correlationRef?
+  returnSurfaceRef?
+  issuedAt
+  expiresAt?
+}
+```
+
+Rules:
+
+- refs + intent only;
+- no broad credentials/tokens in URLs;
+- target resolves refs fresh;
+- unsupported refs fail clearly rather than opening unrelated default state;
+- deep links preserve exact user context.
+
+---
+
+## 15. UIAI execution link
+
+Workforce may project a UIAI-owned execution pointer:
 
 ```ts
 UIAIExecutionLink {
   executionRef
-  cockpitUrlOrRoute
+  surfaceHandoffRef?
+  cockpitRoute?
   browserContextRef?
   controlLeaseRef?
   observationRef?
   evidenceRefs[]
   health
+  freshness
 }
 ```
 
-Opening UIAI must preserve the exact work/execution context.
+Workforce does not operate UIAI private control machinery directly unless UIAI exposes the exact governed operation for that client.
 
-Do not pass broad credentials in URLs.
+Human takeover/release must follow UIAI fencing/re-observation/reconciliation rules.
 
 ---
 
-## 13. Browser page context
+## 16. Correlation
 
-Content-script collection must be minimal and explicit.
+Use ADLBOS `operator.correlation.v1` to connect causal work without centralizing product state.
 
-Default allowed context:
+Minimum useful reference family may include:
+
+```text
+ownerRef
+partnerRef
+assignmentRef
+projectRef
+workstreamRef
+foremanRef
+workRef
+workpointRef
+agentRef
+sessionRef
+executionRef
+evidenceRefs
+receiptRefs
+outcomeRef
+```
+
+Not every operation carries every ref.
+
+A correlation envelope is not a new canonical object store.
+
+---
+
+## 17. Capability posture / contextual expansion
+
+Consume ADLBOS `operator.capability_posture.v1`.
+
+```ts
+CapabilityPosture {
+  capabilityRef
+  providerRef
+  supported
+  entitled
+  activationState
+  authorityPosture?
+  availability
+  setupRef?
+  expansionRef?
+  freshness
+}
+```
+
+The extension may display:
+
+```text
+UIAI supported but not entitled
+Cloud Agent Computer entitled but not activated
+Capability active but worker not authorized
+```
+
+Never infer authority from commercial entitlement.
+
+Commercial metadata/pricing stays with the owning commerce/product system.
+
+---
+
+## 18. Closure
+
+Consume ADLBOS `operator.closure.v1` to connect refs across:
+
+```text
+execution
+Evidence
+verification
+Focusa settlement/receipt
+accepted outcome
+W.I.N.S.
+optional MeriFolio standing
+```
+
+Workforce uses this to explain confidence/proof without becoming the W.I.N.S. or MeriFolio authority.
+
+---
+
+## 19. Browser page context
+
+Default explicit context:
 
 ```text
 page URL
 page title
-selected text only after explicit user action
-basic tab/window identifier local to browser
+selected text after explicit action
+browser-local tab/window identifier
 ```
 
-Do not ambiently capture:
+Do not ambiently collect:
 
 ```text
-page bodies
+full page bodies
 form values
 password fields
 cookies
-browser history
-all tabs
+all tabs/history
 clipboard
 ```
 
-unless a separately authorized feature and owning contract explicitly requires it.
+unless a separately authorized owning feature explicitly requires it.
 
-Page context produces **data/evidence candidate**, never authority.
+Page context is data/evidence candidate, never authority.
 
 ---
 
-## 14. Context-menu operations
+## 20. Context-menu operations
 
-Initial commands:
+Initial useful commands:
 
 ```text
 Ask Foreman about this page
 Send page to Foreman
 Research this page
-Capture selection as evidence candidate
+Capture selection as Evidence candidate
 Open page in UIAI
 Create work proposal from selection
 ```
 
-Each command resolves exact active environment/project/workstream. If scope is not safe to infer, the extension asks the user to choose rather than dispatching globally.
+Each operation resolves exact environment/project/Workstream.
+
+If safe scope cannot be resolved, ask the user to choose rather than dispatch globally.
 
 ---
 
-## 15. Notifications
+## 21. Notifications
 
-Notification payload must contain only enough information to decide whether to open Workforce.
+Notifications contain only enough information to decide whether to open Workforce.
 
-Do not leak sensitive project/credential/content details into ChromeOS notifications by default.
+Avoid leaking project/client/sensitive content into OS notification surfaces by default.
 
-Notification action should deep-link to exact approval/work/evidence context.
+Actions deep-link to exact source attention/work/evidence via a handoff ref.
 
----
-
-## 16. Voice adapter
-
-```ts
-VoiceCaptureState {
-  state: 'idle' | 'listening' | 'transcribing' | 'review' | 'submitting' | 'error'
-  conversationRef?
-  utteranceRef?
-  interimText
-  finalText
-  confidence?
-}
-```
-
-Voice provider credentials should be brokered according to product architecture; do not expose reusable provider secrets in ordinary extension code when avoidable.
+Routine agent activity should not create owner-notification noise.
 
 ---
 
-## 17. Extension message bus
+## 22. Voice
 
-Use explicit typed message families between extension contexts:
+Voice is an input modality to the same Direction/attention/operation contracts.
+
+It does not create separate actuator or authorization semantics.
+
+A voice utterance should retain an attributable utterance/conversation reference where the owning Focusa Conversation contract provides one.
+
+---
+
+## 23. Sovereign federation posture
+
+Workforce may display bounded network posture supplied by the owning Startempire/federation layer:
 
 ```text
-environment.*
-pairing.*
-snapshot.*
-events.*
-direction.*
-approval.*
-evidence.*
-uiai.*
-voice.*
-preferences.*
-diagnostics.*
+private
+available
+federated
+federation_degraded
 ```
 
-Messages must be schema-versioned where persisted or externally exposed.
+It may also show selected workforce-relevant opportunities/collaboration refs.
 
-Avoid a generic `{ method, payload }` RPC that can become an arbitrary privileged backdoor.
+It does not implement the federation trust protocol itself.
 
----
-
-## 18. Diagnostics
-
-A private diagnostics page should expose:
-
-```text
-extension version/commit/channel
-browser version
-paired environments
-Focusa versions/contracts
-event-stream state/cursor/epoch
-last snapshot age
-storage schema version
-UIAI link health
-local bridge health if configured
-recent bounded errors
-```
-
-Never print raw credentials/tokens.
+Federation never grants ambient access to private Operator state.
 
 ---
 
-## 19. Storage/security requirements
+## 24. Security laws
 
-- minimize token scope and lifetime;
-- redact secrets from logs/errors;
-- clear revoked environment credentials promptly;
-- separate public-demo from private credentials;
-- encrypt/protect at rest only using actually supported browser/platform mechanisms; do not claim stronger protection than Chrome provides;
-- use Content Security Policy compatible with MV3;
-- no remote arbitrary code execution;
-- no `eval`/dynamic untrusted script injection;
-- sanitize rendered remote content.
-
----
-
-## 20. Contract-generation direction
-
-Where Focusa exposes generated machine-readable operation schemas, Workforce should generate/consume client types from them rather than hand-maintaining divergent request definitions.
-
-Preferred flow:
-
-```text
-Focusa operation registry
-→ versioned contract bundle
-→ Workforce client generation/validation
-→ CI compatibility test
-```
-
-Local wrapper types may improve UI ergonomics but must retain upstream operation IDs and refs.
+1. Least privilege at browser, product and runtime layers.
+2. Never store raw long-lived secrets in extension logs/cache/source.
+3. Never put credentials in handoff URLs.
+4. Entitlement is not authority.
+5. Pairing is not global authorization.
+6. UIAI control lease is not Focusa cognitive authority.
+7. Network membership is not federation grant.
+8. Public worker standing is not private Operator access.
+9. Stale state cannot be silently presented as current truth.
+10. Unknown outcome triggers reconciliation, not optimistic success.
 
 ---
 
-## 21. Implementation acceptance
+## 25. Design constraint for implementation
 
-This runtime layer is ready when:
+The existing extension's lower-level modules should remain reusable where they already enforce these laws.
 
-1. multiple environments can pair and remain distinguishable;
-2. snapshot + events converge after reconnect;
-3. stale/gap handling never fabricates freshness;
-4. Direction sends exact scope;
-5. approvals reconcile exact state;
-6. UIAI deep-link opens exact execution;
-7. browser context actions cannot widen authority;
-8. extension restart does not duplicate work;
-9. diagnostics explain connection/version failures without exposing secrets.
+The redesign should centralize shared runtime/event/projection state while keeping UI components as presenters/intent emitters.
+
+No presentation framework migration is permission to redesign upstream contracts.
