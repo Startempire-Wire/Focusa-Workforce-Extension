@@ -3,6 +3,7 @@
 **Product:** Focusa Workforce  
 **Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
 **Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md`  
+**Portable seam contract:** ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md`  
 **Current product spec:** `docs/00-workforce-canonical-product-and-implementation-spec.md`
 
 This file tells build agents how to change this repository without breaking product ownership, live deployment, or the human-agent workforce model.
@@ -22,7 +23,8 @@ Before material redesign work:
 ```text
 ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
 ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
-Wirebot-App current product/convergence docs
+ADLBOS CROSS_PRODUCT_SEAM_CONTRACT.md
+Wirebot-App current product/convergence docs (read-only dependency; do not rewrite from this repo)
 this repo docs/00
 docs/05
 docs/06
@@ -120,7 +122,7 @@ fleet/topology
 
 ## Shared ecosystem seams
 
-Consume ADLBOS shared seam families rather than inventing local variants:
+Consume ADLBOS `CROSS_PRODUCT_SEAM_CONTRACT.md` and shared seam families rather than inventing local variants:
 
 ```text
 operator.partner_profile.v1
@@ -134,9 +136,18 @@ operator.credential_use_ref.v1
 
 These are reference envelopes, not another backend.
 
-For actionable shared envelopes, preserve machine-readable compatibility and freshness: schema/version, producer/version, source ref/revision, correlation, issued/observed time, expiry where applicable and idempotency/replay metadata where a mutation can be retried.
+Cross-product refs are typed/source-qualified. Do not assume a bare `workRef`, `attentionRef`, `executionRef`, etc. is globally unique across environments or products.
 
-Unsupported consequential versions fail closed. Stale/expired cached projections may be rendered honestly but must be revalidated before mutation.
+For actionable shared envelopes, preserve machine-readable compatibility and freshness: schema/version, producer/version, source ref/revision, owner/environment scope, actor ref where applicable, correlation, issued/observed time, expiry where applicable and idempotency/replay metadata where a mutation can be retried.
+
+Rules:
+
+- unsupported consequential versions fail closed;
+- stale/expired cached projections may be rendered honestly but must be revalidated before mutation;
+- wall-clock timestamps from independent machines do not establish causal order;
+- prefer source revision/sequence/epoch/generation/lease semantics for conflict and freshness decisions;
+- if clock confidence is insufficient around a consequential expiry, revalidate with the source rather than guessing;
+- ambiguous consequential writes reconcile before retry.
 
 ## Credential-use references
 
@@ -306,8 +317,11 @@ When implementing the shared seams, include negative tests for:
 
 ```text
 delegated human exceeds grant → denied
+same bare ID from two environments → no collision
 stale attention/capability cache → no consequential mutation
 unsupported consequential envelope version → fail closed
+clock disagreement → source revision/sequence wins over local timestamp ordering
+ambiguous mutation → reconcile before retry
 credential-use ref → no raw secret disclosure / no implicit grant
 presenter acknowledgement → source action remains unresolved until owner resolves it
 ```
