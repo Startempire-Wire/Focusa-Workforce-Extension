@@ -35,6 +35,12 @@ Current product architecture outranks older concept language when they conflict.
 ## Ownership boundaries
 
 ```text
+Canonical owner
+  root owner authority
+
+Delegated human operator
+  bounded owner-granted operational scope only
+
 Wirebot / customer-named Operating Partner
   owner relationship, life/business orientation,
   Workforce Composer, owner-wide attention
@@ -61,6 +67,20 @@ Never create duplicate canonical state to make the extension easier to build.
 ## Operator neutrality
 
 The customer-level Operating Partner may be named `Spock`, `Athena`, `Wirebot`, etc. Workforce must not hard-code the assumption that the partner is named Wirebot.
+
+Keep distinct:
+
+```text
+CanonicalOwnerPrincipal
+DelegatedHumanPrincipal
+OperatingPartnerPrincipal
+partner presentation name
+worker/agent identity
+runtime/session/body identity
+optional ArchitectureAuthorityPrincipal
+```
+
+A delegated human may operate only within the owner-issued grant. Human operator access is not co-ownership and is not architecture authority.
 
 Partner identity, presentation name, model/runtime/body and optional architecture authority are distinct.
 
@@ -109,9 +129,33 @@ operator.attention.v1
 operator.correlation.v1
 operator.capability_posture.v1
 operator.closure.v1
+operator.credential_use_ref.v1
 ```
 
 These are reference envelopes, not another backend.
+
+For actionable shared envelopes, preserve machine-readable compatibility and freshness: schema/version, producer/version, source ref/revision, correlation, issued/observed time, expiry where applicable and idempotency/replay metadata where a mutation can be retried.
+
+Unsupported consequential versions fail closed. Stale/expired cached projections may be rendered honestly but must be revalidated before mutation.
+
+## Credential-use references
+
+Workforce does not move reusable secret material between products.
+
+If a work/attention/handoff path needs a provider credential, carry only an opaque `operator.credential_use_ref.v1` reference or bounded use request. The owning credential authority resolves or denies it at execution time.
+
+Never place raw reusable secrets in:
+
+```text
+handoff URLs
+Direction text
+attention objects
+local projection cache
+Evidence
+receipts/logs
+```
+
+Possession of a credential reference is not authorization to use it.
 
 ## Terminology
 
@@ -174,6 +218,8 @@ Show only owner-value items such as approval, owner truth, authentication, takeo
 
 Routine agent activity does not belong here.
 
+A local `seen`, `acknowledged`, `hidden` or `snoozed` state is presenter UX only. It is not the source object's approval/resolution/cancellation. Revalidate the source revision before a consequential action.
+
 ## Evidence truth
 
 Do not equate agent claim with verified result, tool success with accepted work, or screenshot with accepted business outcome.
@@ -202,6 +248,8 @@ consented for this effect
 ```
 
 Contextual expansion may explain adjacent products/capacity, but the extension never grants entitlement or authority.
+
+A cached capability posture is not current authority. Revalidate before consequential activation/use.
 
 ## Browser and UIAI
 
@@ -253,6 +301,16 @@ stale/degraded behavior
 ```
 
 Add regression tests for concrete bugs found.
+
+When implementing the shared seams, include negative tests for:
+
+```text
+delegated human exceeds grant → denied
+stale attention/capability cache → no consequential mutation
+unsupported consequential envelope version → fail closed
+credential-use ref → no raw secret disclosure / no implicit grant
+presenter acknowledgement → source action remains unresolved until owner resolves it
+```
 
 ## Deployment
 
