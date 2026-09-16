@@ -125,7 +125,7 @@ export function resolveTrajectorySource({ view = null, workpoint = null, workLoo
   });
 
   return Object.freeze({
-    source: TrajectorySource.STOP_GAP ?? TrajectorySource.STOP_GAP,
+    source: TrajectorySource.STOPGAP,
     authoritative: false,
     reason: detection.reason,
     failureClass: detection.failureClass,

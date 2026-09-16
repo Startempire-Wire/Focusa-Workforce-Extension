@@ -6,3 +6,4 @@ SHA256SUMS
 node_modules/
 *.log
 .beads/
+.build-test-*/

@@ -42,7 +42,7 @@ export default defineConfig({
   plugins: [svelte()],
   define: { __WF_BUILD__: JSON.stringify(buildStamp()) },
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: process.env.WF_DIST_DIR ? resolve(process.env.WF_DIST_DIR) : resolve(root, 'dist'),
     emptyOutDir: false,
     target: 'chrome114',
     assetsDir: 'workforce-assets',

@@ -3,7 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dist = resolve(root, 'dist');
+// WF_DIST_DIR lets verification build into an isolated directory so it cannot
+// contend with the live dev loop rebuilding dist/ (see tests/build.test.mjs).
+const dist = process.env.WF_DIST_DIR ? resolve(process.env.WF_DIST_DIR) : resolve(root, 'dist');
 const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
 
 const exactPermissions = ['activeTab', 'sidePanel', 'storage'];

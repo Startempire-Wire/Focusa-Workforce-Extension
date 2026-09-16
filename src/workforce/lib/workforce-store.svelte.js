@@ -14,6 +14,7 @@
 import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
 import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
+import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { preflightSafeSession, createPreflightedSession } from '../../lib/session-create.mjs';
@@ -99,6 +100,15 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   const foremanProfiles = $derived(reads.roles?.state === ResultState.OK ? (reads.roles.data?.profiles ?? []) : []);
   const anyBlocked = $derived(Object.values(reads).some((r) => r.state === ResultState.ENTITLEMENT_BLOCKED));
   const projectDashboard = $derived(reads.projects ? projectsFromOwner(reads.projects.data) : null);
+  // Ladder view: the owner projection when it carries a committed ladder,
+  // otherwise a labelled stopgap derived from owner-answered operations.
+  // The cutover is automatic — see lib/trajectory-source.mjs (focusa#621).
+  const trajectoryView = $derived(resolveTrajectorySource({
+    view: reads.trajectory ?? null,
+    workpoint: reads.workpoint ?? null,
+    workLoop: reads.workLoop ?? null,
+    workstream,
+  }));
   const sessionProfiles = $derived(reads.profiles?.state === ResultState.OK ? (reads.profiles.data?.data?.profiles ?? []) : []);
   const sessionPresets = $derived(reads.presets?.state === ResultState.OK ? (reads.presets.data?.data?.presets ?? []) : []);
   const projectSelectionRequired = $derived(projectDashboard?.failureClass === 'project_root_selection_required');
@@ -341,6 +351,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get sessionProfiles() { return sessionProfiles; },
     get sessionPresets() { return sessionPresets; },
     get trajectory() { return trajectory; },
+    get trajectoryView() { return trajectoryView; },
     get foremanProfiles() { return foremanProfiles; },
     get ownerGaps() { return ownerGaps; },
     get anyBlocked() { return anyBlocked; },

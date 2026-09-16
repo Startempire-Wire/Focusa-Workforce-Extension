@@ -211,14 +211,30 @@
   <!-- Frontier / trajectory -->
   <section class="card" aria-labelledby="wf-frontier">
     <h2 id="wf-frontier">Frontier</h2>
+    <p class="source {store.trajectoryView.authoritative ? 'authoritative' : 'stopgap'}">
+      {store.trajectoryView.disclosure}
+    </p>
     <StateNote label="Trajectory" result={store.resultOf('trajectory')} />
-    {#if store.trajectory}
+    {#if store.trajectoryView.authoritative}
       <dl class="facts">
-        <dt>HLT</dt><dd>{store.trajectory.hltRef ?? '—'}</dd>
-        <dt>Current</dt><dd>{store.trajectory.current?.id ?? store.trajectory.current ?? '—'}</dd>
-        <dt>Next</dt><dd>{store.trajectory.next?.id ?? store.trajectory.next ?? '—'}</dd>
-        <dt>Revision</dt><dd>{store.trajectory.revision ?? '—'}</dd>
+        <dt>HLT</dt><dd>{store.trajectoryView.ladder.hltRef ?? '—'}</dd>
+        <dt>Current</dt><dd>{store.trajectoryView.ladder.current?.id ?? store.trajectoryView.ladder.current ?? '—'}</dd>
+        <dt>Next</dt><dd>{store.trajectoryView.ladder.next?.id ?? store.trajectoryView.ladder.next ?? '—'}</dd>
+        <dt>Revision</dt><dd>{store.trajectoryView.ladder.revision ?? '—'}</dd>
       </dl>
+    {:else}
+      <dl class="facts">
+        <dt>Workpoint</dt><dd>{store.trajectoryView.ladder.currentWorkpoint ?? '—'}</dd>
+        <dt>Authority</dt><dd>{store.trajectoryView.ladder.reconciliation.authorityForNextAction ?? '—'}</dd>
+        <dt>Gap</dt><dd>{store.trajectoryView.ladder.gap ?? '—'}</dd>
+        <dt>Missing</dt><dd>{store.trajectoryView.ladder.clarityBlocking.join(', ') || '—'}</dd>
+        <dt>Next step</dt><dd class="tiny">{store.trajectoryView.ladder.nextAction ?? '—'}</dd>
+      </dl>
+      <p class="muted tiny">
+        Ladder values are not invented: they come from the owner's workpoint anchor,
+        clarity gate and reconciliation fields until Focusa's projection reports the
+        committed ladder ({store.trajectoryView.failureClass ?? 'not committed'}).
+      </p>
     {/if}
     <StateNote label="Workpoint" result={store.resultOf('workpoint')} />
     <StateNote label="Work loop" result={store.resultOf('workLoop')} />
@@ -372,6 +388,19 @@
 
   .muted { font-size: var(--text-small); color: var(--text-secondary); margin: 0; }
   .tiny { font-size: var(--text-micro); }
+  .source {
+    font-size: var(--text-micro);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.02em;
+    margin: 0;
+    padding: var(--space-micro) var(--space-tight);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--text-muted);
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+  }
+  .source.authoritative { border-left-color: var(--success); background: var(--success-subtle); color: var(--text-primary); }
+  .source.stopgap { border-left-color: var(--warning); background: var(--warning-subtle); color: var(--text-primary); }
   .gap {
     border-left: 3px solid var(--warning);
     background: var(--warning-subtle);

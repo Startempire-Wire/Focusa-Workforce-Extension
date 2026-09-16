@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -23,8 +23,8 @@ async function digestTree(directory) {
   return hash.digest('hex');
 }
 
-function build() {
-  const result = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
+function build(env = {}) {
+  const result = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8', env: { ...process.env, ...env } });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /PASS: built Focusa Workforce MV3 unpacked extension/);
 }
@@ -42,9 +42,19 @@ test('manifest is least-privilege MV3 with no content script', async () => {
 });
 
 test('unpacked build is deterministic and complete', async () => {
-  build(); const first = await digestTree(resolve(root, 'dist'));
-  build(); const second = await digestTree(resolve(root, 'dist'));
-  assert.equal(second, first);
+  // Build into two isolated dirs: the live dev loop may be rebuilding dist/ concurrently.
+  const dirA = resolve(root, '.build-test-a');
+  const dirB = resolve(root, '.build-test-b');
+  await rm(dirA, { recursive: true, force: true });
+  await rm(dirB, { recursive: true, force: true });
+  try {
+    build({ WF_DIST_DIR: dirA }); const first = await digestTree(dirA);
+    build({ WF_DIST_DIR: dirB }); const second = await digestTree(dirB);
+    assert.equal(second, first);
+  } finally {
+    await rm(dirA, { recursive: true, force: true });
+    await rm(dirB, { recursive: true, force: true });
+  }
   for (const file of ['manifest.json', 'background.mjs', 'sidepanel.html', 'sidepanel.mjs', 'styles.css']) {
     await readFile(resolve(root, 'dist', file));
   }
