@@ -7,17 +7,17 @@ import { execFileSync } from 'node:child_process';
 const root = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Build identity shown in the UI so a loaded build is never ambiguous:
- * the unpacked manifest version is static, so the stamp carries the real identity.
+ * Build identity shown in the UI so a loaded build is never ambiguous.
+ * Derived from source identity only (commit + dirty marker) so identical sources
+ * always produce an identical bundle; it advances on every committed change.
  */
 function buildStamp() {
   try {
     const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
     const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() ? '+' : '';
-    const when = new Date().toISOString().replace('T', ' ').slice(0, 16);
-    return `${sha}${dirty} · ${when}Z`;
+    return `${sha}${dirty}`;
   } catch {
-    return `dev · ${new Date().toISOString().slice(0, 16)}Z`;
+    return 'dev';
   }
 }
 
@@ -42,9 +42,11 @@ export default defineConfig({
     rollupOptions: {
       input: { workforce: resolve(root, 'src/workforce/workforce.html') },
       output: {
-        entryFileNames: 'workforce/[name].js',
-        chunkFileNames: 'workforce/[name].js',
-        assetFileNames: 'workforce-assets/[name][extname]',
+        // Content-hashed names: a refresh re-reads the page from disk and then
+        // fetches a *new* asset URL, so a changed build can never be served stale.
+        entryFileNames: 'workforce/[name].[hash].js',
+        chunkFileNames: 'workforce/[name].[hash].js',
+        assetFileNames: 'workforce-assets/[name].[hash][extname]',
       },
     },
   },

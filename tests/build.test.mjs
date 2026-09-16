@@ -54,7 +54,8 @@ test('the Workforce full page is bundled and its Svelte sources do not ship', as
   if (!built) { build(); built = true; }
   const html = await readFile(resolve(root, 'dist', 'workforce.html'), 'utf8');
   assert.match(html, /workforce-assets\//, 'built page references its bundled assets');
-  await readFile(resolve(root, 'dist', 'workforce', 'workforce.js'));
+  const assets = await readdir(resolve(root, 'dist', 'workforce'));
+  assert.ok(assets.some((f) => /^workforce\.[A-Za-z0-9_-]{8}\.js$/.test(f)), `content-hashed bundle expected, saw ${assets.join(',')}`);
   await assert.rejects(readFile(resolve(root, 'dist', 'workforce', 'App.svelte')));
   await assert.rejects(readFile(resolve(root, 'dist', 'src', 'workforce', 'App.svelte')));
   const manifest = JSON.parse(await readFile(resolve(root, 'dist', 'manifest.json'), 'utf8'));

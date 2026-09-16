@@ -46,9 +46,11 @@ usage: wfx-deploy <target> [args]
 
   build [--public-newtab] [--brand NAME]   Build dist/ from this checkout.
   test                                     Run node --test tests/*.test.mjs.
-  dev brave|chrome [--watch]               Build + sync the channel dir + hot-reload the
-                                            extension in the running browser (no restart).
-                                            --watch rebuilds and reloads on every edit.
+  dev brave|chrome [--watch] [--git]       Build + stage the channel dir in place; the open
+                                            browser picks it up on refresh. --watch repeats on
+                                            every edit; --git also commits + pushes. Never launches
+                                            a browser unless --launch is passed.
+  live brave|chrome                        One-shot: build + stage for refresh (no browser launch).
   gh [--snapshot FILE]                     Embed snapshot (optional), commit, push to GitHub (CI).
   brave | chrome                           Refresh the local browser channel dist from the build.
   veragensia [--snapshot FILE]             Push this checkout's HEAD to OVH lab via uiai-lab-push.
@@ -105,7 +107,13 @@ launch_browser() {
   local b="$1"; shift || true
   local bin; bin="$(browser_binary "$b")"
   local dir="$LOCAL_DIST_ROOT/dist-$b"
-  [[ -d "$dir/manifest.json" ]] || { refresh_local_browser_copy "$b" >/dev/null; }
+  [[ -f "$dir/manifest.json" ]] || { refresh_local_browser_copy "$b" >/dev/null; }
+  # Never add a second window: if this profile is already running, a new launch
+  # only opens another window. The existing window picks up new builds on refresh.
+  if pgrep -f -- "--user-data-dir=$HOME/.config/focusa-workforce/$b" >/dev/null 2>&1; then
+    echo "$b is already running with this profile; refresh your tab instead of launching another window"
+    return 0
+  fi
   local profile="$HOME/.config/focusa-workforce/$b"
   install -d -m 700 "$profile"
   exec "$bin" \
@@ -166,6 +174,10 @@ case "$TARGET" in
     shift; launch_browser "$@"
     ;;
   dev)
+    shift || true
+    "$NODE" "$REPO_ROOT/scripts/wfx-dev.mjs" "$@"
+    ;;
+  live)
     shift || true
     "$NODE" "$REPO_ROOT/scripts/wfx-dev.mjs" "$@"
     ;;

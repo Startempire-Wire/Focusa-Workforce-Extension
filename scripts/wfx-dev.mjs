@@ -20,7 +20,7 @@
  * extension otherwise needs a manual reload.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { cp, mkdir, readFile, rm, stat, watch } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, watch } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,7 +29,9 @@ const args = process.argv.slice(2);
 const browser = args.find((a) => !a.startsWith('-')) ?? 'brave';
 const watchMode = args.includes('--watch');
 const gitMode = args.includes('--git');
-const noLaunch = args.includes('--no-launch');
+// Never launch a browser unless explicitly asked: an operator window is usually
+// already open and a second instance spawns extra windows.
+const mayLaunch = args.includes('--launch');
 const portArg = args.indexOf('--port');
 const port = portArg >= 0 ? Number(args[portArg + 1]) : Number(process.env.UIAI_WFX_CDP_PORT ?? 9335);
 const distRoot = process.env.UIAI_WFX_LOCAL_DIST ?? `${process.env.HOME}/.local/share/focusa-workforce`;
@@ -63,9 +65,22 @@ function build() {
 }
 
 async function syncChannel() {
+  // Sync IN PLACE: never delete the directory the loaded extension reads from.
+  // Copy changed files, then remove only files that no longer exist in dist.
+  const distDir = resolve(root, 'dist');
   await mkdir(channelDir, { recursive: true });
-  await rm(channelDir, { recursive: true, force: true });
-  await cp(resolve(root, 'dist'), channelDir, { recursive: true });
+  const list = async (dir) => new Set((await readdir(dir, { recursive: true, withFileTypes: true }))
+    .filter((e) => e.isFile())
+    .map((e) => resolve(e.parentPath ?? e.path, e.name).slice(dir.length + 1)));
+  const wanted = await list(distDir);
+  const existing = await list(channelDir);
+  for (const rel of wanted) {
+    await mkdir(dirname(resolve(channelDir, rel)), { recursive: true });
+    await cp(resolve(distDir, rel), resolve(channelDir, rel));
+  }
+  for (const rel of existing) {
+    if (!wanted.has(rel)) await rm(resolve(channelDir, rel), { force: true });
+  }
 }
 
 async function cdpTargets() {
@@ -137,13 +152,14 @@ async function deploy({ launch = false } = {}) {
   await syncChannel();
   let targets = await cdpTargets();
   if (!targets) {
-    if (launch && !noLaunch) {
-      log('no CDP endpoint; launching browser');
+    if (mayLaunch) {
+      log('no CDP endpoint; launching browser (--launch given)');
       if (!(await launchBrowser())) { log('launch timed out; extension is staged and loads on next start'); return; }
       targets = await cdpTargets();
     } else {
-      log(`staged -> ${channelDir} (browser not reachable on ${port}; start it with: wfx launch ${browser})`);
+      log(`staged -> ${channelDir}`);
       log(summary);
+      log(`refresh your open ${browser} tab to load it (extension pages re-read from disk; a background/service-worker change needs a chrome://extensions reload)`);
       if (gitMode) log(commitAndPush(summary));
       return;
     }
@@ -159,7 +175,7 @@ async function deploy({ launch = false } = {}) {
 }
 
 async function main() {
-  await deploy({ launch: true });
+  await deploy({ launch: false });
   if (!watchMode) return;
   log('watching src/, manifest.json, vite.config.mjs — edit and the browser reloads'
     + (gitMode ? ' and the commit is pushed' : ''));
