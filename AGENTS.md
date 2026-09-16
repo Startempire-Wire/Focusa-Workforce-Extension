@@ -1,14 +1,11 @@
 # AGENTS — Focusa Workforce Build Contract
 
-**Product:** Focusa Workforce  
 **Execution authority:** `docs/15-build-agent-master-handoff.md`  
-**Full Trajectory:** `docs/14-workforce-full-trajectory.md`
+**Trajectory:** `docs/14-workforce-full-trajectory.md`
 
-> **Focusa Workforce operates the workforce.**
+> **Build Focusa Workforce to completion. Do not turn the build process into the work.**
 
-## Mission
-
-Build the real product continuously. Process exists only to preserve scope, ownership, truth, and material safety boundaries.
+## Operating law
 
 ```text
 Question
@@ -18,76 +15,115 @@ Question
 → Automate last
 ```
 
-Apply that sequence to both:
+Apply it twice: to the product and to the machinery used to build it.
 
-```text
-the product work
-and
-the machinery/process used to build it
-```
+The objective is working software that satisfies the accepted product outcome. Planning, requirements, trajectory, tests, evidence and documentation exist only to prevent wrong work or false completion.
 
-Do not optimize documentation while the product is unfinished.
+## Start
 
----
-
-## Start here
-
-Read first:
+Read:
 
 ```text
 docs/15-build-agent-master-handoff.md
 docs/14-workforce-full-trajectory.md
 current source/tests
-current Focusa owning contracts for the active Workpoint
+current owning Focusa contracts needed by the active frontier
 ```
 
-Then consult only what the active node needs:
+Load detail only when needed:
 
 ```text
-scope/requirements     → docs/10
-navigation/stateflow   → docs/11
-screen anatomy         → docs/12
-visual implementation  → docs/13
-Slice 1 deep detail    → docs/09
-runtime/data contracts → docs/05
-product/UX context     → docs/00, docs/06, docs/08
-baseline/deployment    → docs/07
+scope                 → docs/10
+navigation/stateflow  → docs/11
+screen anatomy        → docs/12
+visual system         → docs/13
+Slice 1 detail        → docs/09
+runtime/data          → docs/05
+product context       → docs/00, docs/06, docs/08
+baseline/deployment   → docs/07
 ```
 
-ADLBOS/Focusa/UIAI/Veragensia docs are loaded when an active boundary depends on them. Do not preload the whole corpus as ritual.
+Do not preload the whole corpus as ritual. Wirebot App is read-only from this workstream; do not rewrite its docs.
 
-Wirebot App is read-only from this workstream. Do not rewrite its docs.
+## Product decisions are resolved; implementation decisions are delegated
 
----
+Do **not** improvise:
+
+```text
+product purpose or accepted scope
+canonical ownership or authority
+Workstream / Foreman semantics
+Trajectory semantics
+Needs You source semantics
+Evidence / settlement meaning
+top-level information architecture
+core visual language
+security/privacy boundaries
+```
+
+Within those boundaries, **use engineering judgment freely**. Do not ask permission for ordinary reversible implementation choices.
+
+Choose the simplest sound option for:
+
+```text
+file/component boundaries
+internal function names
+state/store organization
+adapter shape
+small refactors
+CSS/layout mechanics within the visual contract
+focused test structure
+implementation order among ready nodes
+batching adjacent Workpoints
+performance fixes
+bug fixes
+```
+
+When detail is unspecified:
+
+```text
+infer from the nearest canonical contract/current code
+→ choose the simplest reversible implementation
+→ build it
+→ verify it in running reality
+→ continue
+```
+
+Ask the owner only when the unresolved choice would materially change accepted product behavior, scope, authority, privacy/security, meaningful spend, irreversible external effects, or a major ecosystem boundary.
+
+Minor ambiguity is not a blocker.
 
 ## Outcomes over process
 
+Default loop:
+
 ```text
 understand enough to act
-→ implement real functionality
+→ implement the largest safe useful increment
 → verify the material behavior/risk
-→ reconcile if needed
+→ fix what failed
 → continue
 ```
 
 Rules:
 
-- implementation outranks planning/reporting/proof collection;
-- reuse existing evidence instead of recreating it;
-- one check may satisfy many requirements;
+- implementation outranks planning, reporting and proof collection;
+- prefer complete end-to-end behavior over horizontal scaffolding;
+- batch adjacent work when context is hot;
+- reorder independent ready work when it accelerates the outcome;
+- continue around local blockers;
+- reuse existing evidence and tests;
+- one real check may satisfy many requirements;
 - do not rerun unchanged expensive checks without cause;
-- do not stop ready work for status updates or documentation polish;
-- continue independent ready work when one node is blocked;
-- update docs only when architecture/source truth materially changes;
-- clean artifacts you create as you go.
+- do not stop for routine status updates;
+- update docs only when product/architecture/source truth materially changed;
+- clean temporary artifacts you create as you go.
 
-Requirement IDs are coverage aids, not ticket bureaucracy.
-
----
+Requirement IDs are coverage aids, not tickets.
 
 ## Current frontier
 
-Start at the Short projection in `docs/14`:
+Begin from the current Short projection in `docs/14`:
 
 ```text
 HLT-WF-001
@@ -96,26 +132,25 @@ HLT-WF-001
 → WP-0.1.1
 ```
 
-Resolve current Focusa operation truth.
+Resolve real Focusa operations required by the active product path:
 
 ```text
-real owner operation exists
+real owning operation exists
 → use it
 
-equivalent real operation exists
+equivalent owning operation exists
 → thin provenance-preserving adapter
 
-owning operation missing
-→ implement the smallest owning operation
-→ verify that boundary
-→ return to Workforce
+owning operation is genuinely missing
+→ implement the smallest correct operation in the owning product
+→ return immediately to Workforce
 ```
 
-Never invent convenient endpoints or client-owned canonical state.
+Do not invent client-owned canonical state or fake convenient endpoints.
 
----
+A missing upstream operation blocks only the work that actually depends on it.
 
-## Product ownership
+## Ownership
 
 ```text
 Owner / delegated human
@@ -127,7 +162,7 @@ Wirebot / customer-named Operating Partner
 
 Focusa
   Project / Workstream / Foreman / Workpoint,
-  work authority, continuity, Evidence, settlement
+  governed work, continuity, Evidence, settlement
 
 Focusa Workforce
   live workforce operations UX
@@ -142,21 +177,7 @@ W.I.N.S.
   accepted outcomes
 ```
 
-Never duplicate canonical ownership to make UI implementation easier.
-
-Keep distinct:
-
-```text
-owner
-bounded delegated human
-Operating Partner
-Foreman
-worker
-runtime/body
-optional architecture authority
-```
-
----
+Never duplicate canonical ownership merely to simplify UI code.
 
 ## Technology
 
@@ -170,7 +191,7 @@ JavaScript + JSDoc
 
 No SvelteKit.
 
-Preserve sound existing core modules unless focused evidence requires a change:
+Preserve sound existing core primitives where they remain correct:
 
 ```text
 api-client
@@ -186,11 +207,11 @@ storage
 validation
 ```
 
-MV3 service-worker suspension is normal. Canonical work must not depend on keeping it alive.
+Refactor them when necessary to accomplish the product; do not preserve accidental structure for ceremony.
 
----
+MV3 suspension is normal. Canonical work cannot depend on the extension worker remaining alive.
 
-## UX authority
+## UX construction authority
 
 ```text
 Strategy  → docs/00 + docs/08 + docs/10
@@ -200,15 +221,11 @@ Skeleton  → docs/12
 Surface   → docs/13
 ```
 
-These are implementation targets, not invitations to redesign during construction.
+These resolve product design so the build agent can execute. They are not pixel-law where a simpler implementation preserves the same intended hierarchy, behavior and visual system.
 
-If runtime reality makes a target invalid, refine only the affected owner/node and continue other ready work.
+## Truth boundaries
 
----
-
-## Core truth laws
-
-Do not collapse:
+Keep distinct:
 
 ```text
 Full / Medium / Short trajectory coverage
@@ -218,7 +235,7 @@ authority
 freshness
 ```
 
-Do not equate:
+Never equate:
 
 ```text
 agent claim = verified result
@@ -228,37 +245,28 @@ cached capability = current authority
 presenter acknowledgement = source resolution
 ```
 
-Needs You contains only human-value attention.
-
+Needs You is human-value attention, not activity noise.
 UIAI remains execution/takeover authority.
-
-Fleet is one Operator's multi-environment/body aggregation. Federation is cross-Operator/network sharing.
-
-Reusable secrets never belong in URLs, Direction, attention cache, Evidence, logs, receipts, or repository files.
-
----
+Fleet is one Operator's infrastructure; federation is cross-Operator sharing.
+Reusable secrets never belong in URLs, Direction, attention cache, Evidence, logs, receipts or repository files.
 
 ## Minimum sufficient verification
 
-Ask:
+Verify what you changed, at the cheapest boundary that can expose a material defect.
 
-> What is the smallest existing or new check that would expose a material defect in what I changed?
-
-Possible checks:
+Examples:
 
 ```text
-focused unit/contract test
+focused test
 build/manifest validation
 real browser journey
 relevant stale/degraded case
 relevant authority/source negative case
 ```
 
-Use only the relevant subset.
+Use only what is relevant. Prefer evidence naturally produced by execution. Run broad regression/dogfood at meaningful integration or release boundaries, not after every edit.
 
-Run broader regression/dogfood at meaningful integration/release boundaries, not after every small edit.
-
----
+If a failure is obvious in running reality, fix it instead of creating a report about it.
 
 ## Deployment
 
@@ -272,18 +280,26 @@ main + CI
 
 Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj` unless deliberately migrated.
 
----
-
-## Completion
+## Completion behavior
 
 Keep executing through ready authorized work until:
 
 ```text
-HLT accepted
+the accepted HLT is achieved
 or
-a genuine scoped blocker requires owner input
+a genuine decision requiring owner authority is reached
 ```
 
-At meaningful milestones report only what works, what materially remains, the real blocker if any, current frontier, and promotion status if relevant.
+Do not stop because a Workpoint ended, an MLG ended, a commit landed, a test passed, or a report could be written.
 
-The deliverable is a working Focusa Workforce, not an immaculate process trail.
+At a meaningful milestone or real blocker, report tersely:
+
+```text
+what works
+what materially remains
+real blocker, if any
+current frontier
+promotion status, if relevant
+```
+
+**The deliverable is the functioning product, not the trajectory, the test suite, the documentation, or the process trail.**
