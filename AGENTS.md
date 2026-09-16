@@ -1,7 +1,8 @@
 # AGENTS — Focusa Workforce Build Contract
 
 **Execution authority:** `docs/15-build-agent-master-handoff.md`  
-**Trajectory:** `docs/14-workforce-full-trajectory.md`
+**Trajectory:** `docs/14-workforce-full-trajectory.md`  
+**Architecting standard applied:** Focusa Spec 120A + software-engineering profile `120A-SWE`
 
 > **Build Focusa Workforce to completion. Do not turn the build process into the work.**
 
@@ -53,6 +54,8 @@ runtime/data          → docs/05
 product context       → docs/00, docs/06, docs/08
 baseline/deployment   → docs/07
 ```
+
+Spec 120A/120A-SWE are provenance for how this package was architected, not required preload for ordinary implementation. Consult them only if the architecture package itself must be refined.
 
 Do not preload the whole corpus as ritual. Wirebot App is read-only from this workstream; do not rewrite its docs.
 
@@ -156,6 +159,8 @@ owning operation is genuinely missing
 → implement the smallest correct operation in the owning product
 → return immediately to Workforce
 ```
+
+Known upstream blockers in the trajectory are **implementation/contract-closure work, not permission to reopen settled product semantics**. Use the semantic contracts already pinned in Workforce docs and the owning Focusa/ADLBOS/UIAI/Veragensia specs. Escalate only if those owners are genuinely contradictory or insufficient to determine product behavior.
 
 Do not invent client-owned canonical state or fake convenient endpoints.
 
