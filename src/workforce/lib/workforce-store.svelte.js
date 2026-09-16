@@ -12,6 +12,7 @@
  * @module workforce/lib/workforce-store
  */
 import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
+import { startPairing, pollPairing } from '../../lib/pairing.mjs';
 import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
@@ -87,6 +88,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // Operator-bound exact target per environment (a reference only; the owner
   // roster wins the moment it reports one). Stopgap for the missing session.
   let boundTarget = $state(/** @type {any} */ (null));
+  // In-page pairing (the side panel's proven flow, available on the full page).
+  let pairing = $state(/** @type {any} */ (null));
+  let pairingBusy = $state(false);
+  let pairingError = $state('');
+  let pairingTimer = null;
 
   const active = $derived(environments.find((e) => e.id === activeId) ?? null);
   const workstream = $derived(
@@ -281,6 +287,56 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     await startStream();
   }
 
+  /**
+   * Begin pairing with a Focusa daemon from the full page.
+   * Uses the proven pairing client: owner approval happens on the daemon side.
+   */
+  async function beginPairing({ baseUrl, label }) {
+    pairingError = '';
+    pairingBusy = true;
+    try {
+      pairing = await startPairing({ base_url: baseUrl, label, device_name: 'Focusa Workforce (full page)' }, { chromeApi });
+      startPairingPoll();
+    } catch (error) {
+      pairingError = error instanceof Error ? error.message : String(error);
+    } finally {
+      pairingBusy = false;
+    }
+  }
+
+  function startPairingPoll() {
+    stopPairingPoll();
+    pairingTimer = setInterval(async () => {
+      if (!pairing || pairing.state !== 'awaiting_approval') { stopPairingPoll(); return; }
+      try {
+        const next = await pollPairing(pairing, { chromeApi });
+        pairing = next;
+        if (next.state === 'paired') {
+          stopPairingPoll();
+          await refreshEnvironments();
+          activeId = next.connection.connection_id;
+          await refreshOwner();
+          await loadBoundTarget();
+          await startStream();
+        }
+      } catch (error) {
+        pairingError = error instanceof Error ? error.message : String(error);
+        stopPairingPoll();
+      }
+    }, 3000);
+  }
+
+  function stopPairingPoll() {
+    if (pairingTimer) clearInterval(pairingTimer);
+    pairingTimer = null;
+  }
+
+  function cancelPairing() {
+    stopPairingPoll();
+    pairing = null;
+    pairingError = '';
+  }
+
   async function loadBoundTarget() {
     try {
       const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
@@ -397,6 +453,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
+    get pairing() { return pairing; },
+    get pairingBusy() { return pairingBusy; },
+    get pairingError() { return pairingError; },
     get foremanProfiles() { return foremanProfiles; },
     get ownerGaps() { return ownerGaps; },
     get anyBlocked() { return anyBlocked; },
@@ -420,6 +479,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     stopStream,
     bindTarget,
     clearBoundTarget,
+    beginPairing,
+    cancelPairing,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,

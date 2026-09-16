@@ -25,6 +25,8 @@
   let scanFrom = $state('~/src');
   let bindInput = $state('');
   let bindResult = $state('');
+  let pairUrl = $state('');
+  let pairLabel = $state('');
 
   // Direction addresses an exact owner target. Preferred source: the owner's own
   // roster projection. Stopgap: an operator-bound target (see AGENTS.md stopgap
@@ -112,6 +114,28 @@
       </button>
       <span class="muted tiny">loopback only · the owner authenticates this device itself (no pairing token)</span>
     </div>
+
+    <details class="capability">
+      <summary>Pair a Focusa daemon (remote or paired device)</summary>
+      {#if !store.pairing}
+        <form onsubmit={(event) => { event.preventDefault(); store.beginPairing({ baseUrl: pairUrl, label: pairLabel || 'Focusa daemon' }); }}>
+          <input type="text" aria-label="Daemon URL" placeholder="https://daemon.example:8787" bind:value={pairUrl} />
+          <input type="text" aria-label="Environment label" placeholder="label (optional)" bind:value={pairLabel} />
+          <button type="submit" disabled={store.pairingBusy || !pairUrl.trim()}>Start pairing</button>
+        </form>
+      {:else if store.pairing.state === 'awaiting_approval'}
+        <p class="muted tiny">
+          Approve on the daemon: <code>{store.pairing.operator_command ?? store.pairing.code}</code>
+        </p>
+        <p class="muted tiny">pairing {store.pairing.state} · expires {store.pairing.expires_at}</p>
+        <button type="button" onclick={() => store.cancelPairing()}>Cancel</button>
+      {:else}
+        <p class="gap">pairing {store.pairing.state}</p>
+        <button type="button" onclick={() => store.cancelPairing()}>Reset</button>
+      {/if}
+      {#if store.pairingError}<p class="gap">{store.pairingError}</p>{/if}
+    </details>
+
     {#if environmentError}
       <p class="gap">{environmentError}</p>
     {/if}
@@ -282,6 +306,16 @@
           {store.directing ? 'Submitting…' : 'Send Direction'}
         </button>
       </form>
+      <div class="row">
+        {#each ['start', 'pause', 'resume', 'cancel'] as action (action)}
+          <button
+            type="button"
+            disabled={store.directing}
+            onclick={() => store.controlSession({ action, target: steerTarget })}
+          >{action}</button>
+        {/each}
+        <span class="muted tiny">governed owner operations on the exact target</span>
+      </div>
     {/if}
     {#if store.lastDirection}
       <p class="muted tiny">
