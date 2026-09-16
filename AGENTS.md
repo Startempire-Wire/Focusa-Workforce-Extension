@@ -107,6 +107,36 @@ Ask the owner only when the unresolved choice would materially change accepted p
 
 Minor ambiguity is not a blocker.
 
+## Stopgap doctrine — MVP mode (operator directive 2026-09-16)
+
+> **Never let a missing or defective upstream dependency stop forward progress.**
+> Build the smallest honest stopgap, and **wire the transition to the authoritative
+> path at the same time** — so when the upstream change lands, the product moves
+> onto it automatically with no rework and no second migration.
+
+Rules:
+
+```text
+1. A blocked dependency blocks only its dependents. Everything else keeps moving.
+2. When the owning path is missing/defective, ship a stopgap that preserves the
+   user-visible outcome as truthfully as the available sources allow.
+3. Immediately add the auto-transition in code: detect the authoritative source
+   becoming available and prefer it, with no flags, no manual cutover, no rework.
+   The stopgap must be able to delete itself.
+4. Label the stopgap in the product: the user must always see which source answered
+   and why the authoritative one did not (owner failure class, not vibes).
+5. Never fabricate canonical state in a stopgap. Derive only from real owner
+   operations, and never write stopgap-derived values back as canonical truth.
+6. Keep the stopgap small and separable: one module, one branch, one test pair
+   (authoritative path + stopgap path), so removal is a deletion, not a refactor.
+7. Prefer forward progress over completeness of ceremony. MVP mode: a working,
+   honest, labelled slice now beats a correct design that cannot run.
+```
+
+Applies to upstream contract gaps, defective upstream projections, missing owner
+operations, unbuilt releases, and unavailable tooling. It does **not** license
+inventing authority, bypassing an owner, or presenting a stopgap as canonical.
+
 ## Outcomes over process
 
 Default loop:
