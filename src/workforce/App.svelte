@@ -23,13 +23,13 @@
     store.streamState ? `owner stream ${store.streamState.phase}${store.lastEventAt ? ', last event ' + store.lastEventAt : ''}` : 'owner stream idle',
   );
   let scanFrom = $state('~/src');
+  let bindInput = $state('');
+  let bindResult = $state('');
 
-  const selectedSession = $derived(store.roster.find((r) => r.id === selectedSessionId) ?? null);
-  const steerTarget = $derived(
-    selectedSession && selectedSession.runId && Number.isSafeInteger(selectedSession.generation) && selectedSession.generation >= 1
-      ? { session_id: selectedSession.id, run_id: selectedSession.runId, generation: selectedSession.generation }
-      : null,
-  );
+  // Direction addresses an exact owner target. Preferred source: the owner's own
+  // roster projection. Stopgap: an operator-bound target (see AGENTS.md stopgap
+  // doctrine) used only until the owner reports one.
+  const steerTarget = $derived(store.directionTarget);
 
   onMount(async () => {
     await store.refreshEnvironments();
@@ -243,14 +243,30 @@
   <!-- Direction -->
   <section class="card" aria-labelledby="wf-direction">
     <h2 id="wf-direction">Direction</h2>
-    {#if !selectedSession}
-      <p class="muted">Select a person (silent session) to address exact Direction.</p>
-    {:else if !steerTarget}
+    {#if !steerTarget}
       <p class="gap">
-        Owner reports no exact target (run + generation) for this session, so Direction cannot be submitted safely.
-        Refresh after the owner reports an active run.
+        Owner reports no session instance yet, so there is no exact target (session · run · generation)
+        to address. Bind one from any authoritative surface to direct work now — the owner's roster
+        takes over automatically as soon as it reports a target.
       </p>
+      <form onsubmit={(event) => { event.preventDefault(); const r = store.bindTarget(bindInput); bindResult = r.ok ? `bound ${r.label}` : r.error; if (r.ok) bindInput = ''; }}>
+        <input
+          type="text"
+          aria-label="Exact owner target"
+          placeholder="session_id:run_id:generation  (or paste JSON)"
+          bind:value={bindInput}
+        />
+        <button type="submit" disabled={!bindInput.trim()}>Bind target</button>
+      </form>
+      {#if bindResult}<p class="muted tiny">{bindResult}</p>{/if}
     {:else}
+      <p class="muted tiny">
+        target: <code>{steerTarget.session_id}</code> run <code>{steerTarget.run_id}</code> gen <code>{steerTarget.generation}</code>
+        · source: {store.directionTargetOrigin === 'owner_roster' ? 'Focusa roster (authoritative)' : 'operator binding (stopgap)'}
+        {#if store.directionTargetOrigin === 'operator_binding'}
+          <button type="button" onclick={() => store.clearBoundTarget()}>clear</button>
+        {/if}
+      </p>
       <p class="muted tiny">
         target: <code>{steerTarget.session_id}</code> run <code>{steerTarget.run_id}</code> gen <code>{steerTarget.generation}</code>
       </p>

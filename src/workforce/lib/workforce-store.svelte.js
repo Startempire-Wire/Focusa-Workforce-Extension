@@ -15,6 +15,7 @@ import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '..
 import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
+import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../lib/direction-target.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { preflightSafeSession, createPreflightedSession } from '../../lib/session-create.mjs';
@@ -81,6 +82,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let streamAbort = null;
   let refreshTimer = null;
   const STREAM_CURSOR_KEY = 'focusa.workforce.stream_cursors.v1';
+  const TARGET_KEY = 'focusa.workforce.direction_targets.v1';
+  // Operator-bound exact target per environment (a reference only; the owner
+  // roster wins the moment it reports one). Stopgap for the missing session.
+  let boundTarget = $state(/** @type {any} */ (null));
 
   const active = $derived(environments.find((e) => e.id === activeId) ?? null);
   const workstream = $derived(
@@ -103,6 +108,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // Ladder view: the owner projection when it carries a committed ladder,
   // otherwise a labelled stopgap derived from owner-answered operations.
   // The cutover is automatic — see lib/trajectory-source.mjs (focusa#621).
+  const resolvedTarget = $derived(resolveDirectionTarget({ roster, bound: boundTarget }));
+  const directionTarget = $derived(resolvedTarget.target);
+  const directionTargetOrigin = $derived(resolvedTarget.origin);
   const trajectoryView = $derived(resolveTrajectorySource({
     view: reads.trajectory ?? null,
     workpoint: reads.workpoint ?? null,
@@ -267,7 +275,38 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function setEnvironment(id) {
     activeId = id;
     await refreshOwner();
+    await loadBoundTarget();
     await startStream();
+  }
+
+  async function loadBoundTarget() {
+    try {
+      const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
+      boundTarget = all[activeId] ?? null;
+    } catch {
+      boundTarget = null;
+    }
+  }
+
+  /** @param {string} raw operator-pasted exact target */
+  async function bindTarget(raw) {
+    const parsed = parseExactTarget(raw);
+    if (!parsed.ok) return parsed;
+    boundTarget = parsed.target;
+    try {
+      const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
+      await chromeApi.storage.local.set({ [TARGET_KEY]: { ...all, [activeId]: parsed.target } });
+    } catch { /* binding is a convenience; failure to persist is not fatal */ }
+    return { ok: true, target: parsed.target, label: describeTarget(parsed.target) };
+  }
+
+  async function clearBoundTarget() {
+    boundTarget = null;
+    try {
+      const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
+      delete all[activeId];
+      await chromeApi.storage.local.set({ [TARGET_KEY]: all });
+    } catch { /* ignore */ }
   }
 
   async function setSelection({ projectRoot, continuityId }) {
@@ -352,6 +391,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get sessionPresets() { return sessionPresets; },
     get trajectory() { return trajectory; },
     get trajectoryView() { return trajectoryView; },
+    get directionTarget() { return directionTarget; },
+    get directionTargetOrigin() { return directionTargetOrigin; },
+    get boundTarget() { return boundTarget; },
     get foremanProfiles() { return foremanProfiles; },
     get ownerGaps() { return ownerGaps; },
     get anyBlocked() { return anyBlocked; },
@@ -373,6 +415,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     useProject,
     startStream,
     stopStream,
+    bindTarget,
+    clearBoundTarget,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,

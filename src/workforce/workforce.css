@@ -2,7 +2,7 @@
  * Workforce page base — consumes docs/13 tokens only.
  * Accessibility: visible focus, reduced-motion respect, no colour-only meaning.
  */
-@import './tokens.css';
+@import '../tokens.css';
 
 html, body {
   margin: 0;
