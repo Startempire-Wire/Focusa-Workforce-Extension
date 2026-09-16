@@ -130,3 +130,8 @@ test('bridged surfaces ship the shared token layer in the build', async () => {
   const sidepanel = await readFile(resolve(VERIFY_DIR, 'styles.css'), 'utf8');
   assert.match(sidepanel, /@import '\.\/tokens\.css'/, 'shipped sidepanel css imports the shipped tokens');
 });
+
+test('the workforce page sets border-box so fields cannot overflow their track', async () => {
+  const base = await readFile(resolve(root, 'src/workforce/workforce.css'), 'utf8');
+  assert.match(base, /\*, \*::before, \*::after \{ box-sizing: border-box; \}/, 'border-box is set for all elements');
+});

@@ -4,6 +4,10 @@
  */
 @import '../tokens.css';
 
+/* Border-box everywhere: fields are width-bearing, and content-box made inputs
+   overflow their grid track by exactly their padding+border. */
+*, *::before, *::after { box-sizing: border-box; }
+
 html, body {
   margin: 0;
   padding: 0;
