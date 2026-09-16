@@ -14,9 +14,13 @@ chrome.runtime.onStartup.addListener(() => {
   });
 });
 
-// Keyboard command surfaces: wall opens as a tab; panel opens via action key.
+// Keyboard command surfaces: wall and the full Workforce page open as tabs;
+// the side panel opens via the action key.
 chrome.commands?.onCommand.addListener((command) => {
   if (command === 'open-wall') {
     chrome.tabs.create({ url: chrome.runtime.getURL('wall.html') });
+  }
+  if (command === 'open-workforce') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('workforce.html') });
   }
 });

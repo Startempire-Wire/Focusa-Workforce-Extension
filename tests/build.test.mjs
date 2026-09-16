@@ -29,6 +29,9 @@ function build() {
   assert.match(result.stdout, /PASS: built Focusa Workforce MV3 unpacked extension/);
 }
 
+/** Set when a test has already produced a bundled dist, so later tests can skip work. */
+let built = false;
+
 test('manifest is least-privilege MV3 with no content script', async () => {
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
@@ -45,4 +48,15 @@ test('unpacked build is deterministic and complete', async () => {
   for (const file of ['manifest.json', 'background.mjs', 'sidepanel.html', 'sidepanel.mjs', 'styles.css']) {
     await readFile(resolve(root, 'dist', file));
   }
+});
+
+test('the Workforce full page is bundled and its Svelte sources do not ship', async () => {
+  if (!built) { build(); built = true; }
+  const html = await readFile(resolve(root, 'dist', 'workforce.html'), 'utf8');
+  assert.match(html, /workforce-assets\//, 'built page references its bundled assets');
+  await readFile(resolve(root, 'dist', 'workforce', 'workforce.js'));
+  await assert.rejects(readFile(resolve(root, 'dist', 'workforce', 'App.svelte')));
+  await assert.rejects(readFile(resolve(root, 'dist', 'src', 'workforce', 'App.svelte')));
+  const manifest = JSON.parse(await readFile(resolve(root, 'dist', 'manifest.json'), 'utf8'));
+  assert.equal(manifest.commands['open-workforce'].suggested_key.default, 'Alt+Shift+K');
 });

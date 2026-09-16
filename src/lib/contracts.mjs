@@ -60,3 +60,27 @@ export function redactConnection(record) {
   const valid = validateConnectionRecord(record);
   return Object.freeze({ ...valid, token: '••••' });
 }
+
+/**
+ * A local (loopback) Focusa environment.
+ *
+ * The owner daemon authenticates the device itself as `principal:local-loopback`,
+ * so no pairing token exists or is stored for a local environment. Only loopback
+ * origins qualify; remote environments must be paired and carry a device token.
+ */
+export function validateLocalEnvironment(input) {
+  if (!input || input.schema !== 'focusa.workforce_local_environment.v1') throw new TypeError('local environment schema mismatch');
+  const baseUrl = normalizeDaemonOrigin(input.base_url);
+  const host = new URL(baseUrl).hostname;
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
+    throw new TypeError('a local environment must be a loopback origin; pair remote daemons instead');
+  }
+  if ('token' in input && input.token != null) throw new TypeError('a local environment must not store a token');
+  return Object.freeze({
+    schema: 'focusa.workforce_local_environment.v1',
+    environment_id: bounded(input.environment_id, 'environment_id', 128),
+    label: bounded(input.label, 'label', 200),
+    base_url: baseUrl,
+    created_at: timestamp(input.created_at, 'created_at'),
+  });
+}

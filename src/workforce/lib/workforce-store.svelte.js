@@ -1,0 +1,244 @@
+/**
+ * Workforce presentation store (Svelte 5 runes).
+ *
+ * Holds ONLY presentation state + bounded owner projections:
+ *   - paired environments and the active one
+ *   - the selected Workstream reference (project_root + continuity_id)
+ *   - last owner projections, with their honest result state
+ *
+ * Canonical state (Foreman, trajectory, work, approvals, evidence) is never
+ * stored here; it is read from and re-read after every owner mutation.
+ *
+ * @module workforce/lib/workforce-store
+ */
+import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner } from '../../lib/workforce-client.mjs';
+import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
+import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
+import { orchestrateAction } from '../../lib/orchestration.mjs';
+
+const SELECTION_KEY = 'focusa.workforce.selection.v1';
+const INTENT_KEY = 'focusa.workforce.intents.v1';
+
+/** Durable idempotency store for consequential owner mutations (MV3-safe). */
+function intentStore(chromeApi) {
+  return {
+    async load(key) { return (await chromeApi.storage.local.get(INTENT_KEY))[INTENT_KEY]?.[key] ?? null; },
+    async persist(record) {
+      const current = (await chromeApi.storage.local.get(INTENT_KEY))[INTENT_KEY] ?? {};
+      await chromeApi.storage.local.set({ [INTENT_KEY]: { ...current, [record.idempotency_key]: record } });
+    },
+  };
+}
+
+function randomKey(prefix) { return `${prefix}:${crypto.randomUUID()}`; }
+
+/** @param {any} chromeApi */
+async function loadSelection(chromeApi) {
+  try {
+    const raw = await chromeApi?.storage?.local?.get(SELECTION_KEY);
+    const value = raw?.[SELECTION_KEY];
+    if (value && typeof value === 'object') {
+      return {
+        projectRoot: typeof value.project_root === 'string' ? value.project_root : '',
+        continuityId: typeof value.continuity_id === 'string' ? value.continuity_id : '',
+      };
+    }
+  } catch { /* selection is a convenience; absence is fine */ }
+  return { projectRoot: '', continuityId: '' };
+}
+
+/** @param {any} chromeApi @param {{projectRoot: string, continuityId: string}} selection */
+async function persistSelection(chromeApi, selection) {
+  try {
+    await chromeApi?.storage?.local?.set({
+      [SELECTION_KEY]: { project_root: selection.projectRoot, continuity_id: selection.continuityId, updated_at: new Date().toISOString() },
+    });
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * @param {any} chromeApi
+ */
+export function createWorkforceStore(chromeApi = globalThis.chrome) {
+  let environments = $state(/** @type {any[]} */ ([]));
+  let activeId = $state('');
+  let selection = $state({ projectRoot: '', continuityId: '' });
+  let ownerGaps = $state(/** @type {string[]} */ ([...OWNER_GAPS]));
+
+  /** @type {Record<string, {state: string, status: number|null, note: string|null, data: any, at: string|null}>} */
+  let reads = $state({});
+  let directing = $state(false);
+  let lastDirection = $state(/** @type {any} */ (null));
+  let bootError = $state(/** @type {string|null} */ (null));
+
+  const active = $derived(environments.find((e) => e.id === activeId) ?? null);
+  const workstream = $derived(
+    selection.projectRoot && selection.continuityId
+      ? workstreamRef({ projectRoot: selection.projectRoot, continuityId: selection.continuityId })
+      : null,
+  );
+  const health = $derived(reads.health?.data ?? null);
+  const entitlement = $derived(reads.license?.data?.authority ?? reads.license?.data ?? null);
+  const entitlementState = $derived(
+    reads.license?.state === ResultState.ENTITLEMENT_BLOCKED ? 'blocked'
+      : (entitlement?.state ?? (reads.license?.data ? 'unknown' : null)),
+  );
+  const roster = $derived(reads.sessions?.state === ResultState.OK ? rosterFromOwner(reads.sessions.data) : []);
+  const trajectory = $derived(reads.trajectory?.state === ResultState.OK || reads.trajectory?.state === ResultState.DEGRADED
+    ? trajectoryFromOwner(reads.trajectory.data) : null);
+  const foremanProfiles = $derived(reads.roles?.state === ResultState.OK ? (reads.roles.data?.profiles ?? []) : []);
+  const anyBlocked = $derived(Object.values(reads).some((r) => r.state === ResultState.ENTITLEMENT_BLOCKED));
+
+  function record(name, r) {
+    reads = { ...reads, [name]: { state: r.state, status: r.status, note: r.note ?? r.failureClass ?? null, data: r.data, at: new Date().toISOString() } };
+    if (r.state === ResultState.NETWORK || r.state === ResultState.UNAUTHENTICATED) {
+      // no retry loop here: surfaces render the state and the operator decides (MV3-safe, no background state)
+    }
+  }
+
+  function client() {
+    if (!active) throw new Error('no active environment selected');
+    return createWorkforceClient({ baseUrl: active.baseUrl, token: active.token });
+  }
+
+  async function refreshEnvironments() {
+    try {
+      const paired = (await listConnections(chromeApi)).map((c) => ({
+        id: c.connection_id, kind: 'paired', label: c.label, baseUrl: c.base_url, token: c.token, scopes: c.granted_scopes,
+      }));
+      let local = [];
+      try {
+        local = (await listLocalEnvironments(chromeApi)).map((e) => ({
+          id: e.environment_id, kind: 'local', label: e.label, baseUrl: e.base_url, token: null, scopes: ['read', 'write'],
+        }));
+      } catch { /* an invalid stored local record must not break paired environments */ }
+      environments = [...local, ...paired];
+      if (!activeId && environments.length) activeId = environments[0].id;
+      if (!selection.projectRoot) {
+        const stored = await loadSelection(chromeApi);
+        if (stored.projectRoot) selection = stored;
+      }
+    } catch (error) {
+      bootError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  /**
+   * Register the daemon running on this machine. The owner authenticates the
+   * device as principal:local-loopback, so no pairing token is involved.
+   * @param {string} baseUrl loopback origin, e.g. http://127.0.0.1:8787
+   */
+  async function addLocalDaemon(baseUrl = 'http://127.0.0.1:8787') {
+    const origin = normalizeDaemonOrigin(baseUrl);
+    // Must run inside the click's user gesture: the extension needs an optional
+    // host permission before it can reach the loopback daemon.
+    const granted = await requestDaemonOriginPermission(origin, chromeApi);
+    if (!granted) throw new Error(`origin permission for ${origin} was not granted`);
+    const record = await saveLocalEnvironment({
+      schema: 'focusa.workforce_local_environment.v1',
+      environment_id: `local:${origin}`,
+      label: `This device (${origin})`,
+      base_url: origin,
+      created_at: new Date().toISOString(),
+    }, chromeApi);
+    await refreshEnvironments();
+    activeId = record.environment_id;
+    await refreshOwner();
+    return record.environment_id;
+  }
+
+  async function refreshOwner() {
+    if (!active) return;
+    const c = client();
+    record('health', await c.health());
+    record('license', await c.licenseStatus());
+    if (selection.projectRoot) {
+      record('project', await c.projectIdentity(selection.projectRoot));
+      record('projectStatus', await c.projectStatus(selection.projectRoot));
+      record('workpoint', await c.workpointCurrent(selection.projectRoot));
+      record('sessions', await c.sessions(selection.projectRoot));
+      record('profiles', await c.sessionProfiles(selection.projectRoot));
+    }
+    if (workstream) {
+      record('trajectory', await c.trajectory(workstream));
+      record('workLoop', await c.workLoopStatus(workstream));
+      record('roles', await c.roleProfiles(workstream));
+    }
+  }
+
+  async function setEnvironment(id) {
+    activeId = id;
+    await refreshOwner();
+  }
+
+  async function setSelection({ projectRoot, continuityId }) {
+    selection = {
+      projectRoot: projectRoot ?? selection.projectRoot,
+      continuityId: continuityId ?? selection.continuityId,
+    };
+    await persistSelection(chromeApi, selection);
+    await refreshOwner();
+  }
+
+  /**
+   * Submit Direction to one exact owner target (silent session/run/generation).
+   * Uses the proven governed orchestration path: durable idempotency intent,
+   * owner approval when the action requires it, exact-target refresh, canonical re-read.
+   *
+   * @param {{target: {session_id: string, run_id: string, generation: number}, instruction: string}} input
+   */
+  async function direct({ target, instruction }) {
+    if (!active) throw new Error('no active environment selected');
+    directing = true;
+    lastDirection = null;
+    try {
+      const outcome = await orchestrateAction({
+        action: 'steer',
+        target,
+        payload: { instruction },
+        idempotency_key: randomKey('steer'),
+        idempotencyStore: intentStore(chromeApi),
+        requestOptions: { baseUrl: active.baseUrl, token: active.token },
+      });
+      lastDirection = {
+        ok: true,
+        action: outcome.action,
+        status: outcome.mutation_status ?? null,
+        approval: outcome.approval?.approval_id ?? null,
+      };
+    } catch (error) {
+      lastDirection = { ok: false, kind: error?.kind ?? 'error', message: error instanceof Error ? error.message : String(error) };
+    } finally {
+      directing = false;
+      await refreshOwner();
+    }
+  }
+
+  return {
+    get environments() { return environments; },
+    get activeId() { return activeId; },
+    get active() { return active; },
+    get selection() { return selection; },
+    get workstream() { return workstream; },
+    get reads() { return reads; },
+    get health() { return health; },
+    get entitlement() { return entitlement; },
+    get entitlementState() { return entitlementState; },
+    get roster() { return roster; },
+    get trajectory() { return trajectory; },
+    get foremanProfiles() { return foremanProfiles; },
+    get ownerGaps() { return ownerGaps; },
+    get anyBlocked() { return anyBlocked; },
+    get directing() { return directing; },
+    get lastDirection() { return lastDirection; },
+    get bootError() { return bootError; },
+    refreshEnvironments,
+    refreshOwner,
+    setEnvironment,
+    setSelection,
+    addLocalDaemon,
+    direct,
+    resultOf: (name) => reads[name] ?? null,
+  };
+}

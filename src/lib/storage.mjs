@@ -1,6 +1,7 @@
-import { validateConnectionRecord } from './contracts.mjs';
+import { validateConnectionRecord, validateLocalEnvironment } from './contracts.mjs';
 
 const STORAGE_KEY = 'focusa.workforce.connections.v1';
+const LOCAL_KEY = 'focusa.workforce.local_environments.v1';
 function localArea(chromeApi) {
   if (!chromeApi?.storage?.local) throw new Error('chrome.storage.local is unavailable');
   return chromeApi.storage.local;
@@ -32,4 +33,36 @@ export async function forgetConnection(connectionId, chromeApi = globalThis.chro
   return current.length !== next.length;
 }
 
+/**
+ * Local (loopback) environments — the device itself is the authenticated
+ * principal, so these carry no device token.
+ *
+ * @param {any} chromeApi
+ * @returns {Promise<ReturnType<typeof validateLocalEnvironment>[]>}
+ */
+export async function listLocalEnvironments(chromeApi = globalThis.chrome) {
+  const result = await localArea(chromeApi).get(LOCAL_KEY);
+  const raw = result?.[LOCAL_KEY] ?? [];
+  if (!Array.isArray(raw)) throw new Error('stored local environment collection is invalid');
+  return raw.map(validateLocalEnvironment);
+}
+
+export async function saveLocalEnvironment(record, chromeApi = globalThis.chrome) {
+  const valid = validateLocalEnvironment(record);
+  const current = await listLocalEnvironments(chromeApi);
+  const next = current.filter((item) => item.environment_id !== valid.environment_id);
+  next.push(valid);
+  next.sort((a, b) => a.environment_id.localeCompare(b.environment_id));
+  await localArea(chromeApi).set({ [LOCAL_KEY]: next });
+  return valid;
+}
+
+export async function forgetLocalEnvironment(environmentId, chromeApi = globalThis.chrome) {
+  const current = await listLocalEnvironments(chromeApi);
+  const next = current.filter((item) => item.environment_id !== environmentId);
+  await localArea(chromeApi).set({ [LOCAL_KEY]: next });
+  return current.length !== next.length;
+}
+
 export const connectionStorageKey = STORAGE_KEY;
+export const localEnvironmentStorageKey = LOCAL_KEY;

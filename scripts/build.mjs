@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,7 +30,35 @@ if (manifest.chrome_url_overrides?.newtab !== 'startpage.html') {
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 await writeFile(resolve(dist, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-await cp(resolve(root, 'src'), dist, { recursive: true });
+
+// Copy the plain MV3 sources. The Workforce full page is a built artifact, so
+// its Svelte source tree is excluded from the shipped extension.
+const staticEntries = await readdir(resolve(root, 'src'), { withFileTypes: true });
+for (const entry of staticEntries) {
+  if (entry.name === 'workforce') continue;
+  await cp(resolve(root, 'src', entry.name), resolve(dist, entry.name), { recursive: true });
+}
+
+// Bundle the workforce full page when the toolchain is installed. A missing
+// toolchain degrades to a build without the page; a real bundling failure is
+// an error (never silently shipped as "absent").
+let uiBundled = false;
+let hasVite = true;
+try {
+  await access(resolve(root, 'node_modules/vite/package.json'));
+} catch {
+  hasVite = false;
+}
+if (!hasVite) {
+  console.warn('WARN: vite toolchain absent; workforce.html not bundled (run npm install)');
+} else {
+  const { build } = await import('vite');
+  await build({ configFile: resolve(root, 'vite.config.mjs'), logLevel: 'warn' });
+  const built = await readFile(resolve(dist, 'workforce.html'), 'utf8');
+  if (!/workforce-assets\//.test(built)) throw new Error('workforce.html was built without its bundled assets');
+  await rm(resolve(dist, 'src'), { recursive: true, force: true });
+  uiBundled = true;
+}
 
 // ── White-label: brand substitution from FOCUSA_BRAND (default Focusa Workforce). ──
 const brand = process.env.FOCUSA_BRAND || 'Focusa Workforce';
@@ -46,13 +74,16 @@ const repls = [
 let touched = 0;
 for (const ent of await readdir(dist, { recursive: true })) {
   if (!ent.endsWith('.html') && !ent.endsWith('.mjs')) continue;
+  // Never rewrite the hashed bundle/asset output: it is generated, and brand
+  // text there comes from the source at bundle time.
+  if (ent.startsWith('workforce-assets')) continue;
   const p = resolve(dist, ent);
   const txt = await readFile(p, 'utf8');
   let out = txt;
   for (const [re, to] of repls) out = out.replace(re, to);
   if (out !== txt) { await writeFile(p, out); touched++; }
 }
-console.log(`PASS: built ${brand} MV3 unpacked extension at ${dist} (${touched} files re-branded)`);
+console.log(`PASS: built ${brand} MV3 unpacked extension at ${dist} (${touched} files re-branded${uiBundled ? ', workforce page bundled' : ''})`);
 
 // ── Public demo: FOCUSA_PUBLIC_NEWTAB=1 makes the default new tab render the
 // public Work view (dated, curated snapshot). Private builds are unchanged. ──

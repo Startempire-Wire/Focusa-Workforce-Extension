@@ -43,6 +43,12 @@
         "default": "Alt+Shift+W"
       },
       "description": "Open Focusa organization wall"
+    },
+    "open-workforce": {
+      "suggested_key": {
+        "default": "Alt+Shift+K"
+      },
+      "description": "Open the full Focusa Workforce page"
     }
   }
 }

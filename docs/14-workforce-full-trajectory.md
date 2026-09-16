@@ -569,9 +569,36 @@ Current Short frontier:
 ```text
 HLT-WF-001
 → MLG-0
-→ STG-0.1
-→ WP-0.1.1
+→ STG-0.1  (WP-0.1.1 resolved 2026-09-16 — see src/lib/owner-contracts.mjs)
+→ STG-0.2  (Svelte 5 + minimal Vite/MV3 bundling, workforce.html, shared runtime client) — done
+→ STG-0.3  (tokens/shared state components as used by the first slice) — in progress
+→ MLG-1   (Workstream + Foreman + Direction slice)
 ```
+
+### WP-0.1.1 resolution (2026-09-16)
+
+Inspected `GET /v1/agent/operations` (157 governed operations), the live
+daemon route surface (0.9.194-dev), and the Focusa monorepo route table.
+Recorded in `src/lib/owner-contracts.mjs`:
+
+```text
+environment  real      health · license/status · device/pair/*
+project      real      project/identity · project/status · project/discover
+workstream   equivalent owner identity axes: project_root (project_folder_boundary)
+                       + continuity_id (logical_workstream); workstream_id is derived
+                       in focusa-core workstream_root.rs. No standalone list route:
+                       Workforce resolves the Workstream by those axes.
+direction    real      silent-sessions/{id}/steer|start|cancel + approvals (exact target)
+trajectory   real      trajectory/view · workpoint/current|resume · work-loop/status
+people       real      silent-sessions · profiles · status
+evidence     real      evidence/capture · workpoint/link-evidence
+foreman      GAP       Spec 182 Foreman has no daemon operation (UP-01); closest real
+                       surface is the Workstream role-profile list
+attention    GAP       no operator.attention.v1 operation (UP-03)
+fleet        GAP       no fleet/presence projection (UP-06)
+```
+
+Gaps render as declared owner gaps; Workforce does not fabricate the state.
 
 ---
 
