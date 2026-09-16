@@ -268,6 +268,25 @@ export function createWorkforceClient(config) {
 }
 
 /**
+ * Normalize the owner's recent activity into what Workforce renders.
+ * Owner-projected fields only; unknown stays null.
+ *
+ * @param {any} ownerData
+ */
+export function eventsFromOwner(ownerData) {
+  const body = ownerData?.data ?? ownerData ?? {};
+  const rows = Array.isArray(body.events) ? body.events : [];
+  return Object.freeze(rows.map((row) => Object.freeze({
+    id: row.id ?? null,
+    type: row.type ?? null,
+    timestamp: row.timestamp ?? null,
+    origin: row.origin ?? null,
+    sessionId: row.session_id ?? null,
+    observation: row.is_observation === true,
+  })));
+}
+
+/**
  * Normalize the owner project dashboard into what Workforce renders.
  * @param {any} ownerData
  */

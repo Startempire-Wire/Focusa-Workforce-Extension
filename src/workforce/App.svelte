@@ -331,6 +331,26 @@
     {/if}
   </section>
 
+  <!-- Activity: what the owner reports happening now -->
+  <section class="card" aria-labelledby="wf-activity">
+    <h2 id="wf-activity">Activity</h2>
+    <p class="muted tiny">most recent events Focusa reported for this project scope (owner-sourced)</p>
+    {#if store.activity.length === 0}
+      <p class="muted">Focusa has not reported recent activity for this scope.</p>
+    {:else}
+      <ul class="plain">
+        {#each store.activity.slice(0, 12) as event (event.id ?? `${event.type}-${event.timestamp}`)}
+          <li>
+            <strong>{event.type ?? 'event'}</strong>
+            {#if event.observation}<span class="badge">observation</span>{/if}
+            <span class="muted tiny">{event.timestamp ?? ''}{#if event.origin} · {event.origin}{/if}{#if event.sessionId} · session {event.sessionId.slice(0, 8)}{/if}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <StateNote label="Events" result={store.resultOf('events')} />
+  </section>
+
   <!-- Evidence -->
   <section class="card" aria-labelledby="wf-evidence">
     <h2 id="wf-evidence">Evidence</h2>

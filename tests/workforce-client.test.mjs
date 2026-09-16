@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../src/lib/workforce-client.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner } from '../src/lib/workforce-client.mjs';
 import { workstreamRef } from '../src/lib/owner-contracts.mjs';
 
 /** Real owner response shapes captured from a live Focusa daemon (2026-09-16). */
@@ -298,4 +298,18 @@ test('roster keeps optional owner-project fields when reported and stays silent 
   assert.equal(bare.role, null);
   assert.equal(bare.configRevision, null);
   assert.equal(bare.authority, null);
+});
+
+test('activity normalisation keeps owner fields and marks observations', () => {
+  const events = eventsFromOwner({
+    bounds: { total: 4 },
+    events: [
+      { id: 'e1', type: 'MemoryDecayTick', timestamp: '2026-09-16T00:00:00Z', origin: 'daemon', session_id: 's-1', is_observation: false },
+      { id: 'e2', type: 'ObservationCaptured', is_observation: true },
+    ],
+  });
+  assert.equal(events.length, 2);
+  assert.deepEqual(events[0], { id: 'e1', type: 'MemoryDecayTick', timestamp: '2026-09-16T00:00:00Z', origin: 'daemon', sessionId: 's-1', observation: false });
+  assert.equal(events[1].observation, true);
+  assert.equal(events[1].timestamp, null);
 });

@@ -13,7 +13,7 @@
  */
 import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
 import { startPairing, pollPairing } from '../../lib/pairing.mjs';
-import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner } from '../../lib/workforce-client.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../lib/direction-target.mjs';
@@ -119,6 +119,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // otherwise a labelled stopgap derived from owner-answered operations.
   // The cutover is automatic — see lib/trajectory-source.mjs (focusa#621).
   const evidenceTrail = $derived(buildEvidenceTrail(reads));
+  const activity = $derived(reads.events?.state === ResultState.OK ? eventsFromOwner(reads.events.data) : []);
   const resolvedTarget = $derived(resolveDirectionTarget({ roster, bound: boundTarget }));
   const directionTarget = $derived(resolvedTarget.target);
   const directionTargetOrigin = $derived(resolvedTarget.origin);
@@ -242,6 +243,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('projectStatus', await c.projectStatus(selection.projectRoot));
       record('workpoint', await c.workpointCurrent(selection.projectRoot));
       record('sessions', await c.sessions(selection.projectRoot));
+      record('events', await c.eventsRecent(selection.projectRoot, 20));
       record('profiles', await c.sessionProfiles(selection.projectRoot));
       record('presets', await c.sessionPresets(selection.projectRoot));
     }
@@ -542,6 +544,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get trajectory() { return trajectory; },
     get trajectoryView() { return trajectoryView; },
     get evidenceTrail() { return evidenceTrail; },
+    get activity() { return activity; },
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
