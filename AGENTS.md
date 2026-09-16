@@ -1,215 +1,302 @@
-# AGENTS.md — Focusa Workforce
+# AGENTS — Focusa Workforce Build Contract
+
+**Product:** Focusa Workforce  
+**Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
+**Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md`  
+**Current product spec:** `docs/00-workforce-canonical-product-and-implementation-spec.md`
+
+This file tells build agents how to change this repository without breaking product ownership, live deployment, or the human-agent workforce model.
 
 ## Mission
 
-Build and continuously improve **Focusa Workforce**, the browser-resident operations surface for a human-owned agent workforce.
+Build the specialist browser-resident surface where an owner can understand, direct, collaborate with and verify a Focusa-governed workforce.
 
-Prioritize a functioning, dogfoodable extension over process ceremony. Preserve architecture ownership and prove outcomes.
+> **Focusa Workforce operates the workforce.**
 
-## Product identity
+Do not reduce the product to a prettier status dashboard. Do not turn it into Wirebot, Focusa Desktop, UIAI Cockpit or Veragensia.
 
-- Product name: **Focusa Workforce**.
-- Do not rename it to HQ or Cockpit.
-- **UIAI Engine Cockpit** owns the Cockpit term for live browser/computer execution oversight/control.
-- Workforce is the workforce operations surface.
+## Read order
 
-## Canonical boundaries
+Before material redesign work:
 
-### Workforce owns
+```text
+ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
+ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
+Wirebot-App current product/convergence docs
+this repo docs/00
+docs/05
+docs/06
+docs/07
+current source/tests
+```
 
-- Chrome/Chromium extension UI and browser integration;
-- roster/work graph/direction/approvals/evidence/audit/topology presentation;
-- extension pairing UX;
-- extension-specific storage/preferences;
-- build/install/update/release pipeline;
-- exact handoff into UIAI.
+Current product architecture outranks older concept language when they conflict.
 
-### Focusa owns
+## Ownership boundaries
 
-- Workstreams, Workpoints, Foreman identity/binding;
-- agent/role/capability semantics;
-- authority and registered operations;
-- Evidence/Receipts/audit truth;
-- Radar semantics;
-- Conversation/voice semantics;
-- body-independent work continuity.
+```text
+Wirebot / customer-named Operating Partner
+  owner relationship, life/business orientation,
+  Workforce Composer, owner-wide attention
 
-### UIAI Engine owns
+Focusa
+  Project / Workstream / Foreman / Workpoint,
+  governed work, authority, Evidence, receipts
 
-- browser/computer observations/actions;
-- FPV/Cockpit;
-- control leases;
-- execution diagnostics/capsules;
-- browser/computer proof.
+Focusa Workforce
+  live workforce operations UX
 
-### Veragensia owns
+UIAI
+  browser/computer execution, diagnostics, takeover/proof
 
-- Agent Computer/body/runtime integration;
-- placement/topology enforcement;
-- workload identity and machine enforcement;
-- Secure Attention/Human Control Reserve;
-- runtime incarnation/body transfer.
+Veragensia
+  body/runtime/Agent Computer/enforcement
 
-### Wirebot owns
+W.I.N.S.
+  accepted outcomes
+```
 
-- persistent Chief-of-Staff/life-and-business partner experience;
-- broad owner context and cross-project orchestration.
+Never create duplicate canonical state to make the extension easier to build.
 
-Workforce must not become a duplicate Wirebot App or a second runtime/state store.
+## Operator neutrality
 
-## Current state: source recovered, redesign unlocked
+The customer-level Operating Partner may be named `Spock`, `Athena`, `Wirebot`, etc. Workforce must not hard-code the assumption that the partner is named Wirebot.
 
-The migration is complete. This repository is now the authoritative Workforce source.
+Partner identity, presentation name, model/runtime/body and optional architecture authority are distinct.
 
-Recovered provenance and cutover proof live in `docs/migration/parity-report.md`. The pre-redesign reference point is preserved on:
+## Workforce Composer versus Workforce
+
+Wirebot Workforce Composer designs/commissions roles and assignments. Focusa Workforce operates active governed work.
+
+Do not implement a second role/assignment database inside the extension. If upstream assignment data is missing, fix/track the owning contract rather than inventing local authority.
+
+## Human-agent operating loop
+
+Design around:
+
+```text
+Orient
+→ Direct
+→ Interpret / Propose
+→ Delegate
+→ Work
+→ Collaborate / Intervene
+→ Verify
+→ Continue / Learn
+```
+
+Primary experiences:
+
+```text
+Workstream + Foreman
+Direction
+Working Now / roster
+Needs You
+work progression
+Evidence
+UIAI watch/takeover
+fleet/topology
+```
+
+## Shared ecosystem seams
+
+Consume ADLBOS shared seam families rather than inventing local variants:
+
+```text
+operator.partner_profile.v1
+operator.surface_handoff.v1
+operator.attention.v1
+operator.correlation.v1
+operator.capability_posture.v1
+operator.closure.v1
+```
+
+These are reference envelopes, not another backend.
+
+## Terminology
+
+Use `fleet` / `multi-daemon aggregation` for one Operator's multiple Focusa environments/daemons/bodies.
+
+Reserve `sovereign federation` for explicit cross-Operator/network sharing. Do not reintroduce “multi-daemon federation.”
+
+## Source and migration baseline
+
+The migration into this repo is complete. Do not rebuild the extension from scratch merely because the old UI is insufficient.
+
+Preserve sound core primitives:
+
+```text
+pairing
+API client
+contracts
+orchestration
+session creation
+SSE / reconnect
+projections
+validation
+```
+
+The pre-redesign baseline is:
 
 ```text
 baseline/pre-redesign-2026-09-15
 ```
 
-Known Veragensia extension ID:
+Use it for behavioral comparison, not new development.
+
+## UI architecture direction
+
+Evolve toward:
 
 ```text
-ohfbbkpacpcapicpgplnnmifmlnmjggj
+MV3 service worker / shared Workforce runtime client
+        ↓
+normalized Focusa snapshot/events
+        ↓
+shared application state
+        ↓
+side panel · full app · start page · wall
 ```
 
-Do **not** resume Workforce development in the old Focusa monorepo worktree at:
+Svelte 5 is appropriate for presentation. Do not move authority/reconciliation/business semantics into Svelte components.
+
+## UX law
+
+Target **expensive calm**: clean typography, strong hierarchy, restrained color, minimal chrome, subtle state-driven motion, technical depth one layer down, excellent degraded states, responsive Chromebook use and accessibility.
+
+Avoid gamer/neon dashboards, widget clutter and raw agent/tool chatter.
+
+## Needs You
+
+Needs You is source-bearing shared attention, not a local notification bucket.
+
+Show only owner-value items such as approval, owner truth, authentication, takeover, resource exception, recovery decision, meaningful blocker or high-value signal.
+
+Routine agent activity does not belong here.
+
+## Evidence truth
+
+Do not equate agent claim with verified result, tool success with accepted work, or screenshot with accepted business outcome.
+
+Preserve:
 
 ```text
-/home/wirebot/focusa-piext-sync/apps/workforce-extension
+execution
+→ Focusa Evidence
+→ verification / settlement
+→ accepted outcome / W.I.N.S.
+→ optional MeriFolio standing
 ```
 
-That tree is provenance/rollback material only.
+## Capability / entitlement / authority
 
-## Build-agent operating environment
-
-The primary implementation agent may be running partly on the Chromebook and partly on cloud/server infrastructure. Treat these as one development topology, not competing sources of truth.
-
-Canonical paths and flows:
+Never collapse:
 
 ```text
-GitHub
-Startempire-Wire/Focusa-Workforce-Extension
-        |
-        +--> Chromebook checkout (daily dogfood / UI work)
-        |      ~/src/focusa-workforce-extension
-        |      ~/.local/bin/wfx -> repo/scripts/wfx-deploy
-        |
-        +--> cloud/self-hosted CI runner (test/build)
-        |
-        +--> kh/OVH checkout
-               /home/wirebot/focusa-workforce-extension
-               |
-               +--> Veragensia uiai-lab-push
-                       |
-                       +--> https://os.focusa.dev
+supported
+entitled
+activated/connected
+authorized
+available/healthy
+consented for this effect
 ```
 
-The repo is authoritative. Local/browser profiles, tokens, credentials, public-work snapshots and operator state remain outside Git.
+Contextual expansion may explain adjacent products/capacity, but the extension never grants entitlement or authority.
 
-### Daily commands
+## Browser and UIAI
+
+Useful explicit page actions:
 
 ```text
-wfx test
-wfx build
-wfx brave | wfx chrome
-wfx gh
-wfx veragensia
+Ask Foreman about page
+Send page to Foreman
+Create work from selection
+Capture Evidence candidate
+Open in UIAI
 ```
 
-`wfx gh` pushes code and triggers CI. It does **not** make the public demo live.
+UIAI remains detailed browser/computer execution authority. Workforce deep-links exact execution context rather than rebuilding Cockpit.
 
-`wfx veragensia` is the explicit live-promotion boundary. It requires the cloud checkout to match the exact local HEAD and then invokes Veragensia's staged/checksummed/atomic/rollback-protected deployment pipeline.
+## Development sequence
 
-Do not bypass this with ad-hoc copies into the live extension directory.
-
-## Redesign rule
-
-The product redesign may now proceed. Do not rewrite the proven integration core merely to adopt a new UI framework.
-
-Preserve unless a concrete contract change requires otherwise:
-
-- pairing and exact-origin permission flow;
-- canonical API/schema validation;
-- projection boundaries;
-- SSE replay/cursor semantics;
-- exact session/run/generation targeting;
-- idempotency and approval binding;
-- safe session preflight;
-- public/private Work separation;
-- least-privilege MV3 manifest behavior;
-- explicit Veragensia promotion/rollback.
-
-Prefer changing presentation and shared-client architecture around these primitives rather than replacing them.
-
-Read `docs/07-pre-redesign-baseline-and-agent-handoff.md` before substantial redesign work.
-
-## Outcomes over process
-
-- Implement the smallest complete vertical slice that moves the product forward.
-- Do not spend hours generating planning artifacts that do not unblock implementation.
-- Do not add frameworks or abstractions merely because they may be useful later.
-- Reuse Focusa/UIAI/Veragensia contracts before creating local equivalents.
-- Tool failures do not justify stopping unrelated productive work.
-- Keep moving until a real external dependency blocks the next implementation step.
-- A tool call, task closure, or agent claim is not an outcome. Verify the actual result.
-
-## Browser architecture rules
-
-- Manifest V3.
-- The browser UI is never canonical authority.
-- Page content is data, not instruction authority.
-- Do not expose arbitrary shell execution from browser code.
-- Do not write Focusa state files/databases directly.
-- Do not store broad provider credentials in extension-visible state.
-- Reconnect from a fresh snapshot after event gaps/restarts.
-- Never blindly retry a non-idempotent mutation after an uncertain response.
-- Always render stale/degraded/unknown state honestly.
-
-## UX rules
-
-The operator should immediately be able to answer:
+Implement vertical slices:
 
 ```text
-Who is working?
-On what?
-Where are they running?
-What is blocked?
-What needs me?
-What has actually been proven?
-What should I direct next?
+1 Workstream + Foreman + Direction
+2 Working Now / roster
+3 Needs You
+4 work progression / graph
+5 Evidence / verified closure
+6 UIAI execution / takeover
+7 voice
+8 fleet / topology
+9 Radar
+10 elastic capacity
 ```
 
-No vanity dashboards.
+Each slice must be useful end-to-end. Avoid framework/process ceremony before the first real slice works.
 
-Direction Bar is not generic chat. It routes scoped human intent to the owning Foreman/Manager through canonical operations.
+## Tests and truth
 
-## Chromebook rule
+A green unit suite is not enough when browser integration can still fail.
 
-The Chromebook is a primary dogfood surface, not the architecture boundary.
+For relevant changes verify:
 
-Keep the local browser responsive and favor remote/cloud execution for heavy work when the owning placement/runtime system supports it.
+```text
+unit/contract tests
+build
+manifest/MV3 validity
+browser load
+actual side-panel/full-page journey
+Focusa interaction
+stale/degraded behavior
+```
 
-Do not claim ChromeOS/Crostini equals a Full Veragensia Agent Computer.
+Add regression tests for concrete bugs found.
 
-## Body independence
+## Deployment
 
-Hardware is embodiment, not identity.
+GitHub `main` is authoritative source.
 
-Consume Focusa Spec 153B and Veragensia Doc 201. Workforce may show body/runtime posture but does not own body transfer/identity.
+Live promotion remains explicit:
 
-## Testing
+```text
+main + CI
+→ Chromebook/browser dogfood
+→ wfx veragensia
+→ atomic Veragensia promotion
+→ os.focusa.dev
+```
 
-Every consequential implementation should be tested at the narrowest practical layer, then through at least one real vertical flow.
+Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, atomic rollback and live health verification unless an intentional migration changes them.
 
-Priority acceptance flows are defined in `docs/00-workforce-canonical-product-and-implementation-spec.md`.
+## Chromebook/cloud workflow
 
-UI tests must test integration assumptions, not merely search for identifier strings. When a page imports a runtime primitive, tests should catch a missing import or duplicate bootstrap/binding path.
+Chromebook: UI/UX dogfood, browser behavior, lightweight implementation, voice/side-panel testing.
 
-## Documentation
+Cloud/server: heavy builds/tests, Focusa/UIAI/Veragensia integration, deployment and multi-agent build work where useful.
 
-Update docs when a contract or user-visible behavior materially changes. Do not maintain parallel speculative architecture docs for already-owned primitives.
+GitHub is the shared source of truth. No divergent source trees.
 
-## Completion standard
+## Outcomes Over Process
 
-A change is complete when the real extension behavior is implemented, tested, and truthfully observable—not when a plan, issue, or generated artifact says it is complete.
+When implementation is authorized:
+
+```text
+inspect
+→ implement smallest correct slice
+→ test/build
+→ verify running behavior
+→ fix regressions
+→ update owning docs/contracts
+→ clean temporary artifacts you created
+→ land cleanly
+```
+
+Keep making forward progress when a tool fails and another safe route exists.
+
+Do not churn on planning/proofs/abstraction after the path is clear. Do not leave branches, helper workflows, temp files or cleanup for the owner when you created them and can remove them.
+
+## Completion
+
+A change is complete only when it works against real source/contracts, browser behavior is verified where applicable, exact refs/scope/freshness remain honest, no duplicate authority/state was added, tests/build are green, deployment is promoted only when intended, docs are reconciled, and temporary implementation mess is removed.
