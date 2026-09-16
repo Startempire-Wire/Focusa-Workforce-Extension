@@ -1,10 +1,12 @@
-# CI runs on the org's repo-scoped self-hosted OVH runner (ovh-workforce).
-# The org free plan exhausts private-repo hosted minutes; this repo is public
-# and should keep self-hosted labels. Do not switch to hosted runners.
+# CI runs on GitHub-hosted runners.
+#
+# Why not self-hosted: this repository is public. A self-hosted runner attached
+# to a public repo can be reached by fork pull requests, which execute
+# untrusted code on the runner's host. Public repositories get unmetered
+# GitHub-hosted minutes, so the ephemeral hosted runner is both free and safe.
+# (Private-repo hosted minutes are exhausted on this org's free plan, which is
+# why the private-repo path needs a payment method or an isolated runner.)
 name: Workforce CI
-
-# The Startempire-Wire org runs CI on its self-hosted OVH runner
-# (ovh-focusa-builder); hosted runners are not used for this org.
 
 on:
   pull_request:
@@ -15,9 +17,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: workforce-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
-    runs-on: [self-hosted, Linux, X64, ovh-workforce]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
