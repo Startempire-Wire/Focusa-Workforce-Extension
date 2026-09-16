@@ -30,7 +30,13 @@
 
   onMount(async () => {
     await store.refreshEnvironments();
-    if (store.active) await store.refreshOwner();
+    if (store.active) {
+      await store.refreshOwner();
+      // Owner-sourced freshness: the page follows the daemon's event stream and
+      // re-reads projections rather than polling or inventing state.
+      await store.startStream();
+    }
+    return () => store.stopStream();
   });
 
   async function submitDirection(event) {
@@ -54,7 +60,15 @@
   <header class="app-head">
     <div>
       <h1>Focusa Workforce</h1>
-      <p class="sub">Workstream · Foreman · Direction <span class="stamp" title="loaded build">{buildStamp}</span></p>
+      <p class="sub">
+        Workstream · Foreman · Direction
+        <span class="stamp" title="loaded build">{buildStamp}</span>
+        {#if store.streamState}
+          <span class="live {store.streamState.phase}" title={store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'}>
+            {store.streamState.phase}
+          </span>
+        {/if}
+      </p>
     </div>
     <button type="button" onclick={() => store.refreshOwner()} disabled={!store.active}>Refresh</button>
   </header>
@@ -265,6 +279,10 @@
   h1 { font-size: 18px; margin: 0; }
   .sub { margin: 2px 0 0; font-size: 12px; opacity: 0.65; }
   .stamp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; opacity: 0.8; border: 1px solid #30363d; border-radius: 999px; padding: 1px 7px; }
+  .live { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 999px; padding: 1px 7px; border: 1px solid currentColor; }
+  .live.live { color: #3fb950; }
+  .live.replaying { color: #d29922; }
+  .live.unavailable, .live.unauthorized { color: #f85149; }
   .card { border: 1px solid #30363d; border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 2px; opacity: 0.75; }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

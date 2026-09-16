@@ -73,6 +73,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let bootError = $state(/** @type {string|null} */ (null));
   let discovered = $state(/** @type {any[]} */ ([]));
   let projectBusy = $state(false);
+  // Live freshness: owner-sourced event stream state (never synthesized).
+  let streamState = $state(/** @type {{phase: string, cursor: string|null, attempt: number}|null} */ (null));
+  let lastEventAt = $state(/** @type {string|null} */ (null));
+  let streamAbort = null;
+  let refreshTimer = null;
+  const STREAM_CURSOR_KEY = 'focusa.workforce.stream_cursors.v1';
 
   const active = $derived(environments.find((e) => e.id === activeId) ?? null);
   const workstream = $derived(
@@ -149,7 +155,45 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     await refreshEnvironments();
     activeId = record.environment_id;
     await refreshOwner();
+    await startStream();
     return record.environment_id;
+  }
+
+  /**
+   * Start owner-stream freshness for the active environment. Events are only a
+   * trigger: the projections are always re-read from the owning operations.
+   */
+  async function startStream() {
+    streamAbort?.abort();
+    streamAbort = new AbortController();
+    const environment = active;
+    if (!environment) return;
+    const cursors = (await chromeApi?.storage?.local?.get(STREAM_CURSOR_KEY).catch(() => null))?.[STREAM_CURSOR_KEY] ?? {};
+    try {
+      await createWorkforceClient({ baseUrl: environment.baseUrl, token: environment.token }).openEventStream({
+        scope: selection.projectRoot ? { projectRoot: selection.projectRoot } : {},
+        initialCursor: cursors[environment.id] ?? null,
+        signal: streamAbort.signal,
+        onState: (state) => { streamState = { phase: state.phase, cursor: state.cursor, attempt: state.attempt }; },
+        onEvent: () => {
+          lastEventAt = new Date().toISOString();
+          if (refreshTimer) clearTimeout(refreshTimer);
+          refreshTimer = setTimeout(() => { refreshOwner().catch(() => {}); }, 800);
+        },
+        commitCursor: async (cursor) => {
+          if (!cursor) return;
+          await chromeApi?.storage?.local?.set({ [STREAM_CURSOR_KEY]: { ...cursors, [environment.id]: cursor } }).catch(() => {});
+        },
+      });
+    } catch (error) {
+      streamState = { phase: 'unavailable', cursor: null, attempt: 0 };
+    }
+  }
+
+  function stopStream() {
+    streamAbort?.abort();
+    streamAbort = null;
+    streamState = null;
   }
 
   async function refreshOwner() {
@@ -209,6 +253,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function setEnvironment(id) {
     activeId = id;
     await refreshOwner();
+    await startStream();
   }
 
   async function setSelection({ projectRoot, continuityId }) {
@@ -273,6 +318,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get projectSelectionRequired() { return projectSelectionRequired; },
     get discovered() { return discovered; },
     get projectBusy() { return projectBusy; },
+    get streamState() { return streamState; },
+    get lastEventAt() { return lastEventAt; },
     get directing() { return directing; },
     get lastDirection() { return lastDirection; },
     get bootError() { return bootError; },
@@ -283,6 +330,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     addLocalDaemon,
     discoverProjects,
     useProject,
+    startStream,
+    stopStream,
     direct,
     resultOf: (name) => reads[name] ?? null,
   };

@@ -14,6 +14,7 @@
 
 import { OPERATIONS, scopeQuery } from './owner-contracts.mjs';
 import { normalizeDaemonOrigin } from './validation.mjs';
+import { runReliableEventStream } from './reconnect.mjs';
 
 /** Honest result states, mirroring the owner's own failure taxonomy. */
 export const ResultState = Object.freeze({
@@ -155,6 +156,32 @@ export function createWorkforceClient(config) {
   return Object.freeze({
     baseUrl: origin,
     get hasToken() { return Boolean(token); },
+
+    /**
+     * Subscribe to the owner's live event stream.
+     *
+     * Freshness is owner-sourced: Workforce never synthesizes events, it only
+     * reacts to what the owner emits and then re-reads the projections it owns.
+     * Reconnection, backoff and cursor replay come from the proven stream client.
+     *
+     * @param {{onEvent: (event: any) => void, onState?: (state: any) => void,
+     *          signal?: AbortSignal, initialCursor?: string|null,
+     *          commitCursor?: (cursor: string|null) => void|Promise<void>,
+     *          path?: string}} input
+     */
+    openEventStream(input) {
+      return runReliableEventStream({
+        baseUrl: origin,
+        token,
+        path: input.path ?? `${OPERATIONS.eventsStream.path}?${new URLSearchParams(scopeQuery(input.scope ?? {})).toString()}`.replace(/\?$/, ''),
+        initialCursor: input.initialCursor ?? null,
+        fetchImpl,
+        onEvent: input.onEvent,
+        onState: input.onState ?? (() => {}),
+        commitCursor: input.commitCursor ?? (() => {}),
+        signal: input.signal,
+      });
+    },
 
     // ── environment ────────────────────────────────────────────────────────
     /** @returns {Promise<WorkforceResult>} */ health: () => call('health'),

@@ -232,3 +232,38 @@ test('project discovery sends bounded owner query parameters', async () => {
   assert.equal(url.searchParams.get('max_results'), '30');
   assert.equal(url.searchParams.get('include_git_only'), 'true');
 });
+
+test('owner event stream path carries scope and omits auth for a local environment', async () => {
+  const seen = [];
+  const controller = new AbortController();
+  const client = createWorkforceClient({
+    baseUrl: 'http://127.0.0.1:8787',
+    fetchImpl: async (url, init) => {
+      seen.push({ url: String(url), init });
+      controller.abort(); // the stream client reconnects forever by design
+      return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.close(); } }) };
+    },
+  });
+  await client.openEventStream({ scope: { projectRoot: '/p' }, onEvent: () => {}, signal: controller.signal }).catch(() => {});
+  const url = new URL(seen[0].url);
+  assert.equal(url.pathname, '/v1/events/stream');
+  assert.equal(url.searchParams.get('project_root'), '/p');
+  assert.equal(seen[0].init.headers.authorization, undefined);
+  assert.equal(seen[0].init.headers.accept, 'text/event-stream');
+});
+
+test('owner event stream authorizes with the device token when paired', async () => {
+  const seen = [];
+  const controller = new AbortController();
+  const client = createWorkforceClient({
+    baseUrl: 'http://127.0.0.1:8787',
+    token: 'device-token',
+    fetchImpl: async (url, init) => {
+      seen.push({ url: String(url), init });
+      controller.abort();
+      return { ok: true, status: 200, body: new ReadableStream({ start(c) { c.close(); } }) };
+    },
+  });
+  await client.openEventStream({ onEvent: () => {}, signal: controller.signal }).catch(() => {});
+  assert.equal(seen[0].init.headers.authorization, 'Bearer device-token');
+});

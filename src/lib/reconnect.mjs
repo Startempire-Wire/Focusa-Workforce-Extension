@@ -53,7 +53,12 @@ export async function runReliableEventStream({
     try {
       const response = await fetchImpl(streamUrl(baseUrl, cursor, path), {
         method: 'GET',
-        headers: { accept: 'text/event-stream', authorization: `Bearer ${token}` },
+        headers: {
+          accept: 'text/event-stream',
+          // A local (loopback) environment has no device token: the owner
+          // authenticates the device itself, so no Authorization header is sent.
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
         signal,
       });
       if (response.status === 401 || response.status === 403) {

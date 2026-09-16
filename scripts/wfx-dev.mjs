@@ -20,7 +20,7 @@
  * extension otherwise needs a manual reload.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { cp, mkdir, readdir, readFile, rm, stat, watch } from 'node:fs/promises';
+import { cp, mkdir, open, readdir, readFile, rm, stat, watch } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +36,10 @@ const portArg = args.indexOf('--port');
 const port = portArg >= 0 ? Number(args[portArg + 1]) : Number(process.env.UIAI_WFX_CDP_PORT ?? 9335);
 const distRoot = process.env.UIAI_WFX_LOCAL_DIST ?? `${process.env.HOME}/.local/share/focusa-workforce`;
 const channelDir = `${distRoot}/dist-${browser}`;
+// One build/stage/test cycle at a time: a manual `wfx live` running alongside the
+// watcher would otherwise rebuild dist while tests read it (flaky failures).
+const lockPath = `${distRoot}/.wfx-dev.lock`;
+const LOCK_STALE_MS = 5 * 60 * 1000;
 
 function log(...parts) { console.log(`[wfx-dev]`, ...parts); }
 
@@ -160,31 +164,56 @@ async function launchBrowser() {
   return false;
 }
 
-async function deploy({ launch = false } = {}) {
-  const summary = build();
-  await syncChannel();
-  let targets = await cdpTargets();
-  if (!targets) {
-    if (mayLaunch) {
-      log('no CDP endpoint; launching browser (--launch given)');
-      if (!(await launchBrowser())) { log('launch timed out; extension is staged and loads on next start'); return; }
-      targets = await cdpTargets();
-    } else {
-      log(`staged -> ${channelDir}`);
-      log(summary);
-      log(`refresh your open ${browser} tab to load it (extension pages re-read from disk; a background/service-worker change needs a chrome://extensions reload)`);
-      if (gitMode) log(await commitAndPush(summary));
-      return;
+async function withLock(fn) {
+  await mkdir(distRoot, { recursive: true });
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const handle = await open(lockPath, 'wx');
+      await handle.writeFile(String(process.pid));
+      try {
+        return await fn();
+      } finally {
+        await handle.close();
+        await rm(lockPath, { force: true });
+      }
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const age = await stat(lockPath).then((s) => Date.now() - s.mtimeMs).catch(() => LOCK_STALE_MS);
+      if (age > LOCK_STALE_MS) { await rm(lockPath, { force: true }); continue; }
+      await new Promise((r) => setTimeout(r, 500));
     }
   }
-  const result = await hotReload(targets ?? []);
-  log(summary);
-  log(result.reloaded
-    ? `hot-reloaded extension in ${browser} (${result.pages} page(s) refreshed)`
-    : `staged -> ${channelDir}; reload skipped: ${result.reason}`);
-  const manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'));
-  log('loaded version:', manifest.version, '| channel:', channelDir);
-  if (gitMode) log(await commitAndPush(summary));
+  log('another build cycle is running; skipped this one');
+  return undefined;
+}
+
+async function deploy({ launch = false } = {}) {
+  return withLock(async () => {
+    const summary = build();
+    await syncChannel();
+    let targets = await cdpTargets();
+    if (!targets) {
+      if (mayLaunch) {
+        log('no CDP endpoint; launching browser (--launch given)');
+        if (!(await launchBrowser())) { log('launch timed out; extension is staged and loads on next start'); return; }
+        targets = await cdpTargets();
+      } else {
+        log(`staged -> ${channelDir}`);
+        log(summary);
+        log(`refresh your open ${browser} tab to load it (extension pages re-read from disk; a background/service-worker change needs a chrome://extensions reload)`);
+        if (gitMode) log(await commitAndPush(summary));
+        return;
+      }
+    }
+    const result = await hotReload(targets ?? []);
+    log(summary);
+    log(result.reloaded
+      ? `hot-reloaded extension in ${browser} (${result.pages} page(s) refreshed)`
+      : `staged -> ${channelDir}; reload skipped: ${result.reason}`);
+    const manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'));
+    log('loaded version:', manifest.version, '| channel:', channelDir);
+    if (gitMode) log(await commitAndPush(summary));
+  });
 }
 
 async function main() {
