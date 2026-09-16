@@ -1,10 +1,29 @@
 # Focusa Workforce — Full Trajectory
 
 **Status:** CURRENT trajectory authority  
-**Model:** Focusa issue #618-aligned Full / Medium / Short coverage  
+**Model:** Focusa #618 Full / Medium / Short coverage projections of one connected truth  
 **Accepted scope:** `10-workforce-product-requirements-and-proof-matrix.md`  
 **UX authorities:** `11`, `12`, `13`  
-**Baseline:** `baseline/pre-redesign-2026-09-15`
+**Baseline:** `baseline/pre-redesign-2026-09-15`  
+**Trajectory revision:** 2 (2026-09-16)  
+**Verification basis:** live Focusa daemon `0.9.194-dev` on the estate dev device
+(`developer_full`, `authority_source=tailnet`), `GET /v1/agent/operations` (157 governed
+operations), the daemon route table (509 `/v1` paths in the owning source), and the
+extension's own suite (98 tests) + live contract checks.
+
+Per #618, these four things are distinct and must not be collapsed:
+
+```text
+trajectory view depth   Full | Medium | Short        (this document)
+lifecycle stage         PREPARE DIAGNOSE PLAN SPECIFY DECOMPOSE
+                        VERIFY-AGAINST-SPECS REFINE IMPLEMENT DEPLOY VERIFY-OUTCOME
+operational mode        Orientation Recovery Walking Flying Delivery Correction
+run/readiness status    active | ready | blocked | done | unresolved
+autonomy policy         permitted continuous execution under current grants
+```
+
+A compact projection (Medium/Short) must disclose the coverage it omits and remain
+expandable into this Full record; a current-path summary is never a Full ladder.
 
 This is one connected trajectory. It is a **coverage/dependency map**, not a reporting system or proof ledger.
 
@@ -71,6 +90,24 @@ One finished slice, green build, or successful deployment never implies whole-pr
 ---
 
 # 2. MLG map
+
+Disposition key: `done` (accepted with evidence) · `active` · `ready` (unblocked,
+not started) · `blocked` (named dependency) · `unresolved` (owned resolution step,
+scope or contract not yet determined).
+
+```text
+MLG-0   done        contracts resolved + foundation built (WP-0.1.1, STG-0.2, part of STG-0.3)
+MLG-1   active      slice 1 surface live; Direction needs an owner session instance
+MLG-2   ready       People/responsibility — same client, owner `silent-sessions` is real
+MLG-3   blocked     Needs You — owner gap UP-03 (no attention operation)
+MLG-4   active      Trajectory consumes `trajectory/view` + `workpoint/*` + `work-loop/status`
+MLG-5   ready       Evidence — owner `evidence/capture` + `workpoint/link-evidence` are real
+MLG-6   ready       UIAI handoff/takeover; session create→start→steer path identified
+MLG-7   blocked     Fleet/multi-environment — owner gap UP-06 (no presence projection)
+MLG-8   ready       Surface/visual/accessibility completion (STG-0.3 tokens, docs 12/13)
+MLG-9   unresolved  Voice/Radar — owner scope decision required before implementation
+MLG-10  blocked     Production acceptance depends on the branches above
+```
 
 ```text
 HLT-WF-001
@@ -554,53 +591,70 @@ Parallelize independent ready work. Do not parallelize through unresolved shared
 
 ## Full
 
-All required HLT branches and their current dispositions.
+Complete accounting of HLT-WF-001: the HLT and desired end state (§1), all required
+MLG/STG branches with dispositions (§2 and its subtrees), accepted requirements and
+their families (§16, `docs/10`), cross-branch dependencies (all `SEC-*`, `CORE-*`),
+the owning operations each branch consumes (§3 STG-0.1), and the upstream
+dependencies that are not yet provided (§17). Completed, active, ready, blocked and
+unresolved scope are all visible above; nothing is silently omitted.
+
+Per #618, complete coverage and per-frontier readiness are separate checks: Full
+coverage here means every branch has an owner, a disposition and a path; it does not
+mean distant branches are ready to execute.
 
 ## Medium
 
-One MLG/substantial Workstream subtree plus HLT ancestry, cross-dependencies, and current frontier.
+Current subtree: **MLG-0 accepted → MLG-1 (Workstream + Foreman + Direction)**,
+retaining HLT ancestry and showing:
+
+```text
+acceptance (docs/10)   WF-SCP environment/scope, WF-FOR foreman, WF-DIR direction
+owner operations       project/* · trajectory/view · workpoint/* · work-loop/status
+                       silent-sessions/* · roles/profiles (see src/lib/owner-contracts.mjs)
+dependencies           SEC (scoped reads/writes, no fabricated authority),
+                       NFR (MV3 build identity, honest degraded states)
+active graph           Workforce full page (Svelte 5 + Vite) over the shared runtime client
+Workpoints             WP-0.1.1 done · STG-0.2 done · STG-0.3 active · WP-1.1.x/WP-1.2.x/WP-1.3.x
+cross-branch prereqs   MLG-6 session instance (unblocks Direction end-to-end)
+                       UP-01 Foreman contract (blocks the real Foreman card)
+```
+
+`MLG-1`, `MLG-2`, `MLG-4`, `MLG-5`, and `MLG-6` together form the production-grade
+core release surface; `MLG-3`/`MLG-7` inherit their gaps and `MLG-9` is unresolved.
+Coverage omitted from this Medium view: MLG-8/9/10 detail and the full requirement
+table — expand in §16 and `docs/10`.
 
 ## Short
 
-The nearest executable slice with exact current gap, source/contract, prerequisites, authority, implementation action, material verification/reconcile need, and next advancement condition.
-
-Current Short frontier:
+The current executable slice, with retained ancestry:
 
 ```text
-HLT-WF-001
-→ MLG-0
-→ STG-0.1  (WP-0.1.1 resolved 2026-09-16 — see src/lib/owner-contracts.mjs)
-→ STG-0.2  (Svelte 5 + minimal Vite/MV3 bundling, workforce.html, shared runtime client) — done
-→ STG-0.3  (tokens/shared state components as used by the first slice) — in progress
-→ MLG-1   (Workstream + Foreman + Direction slice)
+HLT-WF-001 → MLG-0 (accepted) → MLG-1 → STG-1.3 (Direction) → WP-1.3.3 (typed submit)
 ```
-
-### WP-0.1.1 resolution (2026-09-16)
-
-Inspected `GET /v1/agent/operations` (157 governed operations), the live
-daemon route surface (0.9.194-dev), and the Focusa monorepo route table.
-Recorded in `src/lib/owner-contracts.mjs`:
 
 ```text
-environment  real      health · license/status · device/pair/*
-project      real      project/identity · project/status · project/discover
-workstream   equivalent owner identity axes: project_root (project_folder_boundary)
-                       + continuity_id (logical_workstream); workstream_id is derived
-                       in focusa-core workstream_root.rs. No standalone list route:
-                       Workforce resolves the Workstream by those axes.
-direction    real      silent-sessions/{id}/steer|start|cancel + approvals (exact target)
-trajectory   real      trajectory/view · workpoint/current|resume · work-loop/status
-people       real      silent-sessions · profiles · status
-evidence     real      evidence/capture · workpoint/link-evidence
-foreman      GAP       Spec 182 Foreman has no daemon operation (UP-01); closest real
-                       surface is the Workstream role-profile list
-attention    GAP       no operator.attention.v1 operation (UP-03)
-fleet        GAP       no fleet/presence projection (UP-06)
+exact gap            Direction is implemented and governed, but no owner silent-session
+                     instance exists on the dev device, so there is no exact target
+                     (session_id + run_id + generation) to address it to.
+owner evidence       GET /v1/silent-sessions → data: [] ; owner tables
+                     runtime_silent_sessions = 0 rows, runs = 0, leases = 0, approvals = 0.
+                     Capability is present (profiles "Local Pi RPC session in an isolated
+                     worktree", preset "conservative", preflight/create/start/steer/approvals).
+frontier node        WP-1.3.3 (typed owning submit) — blocked only by target existence
+nearest ready        WP-6.x session create→preflight→start (MLG-6 partial) feeding WP-1.3.3
+preconditions        orientation packet scope (project_root + continuity_id),
+                     write authority (satisfied: developer_full; tokenless loopback proven),
+                     durable idempotency (satisfied: chrome.storage intent store)
+evidence required    owner create/start receipt with the exact session/run target, then the
+                     steer receipt + canonical re-read
+material rollback    cancel the created session through its owning operation; no local
+                     canonical state exists to roll back
+advancement          Direction submits to a real target and the owner's canonical re-read
+                     reflects the new run state, verified live in the browser
 ```
 
-Gaps render as declared owner gaps; Workforce does not fabricate the state.
-
----
+Coverage omitted from this Short view: every branch outside MLG-1 STG-1.3 and the
+MLG-6 subset above. This is a current-path summary, not a Full ladder.
 
 # 16. Requirement-family coverage
 
@@ -622,31 +676,62 @@ This table is for coverage orientation only. Commits/PRs do not need ceremonial 
 
 ---
 
-# 17. Known upstream blockers
+# 17. Known upstream blockers — verified status
+
+Verified 2026-09-16 against the running daemon (0.9.194-dev) and the owning source.
+An upstream gap blocks only its dependents; independence is preserved per branch.
 
 ```text
-UP-01 Foreman operations may remain draft/unmounted
-UP-02 Full/Medium/Short trajectory source projection may need Focusa implementation
-UP-03 shared operator.attention.v1 may need adapter/implementation
-UP-04 closure/W.I.N.S. cross-ref may not be end-to-end
-UP-05 UIAI surface-handoff exact contract may need alignment
-UP-06 fleet/multi-environment projection may need Focusa/Veragensia adapter
-UP-07 voice/Radar operations may remain later-stage contracts
+UP-01  Foreman binding/status        OPEN     No `/v1/foreman*` route in the running binary
+                                              or the owning route table; Spec 182 has no
+                                              daemon operation. Closest real surface is the
+                                              workstream-scoped role-profile list (empty).
+                                              → Workforce renders the gap and must not fabricate.
+UP-02  Full/Medium/Short trajectory  DEFECT   Storage and projection disagree in daemon
+                                              0.9.194-dev. Observed 2026-09-16 for scope
+                                              project_root=<workforce repo>, continuity_id=workforce-build:
+                                              · `trajectory/define-goal` + `trajectory/checkpoint`
+                                                return `canonical: true` and persist a full ladder in
+                                                `$FOCUSA_HOME/trajectory-ledger/<scope>/events.jsonl`
+                                                — 28 events, levels hlt=2 mlg=2 stg=2 waypoint=20
+                                                current_state=2, authority=canonical_explicit,
+                                                hlt_version=5 (plus 2 HLT-ledger records).
+                                              · the same daemon's `trajectory/view` then reports
+                                                `status: not_found`, `hlt_status: missing_required`,
+                                                `HLT_IMPASSE: no committed project HLT exists`,
+                                                `definition_status: unclear`, `checkpoint_count: 0`,
+                                                `durable_lifecycle.canonical: false`.
+                                              · the CLI repair path is unusable: `focusa trajectory
+                                                define-goal` requires `--lifecycle-action` and then
+                                                rejects it ("supported by install, update, and
+                                                uninstall").
+                                              Consequence: an HLT/Ladder that is committed in the
+                                              owner's own ledger is invisible to the owner's
+                                              projection, so MLG-4 cannot consume it and any
+                                              surface reading the projection under-reports truth.
+                                              Owner-level item: fix the projection/read path (or the
+                                              commitment gate) in Focusa; Workforce must keep
+                                              rendering the gap and must not synthesize ladder values.
+                                              Anchor that DOES hold: `workpoint/checkpoint` reports
+                                              canonical and `trajectory/view` reconciliation returns
+                                              `surface_states.workpoint = canonical`.
+UP-03  operator.attention.v1         OPEN     No attention/approval-list operation. Approval
+                                              operations exist only per silent session.
+UP-04  closure / W.I.N.S. cross-ref   PARTIAL  `/v1/outcomes/{claim,resolve,correct,dispute}` and
+                                              `work-items/closure/*` exist; cross-ref to W.I.N.S.
+                                              acceptance is unverified.
+UP-05  UIAI surface-handoff          UNKNOWN  Exact handoff contract not yet inspected; UIAI
+                                              remains execution/takeover owner.
+UP-06  fleet / presence              OPEN     No fleet/presence projection; `instances/list`
+                                              is remote-stream gated. Workforce shows only
+                                              locally paired environments and their health.
+UP-07  voice / Radar                 LATER    Operations not inspected; MLG-9 stays unresolved
+                                              pending an owner scope decision.
 ```
 
-For each:
-
-```text
-inspect owner
-→ use existing operation if real
-→ otherwise implement smallest missing owner operation
-→ verify the owner boundary sufficiently
-→ return to Workforce
-```
-
-Do not bypass the owner in the extension.
-
----
+Resolution rule for each: inspect owner → use the real operation; else implement the
+smallest correct owning operation → verify the owner boundary → return to Workforce.
+Never bypass the owner inside the extension.
 
 # 18. Stop / refine
 
@@ -691,3 +776,44 @@ rollback remains available
 ```
 
 Use existing evidence and the smallest additional checks needed to establish these. Do not create a separate final proof-management project.
+---
+
+# 20. Build-agent mission run (current)
+
+The build agent runs the same pattern on itself, per #618: one closed loop, staged
+lifecycle, explicit posture, and an exact nearest ready Workpoint.
+
+```text
+Prepare   → read AGENTS.md, docs/15, docs/14 frontier; inspect real source + owner contracts
+Act       → implement the largest safe useful increment in Workforce
+Reconcile → run the cheapest real check that can expose a material defect
+            (focused test · live owner contract check · rendered browser behaviour)
+Advance   → re-read this trajectory, update dispositions, continue to the nearest
+            ready node (or record the exact owner-level blocker)
+```
+
+Current run position:
+
+```text
+lifecycle stage   IMPLEMENT (MLG-6 subset feeding MLG-1 STG-1.3 VERIFY-OUTCOME)
+operational mode  Walking (bounded increments inside an authorized mission)
+run status        active
+autonomy policy   permitted continuous execution within resolved product boundaries
+trajectory depth  Short (this section is compact and discloses omissions above)
+```
+
+Work completed in the current run (evidence-backed):
+
+```text
+WP-0.1.1  owner contract resolution            src/lib/owner-contracts.mjs + tests
+STG-0.2   Svelte 5 + minimal Vite/MV3, page     dist/workforce.html, hashed bundles
+STG-0.2.3 shared runtime client + live stream   src/lib/workforce-client.mjs
+STG-0.3   partial: tokens/state components      src/workforce/*
+MLG-1     environment, project discovery/selection, Workstream axes, Foreman gap card,
+          frontier, roster, Direction composer, session capability display
+DELIVERY  live build loop + visible build stamp; staged refresh deploys; CI green
+```
+
+Nearest ready next action: **wire orientation → session create/preflight/start → steer**
+so Direction converges on a real owner target, then return to MLG-1 STG-1.3 for
+VERIFY-OUTCOME on the live browser surface.
