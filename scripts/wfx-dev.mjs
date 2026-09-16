@@ -45,6 +45,13 @@ function log(...parts) { console.log(`[wfx-dev]`, ...parts); }
 
 function git(args) { return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); }
 
+/** Short, readable identity for a live-build commit. */
+function commitLabel() {
+  const files = git(['status', '--porcelain']).stdout.trim().split('\n').filter(Boolean).length;
+  const when = new Date().toISOString().slice(11, 19);
+  return `chore(dev): live build ${when}Z (${files} file${files === 1 ? '' : 's'})`;
+}
+
 /** Run the test suite; the live loop only commits verified builds. */
 async function runTests() {
   const files = (await readdir(resolve(root, 'tests'))).filter((f) => f.endsWith('.test.mjs')).sort();
@@ -63,7 +70,7 @@ async function commitAndPush(stamp) {
   const tests = await runTests();
   if (!tests.ok) return `git: NOT committed — ${tests.summary}`;
   if (git(['add', '-A']).status !== 0) return 'git: add failed';
-  const commit = git(['commit', '-q', '-m', `chore(dev): live build ${stamp}`, '--no-verify']);
+  const commit = git(['commit', '-q', '-m', commitLabel(), '--no-verify']);
   if (commit.status !== 0) return `git: commit failed (${(commit.stderr || commit.stdout).trim().slice(0, 120)})`;
   const push = git(['push', '-q', 'origin', 'HEAD']);
   return push.status === 0
@@ -219,10 +226,11 @@ async function deploy({ launch = false } = {}) {
 async function main() {
   await deploy({ launch: false });
   if (!watchMode) return;
-  log('watching src/, manifest.json, vite.config.mjs — edit and the browser reloads'
+  log('watching src/, scripts/, manifest.json, vite.config.mjs — edit and the browser reloads'
     + (gitMode ? ' and the commit is pushed' : ''));
   const watchers = [
     watch(resolve(root, 'src'), { recursive: true }),
+    watch(resolve(root, 'scripts'), { recursive: true }),
     watch(resolve(root, 'manifest.json')),
     watch(resolve(root, 'vite.config.mjs')),
   ];
