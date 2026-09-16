@@ -1,73 +1,110 @@
 # Focusa Workforce — Master Build-Agent Handoff
 
 **Status:** EXECUTION READY  
-**Mission:** implement the complete Workforce redesign without making foundational product/UX/architecture decisions during construction.  
+**Mission:** run the Workforce redesign to the accepted outcome without reopening settled product design.  
 **Do not modify:** Wirebot App documentation from this workstream.
 
----
+## 1. Prime directive
 
-## 1. Run law
+> **Build the product. The blueprint exists to remove ambiguity, not to create a second workload.**
 
-> **Build the actual product. The blueprint removes ambiguity; it must not become a second workload.**
-
-Apply Algorithm² to both the product and the build process:
+Apply Algorithm² continuously:
 
 ```text
-Question requirements
-→ Delete unnecessary parts/process
-→ Simplify around existing owners/primitives
-→ Accelerate real implementation and feedback
-→ Automate only proven repetition
+Question
+→ Delete
+→ Simplify
+→ Accelerate
+→ Automate last
 ```
 
 Default loop:
 
 ```text
-read current frontier
-→ inspect current source/owning contract
-→ implement smallest material advance
-→ verify the material acceptance/risk
-→ reconcile only if reality changed
-→ continue immediately
+current frontier
+→ inspect real source
+→ implement the largest safe useful increment
+→ verify the material behavior
+→ fix/reconcile what changed
+→ continue
 ```
 
-No routine permission pauses. No per-Workpoint essays. No proof packets. No cosmetic tracking work.
-
----
+No routine permission pauses. No proof packets. No per-Workpoint reports. No cosmetic matrix maintenance. No architecture ceremony after the implementation path is clear.
 
 ## 2. Minimum read path
 
-Start with only:
+Start with:
 
 ```text
 Workforce/AGENTS.md
 docs/14-workforce-full-trajectory.md
 current Workforce source/tests
-current Focusa owning operations/contracts needed by the active Workpoint
+current owning Focusa contract/source for the active frontier
 ```
 
-Pull detail on demand:
+Pull detail only when the current work needs it:
 
 ```text
 accepted scope          → docs/10
 navigation/stateflow    → docs/11
 screen/component shape  → docs/12
 visual system           → docs/13
-Slice 1 specifics       → docs/09
+Slice 1 detail          → docs/09
 runtime/data semantics  → docs/05
 product context         → docs/00, docs/06, docs/08
 baseline/deployment     → docs/07
 ```
 
-Consult ADLBOS/UIAI/Veragensia only when the active boundary crosses them.
+Consult ADLBOS/UIAI/Veragensia only when crossing those boundaries.
 
-Do not preload the entire corpus as ceremony.
+## 3. Autonomy boundary
 
----
+The product architecture is resolved. Do not redesign:
 
-## 3. Current Short frontier
+```text
+product purpose / accepted scope
+canonical ownership / authority
+Workstream / Foreman semantics
+Trajectory semantics
+Needs You semantics
+Evidence / settlement meaning
+top-level information architecture
+core visual language
+security/privacy boundaries
+```
 
-Start here:
+Everything below that boundary is normal engineering discretion.
+
+Without asking permission, choose and change the simplest reversible implementation for:
+
+```text
+files/components/internal APIs
+state/store organization
+adapters
+small refactors
+CSS/layout mechanics
+performance work
+test implementation
+bug fixes
+implementation order among ready nodes
+batching adjacent Workpoints
+```
+
+When the blueprint does not specify a low-level detail:
+
+```text
+use nearest canonical source/current conventions
+→ choose simplest reversible option
+→ implement
+→ verify in reality
+→ keep moving
+```
+
+Owner input is required only if the unresolved decision materially changes accepted scope/product behavior, owner authority, privacy/security, meaningful spend, irreversible external effects, or a major ecosystem boundary.
+
+## 4. Current frontier
+
+Start from the Short projection in `docs/14`:
 
 ```text
 HLT-WF-001
@@ -76,81 +113,44 @@ HLT-WF-001
 → WP-0.1.1
 ```
 
-Resolve current Focusa source truth for:
+Resolve the real Focusa operations needed by the first live product path.
+
+For each semantic:
 
 ```text
-Workstream listing/resolution
-Foreman binding/status/hydration
-Direction/steer/proposal
-Trajectory projection
-attention/approval
-Evidence/settlement
-UIAI execution refs
-presence/fleet
-```
+owning operation exists
+→ use it
 
-Decision rule:
+equivalent owning operation exists
+→ thin adapter preserving source identity
 
-```text
-real operation exists
-→ consume it
-
-equivalent real operation exists
-→ thinnest provenance-preserving adapter
-
-owning operation genuinely missing
-→ implement smallest owning Focusa operation
-→ verify that boundary
+operation genuinely missing
+→ implement the smallest correct operation in Focusa
 → return to Workforce
 ```
 
-Do not invent `/v1/foreman/*` or any other convenient client contract because a design document suggests a name.
+Never fabricate a client-side canonical Foreman, Trajectory, approval, Evidence state, or convenient endpoint.
 
----
+A missing upstream operation blocks only its dependents. Continue other ready work.
 
-## 4. Full trajectory
+## 5. Build for connected outcomes, not ticket completion
 
-`docs/14-workforce-full-trajectory.md` is the coverage map:
+`docs/14` is a coverage/dependency map. Workpoints are navigation aids, not mandatory serial tickets.
 
-```text
-MLG-0  Foundation/contracts
-MLG-1  Workstream + Foreman + Direction
-MLG-2  Working Now / People
-MLG-3  Needs You
-MLG-4  Trajectory / progression
-MLG-5  Evidence / closure
-MLG-6  UIAI / browser context
-MLG-7  Fleet / topology / capacity
-MLG-8  Complete surfaces / accessibility
-MLG-9  Voice / Radar / contextual expansion
-MLG-10 Production acceptance
-```
-
-It is not a command to serialize all work. Advance independent ready nodes in parallel when dependencies are genuinely satisfied.
-
-A blocked node blocks only its dependents.
-
-Do not spend time continuously rewriting trajectory prose. Update it only when accepted scope/dependency truth materially changes.
-
----
-
-## 5. Five UX planes are build constraints
+The agent may:
 
 ```text
-Strategy  → docs/00 + docs/08 + docs/10
-Scope     → docs/10
-Structure → docs/11
-Skeleton  → docs/12
-Surface   → docs/13
+batch adjacent Workpoints
+complete several STGs in one implementation pass
+parallelize independent work
+reorder ready work when it shortens feedback
+refactor opportunistically when it reduces total complexity
+reuse one implementation/test across multiple requirements
 ```
 
-Do not redesign them during implementation.
+Do not stop at artificial document boundaries when the next connected work is clear.
 
-If source reality makes one decision impossible, change only the affected plane/node deliberately; do not create a third interpretation in code.
-
----
-
-## 6. Implementation defaults
+## 6. Technology and preservation
 
 Use:
 
@@ -162,183 +162,115 @@ JavaScript + JSDoc
 
 No SvelteKit.
 
-Preserve proven current core logic unless a concrete defect requires change:
+Preserve proven current core behavior where correct: pairing, API client, contracts, orchestration, orientation, projections, reconnect, session creation, SSE, storage and validation.
+
+Preservation is about behavior, not file shape. Refactor structure when it makes the implementation simpler without changing ownership/semantics.
+
+Canonical work must survive MV3 service-worker suspension.
+
+## 7. UX implementation
+
+The five planes are settled inputs:
 
 ```text
-src/lib/api-client.mjs
-src/lib/contracts.mjs
-src/lib/orchestration.mjs
-src/lib/orientation.mjs
-src/lib/pairing.mjs
-src/lib/projections.mjs
-src/lib/reconnect.mjs
-src/lib/session-create.mjs
-src/lib/sse-parser.mjs
-src/lib/storage.mjs
-src/lib/validation.mjs
+Strategy  → docs/00 + docs/08 + docs/10
+Scope     → docs/10
+Structure → docs/11
+Skeleton  → docs/12
+Surface   → docs/13
 ```
 
-Add `workforce.html` and use the route/screen contracts from docs 11/12.
+Implement their intent. Do not reopen design exploration during construction.
 
-Implement doc 13's visual system rather than choosing a new theme/component-kit aesthetic.
+Do not mistake exact example layouts for mandatory accidental pixels: preserve hierarchy, behavior, responsive intent and visual language while using sound implementation judgment.
 
----
+## 8. Truth and safety
 
-## 7. Product ownership hard lines
+Do not collapse:
 
 ```text
-Wirebot / named Operating Partner
-  owner relationship + Workforce Composer
-
-Focusa
-  Workstream / Foreman / Workpoint / authority / Evidence / settlement
-
-Focusa Workforce
-  live workforce-operations UX
-
-UIAI
-  computer/browser execution + takeover
-
-Veragensia
-  body/runtime/placement/enforcement
-
-W.I.N.S.
-  accepted outcomes
+entitled / authorized / available / consented
+claim / observed / verified / settled
+presenter acknowledgement / source resolution
+Full / Medium / Short trajectory
+Human / Operations / Technical detail
+fleet / sovereign federation
 ```
 
-Never create duplicate canonical state merely to make the extension easier to build.
+Consequential mutations require current source scope/authority. Ambiguous writes reconcile before retry. Reusable secrets do not move through UI handoffs, Direction, attention, caches, Evidence or logs.
 
-Wirebot App docs are read-only from this workstream.
+These boundaries are mandatory because they prevent wrong effects, not because they create process.
 
----
+## 9. Verification
 
-## 8. Requirements without bureaucracy
+Use **minimum sufficient verification**.
 
-`docs/10` is accepted scope, not a ticket queue.
+Ask:
 
-Use requirement IDs when they help preserve scope, debug, or hand off meaningful work.
+> What is the cheapest check that could reveal a material defect in what just changed?
 
-Do not:
-
-```text
-annotate every edit with IDs
-maintain a separate proof ledger
-create one test per requirement
-pause implementation to keep matrices pretty
-repeat evidence already established
-```
-
-At meaningful integration/release boundaries, confirm accepted scope has not been silently dropped.
-
----
-
-## 9. Truth laws
-
-Keep distinct:
+Use the relevant subset only:
 
 ```text
-Full / Medium / Short trajectory coverage
-Human / Operations / Technical presentation depth
-lifecycle stage
-freshness
-authority
-```
-
-Never infer whole-project completion from a finished Workpoint/branch.
-
-Never equate:
-
-```text
-agent claim = verified
-command success = accepted product outcome
-screenshot = settlement
-cached capability = current authority
-presenter acknowledgement = source resolution
-```
-
-Needs You contains only human-value attention.
-
-Fleet is intra-Operator aggregation. Federation is cross-Operator/network sharing.
-
-Reusable secrets never enter URL/Direction/attention cache/Evidence/log/receipt/repository content.
-
----
-
-## 10. Minimum sufficient verification
-
-Ask one question:
-
-> **What is the smallest existing or new check that could expose a material defect in the behavior I changed?**
-
-Choose only what applies:
-
-```text
-focused unit/contract test
-build/manifest validation
+focused test
+build/manifest check
 real browser journey
-relevant stale/degraded case
+relevant degraded/reconnect case
 relevant authority/source negative case
-owning-system receipt/source revision
 ```
 
-Reuse still-valid evidence.
+Reuse valid evidence. Do not duplicate proof formats. Do not rerun expensive unchanged checks without a reason.
 
-One representative connected browser journey can cover many UI requirements.
+Run broad integration/regression at meaningful integration/release boundaries.
 
-Run broader regression/dogfood at meaningful integration/release boundaries, not reflexively after every edit.
+## 10. Promotion
 
----
-
-## 11. Failure and ambiguity
-
-When a mutation outcome is ambiguous, reconcile before retry.
-
-When source state is stale, render it honestly and revalidate before consequential action.
-
-When one tool/route fails, use another valid route and keep moving.
-
-When one trajectory node is blocked, advance ready independent work.
-
-Only stop for owner input when there is a genuine scoped decision/authority boundary that cannot be resolved from current contracts/direction.
-
----
-
-## 12. Promotion
+Normal release boundary remains:
 
 ```text
-source changes
+working source
 → sufficient changed-scope verification
 → main/CI
-→ Chromebook/browser dogfood at meaningful boundary
+→ Chromebook/browser dogfood
 → explicit wfx veragensia
 → atomic promotion
 → verify changed live journey
 ```
 
-Do not make every main push a live deployment.
+Do not automatically promote every main push.
 
-Preserve stable extension ID unless deliberately migrated.
+## 11. Stop conditions
 
----
+Keep moving until the HLT is achieved.
 
-## 13. Cleanup and reporting
+Stop only when continuing would require:
 
-Clean temporary artifacts you create as you go. Do not create a separate cleanup project for trivial debris.
+```text
+owner-only product/scope decision
+missing authority/grant
+material irreversible or high-consequence choice not already authorized
+canonical upstream decision that cannot be safely inferred or implemented
+explicit owner pause/stop
+```
 
-At a meaningful milestone or genuine blocker report only:
+A failed tool, missing preferred route, ended Workpoint, finished MLG, passing test, landed commit, or documentation gap is **not** by itself a stop condition.
+
+## 12. Reporting
+
+Reporting never interrupts ready work.
+
+At meaningful milestones or genuine blockers, report only:
 
 ```text
 what now works
 what materially remains
 real blocker, if any
-current Short frontier
-promotion status, if relevant
+current frontier
+live promotion status, if relevant
 ```
 
-Requirement IDs/tests/source refs are included only when they help the next action.
+Requirement IDs/source refs/test names are included only when they materially help continuation or explain risk.
 
----
+## Final directive
 
-## 14. Final directive
-
-> **Run the trajectory to completion. Build first. Verify material risk, not paperwork. Reuse proof. Remove unnecessary machinery. Continue through ready authorized work until the HLT is accepted or a genuine scoped blocker requires owner input.**
+> **Use the blueprint as rails, not shackles. Make the product real. Exercise engineering judgment aggressively inside resolved product boundaries. Delete ceremony, preserve truth, keep advancing, and do not stop until the accepted outcome is actually achieved or a genuine owner decision is required.**
