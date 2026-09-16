@@ -1,825 +1,669 @@
-# Focusa Workforce — Canonical Product and Implementation Specification
+# Focusa Workforce — Canonical Product and Implementation Spec
 
-**Status:** canonical product/build direction for this repository  
-**Date:** 2026-09-14  
-**Product name:** Focusa Workforce  
-**Primary surface:** Chrome/Chromium extension  
-**Architecture posture:** browser-resident workforce operations surface; not the runtime, not the source of truth
+**Status:** CURRENT product architecture  
+**Product:** Focusa Workforce  
+**Canonical work authority:** Focusa  
+**Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md`  
+**Partner/application counterpart:** `Startempire-Wire/Wirebot-App`
 
----
+> **Focusa Workforce operates the workforce.**
 
-## 0. Outcome
+Focusa Workforce is the browser-resident specialist operations surface through which an owner or Operating Partner observes, directs, intervenes in, and verifies a Focusa-governed agent workforce.
 
-Build **Focusa Workforce** into the complete browser-resident surface for operating a human-owned agent workforce across local computers, cloud Agent Computers, Silent Sessions, UIAI browser/computer execution, and future body profiles.
-
-The extension must be immediately useful on a Chromebook while remaining a first-class surface inside the broader Focusa/Veragensia ecosystem.
-
-The product should feel like:
-
-> Open the browser and your workforce is already there: who is working, what they are doing, what needs you, what is proven, where work is running, and what you can direct next.
-
-It must not feel like:
-
-- a generic chatbot;
-- a devtools panel;
-- a remote terminal;
-- a second Focusa database;
-- a second Wirebot App;
-- a second UIAI Cockpit;
-- a dashboard full of ornamental metrics.
+It is not the workforce runtime. It is not the customer's Chief of Staff. It is not UIAI Cockpit. It is not a second Focusa database. It is a projection and intent surface over canonical owners.
 
 ---
 
-## 1. Product role
+## 1. Product experience
+
+The product should feel like the shared working environment where a human and their governed AI organization actually collaborate.
+
+Within seconds it should answer:
 
 ```text
-Human
-  |
-  +-- Wirebot ---------------- life/business Chief of Staff relationship
-  |
-  +-- Focusa Workforce ------- workforce operations
-  |      |
-  |      +-- Foremen / Managers
-  |      +-- Workers / Crew
-  |      +-- Workstreams
-  |      +-- Task graphs
-  |      +-- Direction
-  |      +-- Approvals
-  |      +-- Evidence
-  |      +-- Audit
-  |      +-- topology/body posture
-  |
-  +-- Focusa Desktop --------- deep project/work cognition surface
-  |
-  +-- UIAI Cockpit ----------- live browser/computer execution oversight/control
-  |
-  +-- Veragensia ------------ body/runtime/enforcement/placement substrate
+Who is working?
+What are they doing?
+What is the current objective?
+What is blocked?
+What genuinely needs me?
+What has been proven?
+Where is work executing?
+What can I direct next?
 ```
 
-### 1.1 Product law
+The experience is not an agent-debug dashboard and not a stream of model chatter.
 
-**Workforce operates the workforce.**
+The primary operating loop is:
 
-Wirebot decides and coordinates across life/business context. Focusa owns canonical work/cognition/authority state. UIAI owns browser/computer execution. Veragensia owns machine/body integration and enforcement.
-
-Workforce makes those primitives legible and operable in the browser without copying their authority.
+```text
+ORIENT
+  ↓
+DIRECT
+  ↓
+INTERPRET / PROPOSE
+  ↓
+DELEGATE
+  ↓
+WORK
+  ↓
+COLLABORATE / INTERVENE
+  ↓
+VERIFY
+  ↓
+CONTINUE / LEARN
+```
 
 ---
 
-## 2. Primary user jobs
+## 2. Ecosystem position
 
-The operator must be able to:
+```text
+CANONICAL OWNER PRINCIPAL
+        ↓
+OPERATING PARTNER / CHIEF OF STAFF
+Wirebot implementation family
+customer presentation may be "Spock", "Athena", etc.
+        ↓ desired outcomes / bounded delegation
+FOCUSA
+Project · Workstream · Foreman · Workpoint · authority · Evidence
+        ↓
+FOCUSA WORKFORCE
+live workforce operations
+        ↓
+workers / Pi / Silent Sessions / UIAI / Agent Computers
+        ↓
+Evidence / settlement
+        ↓
+accepted outcome / W.I.N.S.
+```
 
-1. see every active Foreman/Manager and worker relevant to the current owner scope;
-2. understand each agent's assignment, status, location/runtime, spend/resource posture, and last verified outcome;
-3. switch between Projects and Workstreams without losing context;
-4. inspect the task/work graph and current ready/running/blocked frontier;
-5. give natural-language or structured direction to the owning Foreman/Manager;
-6. inject/reprioritize bounded work during execution;
-7. review approvals and understand the exact consequence before deciding;
-8. inspect Evidence/Receipts and distinguish verified, unverified, uncertain, failed, and pending outcomes;
-9. inspect audit history and trace human direction → agent action → evidence → result;
-10. open the exact UIAI Cockpit/FPV execution surface for browser/computer work;
-11. see where work is running: local computer, cloud Agent Computer, workcell, Silent Session, browser context, specialist runtime, future physical body;
-12. request more workforce/capacity through canonical topology operations when available;
-13. speak direction through voice without creating a parallel voice authority system;
-14. reconnect after browser close/restart without losing durable work;
-15. use the extension as a useful Chromebook-native daily surface even when heavyweight execution runs elsewhere.
+Workforce must remain usable with any compatible Operating Partner presentation. It must never assume that the customer-facing partner is literally named `Wirebot`.
 
 ---
 
-## 3. Information architecture
+## 3. Owner, partner, Foreman, worker
 
-### 3.1 Persistent shell
+These roles are different.
 
-The extension should provide a stable shell with:
+### Owner
 
-```text
-Owner / environment selector
-Project / Workstream scope
-global Direction Bar
-attention / approval count
-connection + freshness posture
-body/topology summary
-quick access to UIAI
-```
+The human/legal `CanonicalOwnerPrincipal` owns the deployment and root authority.
 
-Recommended primary destinations:
+### Operating Partner / Chief of Staff
+
+Wirebot architecture underneath; presentation may be customer-selected.
+
+Portfolio altitude:
 
 ```text
-Overview
-Workforce
-Work
-Approvals
-Evidence
-Audit
-Topology
+What matters across life/business?
+What deserves attention?
+What should be delegated?
+What capability or role is missing?
+What outcome was accepted?
 ```
-
-These are logical destinations, not a requirement for seven fixed tabs. Side panel, full-page app, start page, and contextual browser surfaces may compose them differently.
-
-### 3.2 Overview
-
-Purpose: immediate operational orientation.
-
-Show only information that changes action:
-
-- active Workstream / Foreman;
-- what is running now;
-- what needs owner attention;
-- blockers/failures;
-- next likely decision;
-- recently verified outcomes;
-- current local/cloud resource posture;
-- stale/degraded connectivity.
-
-No vanity charts.
-
-### 3.3 Workforce
-
-The roster is organizational, not merely process-oriented.
-
-Each card/row should expose:
-
-```text
-identity / role
-Foreman | Manager | Worker | Verifier | Specialist
-current assignment
-Workstream
-runtime/body/node
-status
-last meaningful event
-last Evidence/Receipt
-budget/spend where applicable
-authority/capability posture
-controls: inspect / direct / pause / stop / open execution
-```
-
-Worker identity and role MUST come from Focusa-owned contracts.
-
-### 3.4 Work
-
-A graph/timeline hybrid should make the execution model understandable.
-
-Required states:
-
-```text
-proposed
-ready
-queued
-running
-waiting
-blocked
-awaiting_approval
-verifying
-review_ready
-completed_verified
-failed
-unknown
-cancelled/stopped
-```
-
-The surface must preserve the distinction between:
-
-- work existing;
-- work dispatched;
-- an agent claiming completion;
-- Evidence existing;
-- outcome being verified/settled.
-
-### 3.5 Approvals
-
-Each approval must answer:
-
-```text
-Who is asking?
-What exactly will happen?
-What resource/account/body is affected?
-Why is approval required?
-What evidence/context supports the request?
-What are the material effects?
-Can it be reversed?
-What happens if I deny/defer?
-```
-
-Never reduce consequential approval to unlabeled Approve/Deny buttons.
-
-### 3.6 Evidence
-
-Evidence is a first-class product surface, not an attachment drawer.
-
-Support:
-
-```text
-artifact
-file/diff
-screenshot/frame
-UIAI execution proof
-test/build result
-receipt
-external-system record
-operator observation
-verification result
-```
-
-Display provenance, freshness, scope, verification posture and related Workpoint/task.
-
-### 3.7 Audit
-
-The audit timeline should support causal tracing:
-
-```text
-human direction
-→ Foreman interpretation/proposal
-→ assignment/delegation
-→ worker execution
-→ tool/computer actions
-→ approvals/interventions
-→ evidence
-→ verification/settlement
-```
-
-Filters:
-
-- Workstream;
-- agent;
-- runtime/body;
-- operation;
-- approval;
-- evidence type;
-- state;
-- time.
-
-### 3.8 Topology
-
-Topology answers **where the workforce exists and where work is happening**.
-
-Represent:
-
-```text
-local body / Chromebook
-Full Agent Computers
-cloud Agent Computers
-workcells
-Silent Sessions
-UIAI browser contexts
-mobile/wearable surfaces
-future robotic bodies
-```
-
-For each:
-
-- health/freshness;
-- body/runtime class;
-- active agents/work;
-- CPU/memory/resource posture where exposed;
-- trust/enforcement class;
-- capabilities;
-- spend/budget posture where applicable.
-
-Do not imply a conventional Chromebook has Full Agent Computer enforcement guarantees.
-
----
-
-## 4. Browser surfaces
-
-The extension SHOULD support four complementary browser forms.
-
-### 4.1 Side panel
-
-The fastest ambient surface.
-
-Use for:
-
-- current Workstream/Foreman;
-- roster subset;
-- Direction Bar;
-- approvals;
-- current page → Foreman actions;
-- active execution status;
-- quick UIAI handoff.
-
-### 4.2 Full Workforce app
-
-The main deep operations surface, opened in a browser tab/window or installable extension page.
-
-Use for full roster, work graph, audit, evidence, topology and settings/pairing.
-
-### 4.3 Start/new-tab surface
-
-Optional and user-controlled.
-
-When enabled, start page provides:
-
-- owner briefing for workforce operations;
-- active work;
-- attention;
-- verified outcomes;
-- quick direction;
-- launch back into normal browser.
-
-Never hijack the new tab without explicit opt-in.
-
-### 4.4 Contextual browser actions
-
-Examples:
-
-```text
-Send this page to Foreman
-Research this
-Capture as Evidence
-Open this in UIAI
-Create bounded work from selection
-Ask Workforce about this page
-```
-
-Page content is data, never authority.
-
----
-
-## 5. Direction model
-
-### 5.1 Direction Bar
-
-The Direction Bar is not a generic chatbot box.
-
-Its contract is:
-
-```text
-human intent
-→ exact owner/project/workstream scope
-→ owning Foreman/Manager
-→ Focusa operation/proposal
-→ authority/approval as required
-→ execution
-→ evidence/outcome
-```
-
-The UI should surface resolved scope before consequential dispatch.
-
-Examples:
-
-```text
-"Give this project another team."
-"Move the build work to the cloud computer."
-"Pause everything expensive."
-"Have the verifier inspect this result."
-"Focus the team on the login regression first."
-```
-
-### 5.2 Voice
-
-Voice is another input modality to the same Direction contract.
-
-Voice should support:
-
-- push-to-talk initially;
-- realtime transcription where configured;
-- explicit listening state;
-- interruption/barge-in where supported;
-- transcript correction;
-- attribution to the operator;
-- no voice-only hidden mutation path.
-
-Focusa Conversation/Expression contracts own semantic voice lineage.
-
----
-
-## 6. Foreman / Manager / Crew model
-
-The extension must reconcile the existing Workforce concept with newer Focusa Project Foreman semantics.
 
 ### Foreman
 
-Persistent Workstream-scoped responsible intelligence.
+Persistent Workstream-responsible intelligence.
 
-Owns no independent canonical database; hydrates from Focusa state.
-
-### Manager
-
-A long-lived management role where the workforce model requires a manager beneath or beside the Foreman. Managers may delegate within bounded allowance.
-
-### Crew / Worker
-
-Task/run-scoped execution actor. May be ephemeral.
-
-### Verifier / Reviewer
-
-Independently checks required outcomes/evidence where the work contract requires it.
-
-### Rule
-
-Do not create ambiguous duplicate personas where the Foreman already fills the persistent project-responsibility role.
-
----
-
-## 7. Multi-daemon federation
-
-Workforce may pair with N Focusa daemons.
+Workstream altitude:
 
 ```text
-Workforce
-  +-- daemon A: Chromebook/local
-  +-- daemon B: business VPS
-  +-- daemon C: Cloud Agent Computer
-  +-- daemon D: specialist/private node
+What is happening in this Workstream?
+What is the current frontier?
+Who should execute next?
+What is blocked?
+What satisfies acceptance?
 ```
 
-Required properties:
+### Manager / worker / verifier / specialist
 
-- explicit pairing;
-- device/node identity;
-- credential revocation;
-- source identity on every projection;
-- per-daemon health/freshness;
-- query-at-render federation where appropriate;
-- no hidden browser-side canonical merge database;
-- conflict-aware direction semantics;
-- reconnect without replaying ambiguous mutations.
+Bounded execution roles underneath the Foreman according to current Focusa contracts.
 
-A daemon disconnect must become stale/unavailable, not silently healthy.
+The Chief of Staff is not a global Foreman. A Foreman does not inherit owner-wide partner context.
 
 ---
 
-## 8. Realtime event model
+## 4. Workforce Composer versus Focusa Workforce
 
-Preferred pattern:
+Wirebot's **Workforce Composer** designs and commissions the organization.
+
+It answers:
 
 ```text
-initial snapshot
-+ resumable event stream
-+ explicit freshness
-+ resnapshot after gap/epoch change
+What role/team should exist?
+Why?
+What task packs/capabilities are required?
+What data/budget/authority/supervisor are needed?
+Should an existing worker or Draftee fill it?
 ```
 
-The extension should consume Focusa SSE/event contracts where available.
-
-Every projected object SHOULD carry enough metadata to reason about:
+Focusa Workforce answers:
 
 ```text
-source daemon
-revision / sequence
-runtime epoch/incarnation when relevant
-freshness
-canonical/degraded posture
+Who is working now?
+On which Workstream?
+What are they doing?
+What is blocked?
+What needs the owner?
+What evidence exists?
+Where is work running?
 ```
 
-Never retry a non-idempotent mutation merely because the browser lost the response.
-
----
-
-## 9. Pairing and trust
-
-Pairing must be explicit and revocable.
-
-The extension should never require raw daemon/admin credentials to be stored in ordinary page-visible JavaScript state.
-
-Pairing flow:
+Canonical path:
 
 ```text
-add Focusa environment
-→ discover/enter trusted endpoint
-→ pairing token / device registration
-→ versioned nonce/handshake
-→ capability/version negotiation
-→ store scoped extension credential
-→ initial snapshot
-→ live event connection
+observed business/life need
+→ Wirebot recommendation
+→ Workforce Composer
+→ CRIST / assignment packet
+→ owner/governance acceptance
+→ Focusa Workstream/Foreman/authority binding
+→ Focusa Workforce
+→ execution
+→ Evidence / settlement
+→ accepted outcome
 ```
 
-Support separate environments:
+Workforce MUST NOT create a parallel role/roster authority to make this flow easier to render.
+
+---
+
+## 5. Product surfaces
+
+### 5.1 Side Panel — immediate collaboration
+
+The side panel is the fast, contextual operating surface:
 
 ```text
-local/private
-customer/private
-public demo
+[ Environment / health ]
+[ Project / Workstream ]
+
+Foreman
+current objective / Workpoint / status
+
+Direction Bar
+
+Needs You
+
+Working Now
+
+Verified Recently
+
+[ Open Workforce ]  [ Watch UIAI ]
 ```
 
-Public demo credentials/profiles MUST NOT migrate to private devices.
+It should support orientation, quick direction, owner responses, takeover links and confirmation of recent proof without becoming a tiny version of every full-app screen.
+
+### 5.2 Full Workforce — deep operations
+
+The full application is the specialist operations room:
+
+- Workstream/Foreman context;
+- workforce roster;
+- active work/dependency progression;
+- Needs You;
+- Direction;
+- Evidence / verification;
+- task/work graph at progressive levels of detail;
+- execution links to UIAI;
+- fleet/body/topology posture;
+- audit/history where useful.
+
+### 5.3 Start Page — return/orientation
+
+Optional return surface showing a calm briefing:
+
+- current focus;
+- active workers;
+- meaningful changes;
+- owner attention;
+- verified recent outcomes;
+- exact continuation entry points.
+
+### 5.4 Wall / situational surface
+
+Large-screen/read-only situational projection when useful. It must not become a separate operational authority.
 
 ---
 
-## 10. UIAI integration
+## 6. Information hierarchy
 
-UIAI Engine Cockpit retains ownership of execution control.
-
-Workforce should show enough to answer:
-
-- is UIAI executing this task?
-- what browser/computer body/context is it using?
-- is the observation/control lease fresh?
-- what Evidence has been produced?
-- can I inspect/take over?
-
-Then deep-link/open the exact UIAI Cockpit surface.
-
-Do not duplicate UIAI's FPV, control-lease, observation/action or diagnostics engines inside Workforce.
-
----
-
-## 11. Wirebot integration
-
-Wirebot is the Chief-of-Staff/life-and-business partner.
-
-Workforce is a specialist workforce operations surface.
-
-Wirebot may:
+Primary conceptual destinations:
 
 ```text
-brief owner
-recommend outcome
-select exact Workstream/Foreman
-delegate bounded work
-open Workforce on the relevant scope
-receive verified outcome
+Overview / Today
+Work
+People
+Evidence
 ```
 
-Workforce must not become a second Life & Business map, CRM, personal knowledge system, W.I.N.S. application, or generalized Wirebot command center.
-
----
-
-## 12. Chromebook deployment profile
-
-The initial Chromebook profile should optimize for responsiveness.
-
-Local:
+Global/contextual capabilities:
 
 ```text
-Chrome/Chromium UI
-Workforce extension
-Direction/voice
-light Focusa/Pi bridge where practical
-resource telemetry
+Needs You
+Direction
+Audit
+Topology / Fleet
+Settings
 ```
 
-Remote/offloaded:
+Approvals need not become a disconnected dashboard if they are represented correctly inside `Needs You` and their owning Focusa operation.
+
+---
+
+## 7. `Needs You`
+
+This is a defining product experience.
+
+Only items requiring human comparative advantage should enter it.
+
+Examples:
 
 ```text
-heavy agents
-builds/tests
-browser fleets
-indexing
-containers
-large context/model workloads
-cloud Agent Computers/workcells
+approval
+owner truth / clarification
+UIAI authentication/takeover
+high-consequence decision
+resource/budget exception
+failed recovery
+meaningful Radar signal
 ```
 
-The extension should make execution placement visible so the user experiences one workforce regardless of where compute occurs.
+Do not fill it with routine activity such as agent starts/completions.
+
+Use ADLBOS `operator.attention.v1` semantics. Every item retains its source-domain ref. Workforce projects and routes the decision; it does not manufacture duplicate approvals.
+
+Wirebot App may show the same item's owner-wide projection.
 
 ---
 
-## 13. Resource-pressure / placement projection
+## 8. Direction
 
-Workforce should project, not own, a body/resource posture such as:
+Direction is one of the highest-value interactions.
+
+Example:
+
+> Prioritize the login regression. Keep the fix surgical and independently verify it before resuming styling.
+
+The extension submits a typed intent to the exact Focusa environment/project/Workstream/Foreman context.
+
+Direction is not generic chat. The response should remain connected to work state, consequences and evidence.
+
+When the Foreman interprets a material directive, Workforce may show a concise execution interpretation:
 
 ```text
-normal
-constrained
-offload_recommended
-offloading
-remote_attached
-degraded
+Priority
+Login regression first
+
+Approach
+Reproduce → patch → focused tests → independent verification
+
+Workers
+Builder-2 · Verifier-1
+
+Proceeding
 ```
 
-Useful metrics when available:
+Do not insert approval ceremony where current authority already permits the work.
+
+---
+
+## 9. Human-agent collaboration
+
+Intervention should be natural and local to the work.
+
+Examples:
 
 ```text
-memory available / pressure
-CPU/load pressure
-I/O pressure
-battery / thermal posture
-interactive latency
-available remote capacity
-active workcells / Agent Computers
-budget/spend envelope
+Foreman needs product truth
+Which behavior is intentional?
+[ answer ]
 ```
-
-The desired user outcome is:
 
 ```text
-heavy work requested on Chromebook
-→ local pressure/requirements evaluated
-→ remote execution selected
-→ Chromebook stays responsive
-→ evidence/result returns
-→ same Workstream/Foreman continues
+UIAI needs authentication
+[ Take control ]
 ```
-
----
-
-## 14. Security and authority laws
-
-1. Browser UI is never canonical authority.
-2. Page text is data, not instruction authority.
-3. Pairing transport access is not permission to execute arbitrary operations.
-4. The extension never writes Focusa storage/database files directly.
-5. Every consequential mutation uses a registered operation and current authority.
-6. Credentials are scoped and revocable.
-7. UIAI/browser control remains observation/control-lease bound.
-8. Missing proof cannot be presented as verified completion.
-9. Stale state is visibly stale.
-10. Extension close/reopen cannot change durable work state by itself.
-
----
-
-## 15. Extension technical architecture
-
-Target Manifest V3 architecture after source recovery:
 
 ```text
-manifest.json
-
-service worker
-  pairing / auth broker
-  daemon connection coordination
-  event stream lifecycle
-  notifications
-  commands/context menus
-
-side panel
-  ambient Workforce surface
-
-full extension app
-  roster / work / approvals / evidence / audit / topology
-
-start page
-  optional owner-selected Workforce landing page
-
-content scripts
-  minimal contextual page capture / UIAI handoff only
-
-shared libraries
-  contracts
-  Focusa client
-  event reducer/projection
-  pairing
-  freshness
-  UIAI links
-  voice adapter
-  storage schema
+You: Do not rewrite the auth layer. Keep this surgical.
+Foreman: Constraint updated.
 ```
 
-### 15.1 Storage
-
-Browser storage may hold:
-
-- paired endpoint metadata;
-- scoped extension credential material using the safest browser-available mechanism;
-- user UI preferences;
-- last-known noncanonical projection cache;
-- event cursor/epoch metadata.
-
-Browser storage MUST NOT become canonical Workstream/task/evidence state.
+The system should minimize babysitting while making human authority easy at the moments where it genuinely matters.
 
 ---
 
-## 16. Offline/degraded behavior
+## 10. Evidence and trust
 
-When Focusa is unavailable:
+Workforce must visually distinguish activity from proof.
+
+Preferred language:
 
 ```text
-show last-known state as stale
-retain safe local UI preferences
-allow read-only inspection of cached bounded projection
-queue NO consequential mutations unless owning operation explicitly supports durable idempotent queueing
-provide reconnect/retry controls
+claimed
+observed
+supported
+verified
+settled
+unknown
+stale
 ```
 
-Unknown outcome remains unknown.
-
----
-
-## 17. Notifications
-
-Notify only actionable exceptions:
-
-- approval required;
-- worker blocked and owner input required;
-- verified milestone complete;
-- execution failed after bounded recovery;
-- resource/spend threshold requires decision;
-- agent requests takeover/authentication;
-- critical Radar signal where policy allows.
-
-Do not notify for ordinary internal agent chatter.
-
----
-
-## 18. Accessibility and input
-
-Required:
-
-- keyboard operability;
-- meaningful focus order;
-- screen-reader labels;
-- reduced-motion support;
-- readable compact Chromebook layouts;
-- no color-only status semantics;
-- voice path for high-frequency direction;
-- adequate touch targets for convertible Chromebooks/tablets.
-
----
-
-## 19. Performance targets
-
-For Chromebook-class hardware:
-
-- side panel becomes interactive quickly from local cached shell;
-- expensive graph rendering is incremental/lazy;
-- event updates patch bounded state rather than rerendering the entire app;
-- no continuous high-frequency polling when event streams are healthy;
-- no embedded browser automation runtime in the extension;
-- large Evidence artifacts open on demand;
-- browser memory use remains subordinate to normal browsing.
-
-Exact measured budgets should be established after source recovery on the actual Chromebook.
-
----
-
-## 20. Acceptance journeys
-
-### A. Open and orient
-
-Open Chromebook → Workforce shows exact paired environment, current Workstream/Foreman, active workers, blockers, approvals, and freshness.
-
-### B. Direct work
-
-Enter direction → exact scope resolved → Foreman receives canonical request → worker dispatch visible → evidence/result returns.
-
-### C. Approval
-
-Worker reaches consequential step → Workforce shows exact consequence → owner approves/denies → decision and resulting effect are auditable.
-
-### D. UIAI takeover
-
-Browser task running → open exact UIAI Cockpit → inspect/take over → return control → Workforce shows reconciled status/evidence.
-
-### E. Cloud offload
-
-Request heavy work on constrained Chromebook → remote body/workcell selected → local UI stays responsive → same Workstream receives result.
-
-### F. Browser close/reopen
-
-Close Chrome → agents continue in owning runtimes → reopen → resnapshot/reconnect → no duplicate dispatch.
-
-### G. Multi-daemon
-
-Pair local + cloud/private daemon → view unified roster with clear source identity → direct exact Workstream → no cross-daemon ambiguity.
-
-### H. Voice
-
-Speak bounded direction → transcript visible/correctable → same Direction operation path executes → lineage retained.
-
----
-
-## 21. Release definition
-
-A release is not “the extension loads.”
-
-A release candidate must prove:
+Example:
 
 ```text
-build reproducibility
-manifest validity
-pairing/auth
-snapshot + event stream
-scope correctness
-roster truthfulness
-direction dispatch
-approval semantics
-evidence/audit lineage
-UIAI handoff
-close/reopen continuity
-Chromebook performance
-upgrade/rollback path
+LOGIN REGRESSION
+
+Implementation       ✓ Finished
+Focused tests        ✓ 18 / 18
+Browser verification ✓ UIAI
+Independent review   ✓ Verifier
+
+VERIFIED
+[ Inspect evidence ]
 ```
 
----
+Versus:
 
-## 22. Implementation order
+```text
+DEPLOYMENT
+Agent reports complete
 
-1. recover deployed source;
-2. reproduce current build exactly;
-3. install same build on Chromebook;
-4. document current implemented surfaces/gaps;
-5. stabilize pairing + event layer;
-6. Roster + Workstream scope;
-7. Direction Bar;
-8. Work graph;
-9. Approvals;
-10. Evidence + Audit;
-11. UIAI exact handoff;
-12. voice;
-13. topology/resource/body posture;
-14. multi-daemon federation;
-15. Chromebook performance hardening;
-16. versioned CD/promotion channels;
-17. richer agent-first browser interactions.
+UNVERIFIED
+No external observation/receipt received.
+```
 
-No new architecture ceremony should delay a functioning vertical slice.
+Closure follows ADLBOS:
+
+```text
+execution
+→ Focusa Evidence
+→ verification / settlement
+→ accepted outcome / W.I.N.S. where applicable
+→ optional MeriFolio standing
+```
+
+Workforce never equates a screenshot or agent assertion with accepted business outcome.
 
 ---
 
-## 23. Completion criterion
+## 11. UIAI integration
 
-Focusa Workforce is mature when the operator can use the Chromebook as a responsive workforce operations surface while the actual workforce may span local, cloud, browser, specialist, and future embodied runtimes — and the operator never has to reason about infrastructure topology merely to know who is working, steer them, intervene, and verify outcomes.
+UIAI remains the browser/computer execution authority and detailed control surface.
+
+Workforce renders bounded execution posture:
+
+```text
+Builder-2
+Using UIAI
+Chrome · Context 7
+● Working
+Last observation 2s ago
+[ Watch ]
+```
+
+`Watch` / `Take control` opens the exact UIAI context through the shared surface-handoff contract.
+
+Workforce does not reimplement Cockpit's browser automation, control leases, diagnostics or takeover machinery.
+
+Human takeover must be followed by UIAI/Focusa reconciliation before autonomous continuation where required by owning contracts.
+
+---
+
+## 12. Fleet and topology
+
+One Operator may use multiple Focusa daemons, machines, Agent Computers and cloud bodies.
+
+Call this:
+
+```text
+fleet
+multi-daemon aggregation
+environment fleet
+```
+
+Reserve `federation` for communication between independently scoped sovereign Operators.
+
+Workforce gives one owner lens while retaining source environment/daemon/body/runtime refs on every projection.
+
+It must never silently merge canonical reducer state across environments.
+
+---
+
+## 13. Sovereign Operator deployments
+
+Workforce is Operator-neutral.
+
+A customer environment may present:
+
+```text
+ACME OPERATOR
+Partner: Spock
+Environment: Private Operator Deployment
+Network: Private
+```
+
+or:
+
+```text
+VERIOUS OPERATOR
+Partner: Wirebot
+Network: Federated
+```
+
+Workforce does not need the customer-facing partner to be named Wirebot.
+
+The partner profile is projected from the ADLBOS/Wirebot identity layer.
+
+---
+
+## 14. Optional federation and network opportunities
+
+Startempire Wire federation is optional.
+
+Workforce may quietly project network posture and relevant workforce-specific opportunities, but it is not the network application.
+
+Examples:
+
+```text
+Network: Private
+[ Explore federation ]
+```
+
+or:
+
+```text
+Network: Federated
+2 capabilities shared
+1 collaborative Workstream
+```
+
+Federation never gives remote participants ambient private memory, Workstreams, files, credentials, UIAI control or owner authority.
+
+Wirebot/Startempire surfaces own the broader network relationship.
+
+---
+
+## 15. Capability and expansion posture
+
+Workforce may expose adjacent capabilities contextually.
+
+Keep distinct:
+
+```text
+supported
+entitled
+activated/connected
+authorized
+available/healthy
+consented for this effect
+```
+
+Examples:
+
+```text
+Browser execution required.
+UIAI Engine is available for this Operator but not entitled.
+[ Learn about UIAI ]
+```
+
+```text
+Current body is resource constrained.
+Cloud Agent Computer capacity is available.
+[ Review capacity ]
+```
+
+Such cards are recommendations, not grants or authority checks.
+
+Avoid generic upgrade banners.
+
+---
+
+## 16. Draftees and MeriFolio
+
+Draftees may supply public candidate/track-record information to the organization-composition flow.
+
+A selected Draftee becomes a private Operator worker only through an explicit assignment/authority binding.
+
+MeriFolio is a portable worker identity/trust/standing layer. It does not own local Focusa Workstreams or Workforce runtime state.
+
+---
+
+## 17. Shared ADLBOS contracts
+
+Workforce consumes, rather than reinvents, these cross-product seam families:
+
+```text
+operator.partner_profile.v1
+operator.surface_handoff.v1
+operator.attention.v1
+operator.correlation.v1
+operator.capability_posture.v1
+operator.closure.v1
+```
+
+They are reference envelopes, not a new backend.
+
+Workforce-specific runtime contracts remain in `05-extension-runtime-data-and-integration-contracts.md`.
+
+---
+
+## 18. Browser role
+
+Focusa Workforce is the primary specialist browser-resident **workforce** surface.
+
+Browser context operations may include:
+
+```text
+Ask Foreman about this page
+Send page to Foreman
+Create work proposal from selection
+Capture selection as Evidence candidate
+Open page in UIAI
+```
+
+This makes Workforce a natural browser bridge for governed work without making it Wirebot itself.
+
+A future separate Wirebot browser extension should exist only for truly non-overlapping owner/partner browser jobs after shared browser operations are evaluated.
+
+---
+
+## 19. Visual/product design law
+
+The visual goal is **expensive calm**, not futuristic dashboard theater.
+
+Principles:
+
+- Google-clean restraint;
+- strong typography and spacing;
+- minimal chrome;
+- information hierarchy over widget abundance;
+- subtle motion that communicates real work changes;
+- scarce saturated color;
+- Evidence/attention/active work prioritized;
+- contextual expansion rather than constant navigation;
+- dense technical detail one layer down;
+- accessible keyboard/touch/screen-reader behavior;
+- honest stale/degraded/unknown states.
+
+If a statistic, control or panel does not improve orientation, direction, intervention or confidence, it probably does not belong on the primary surface.
+
+---
+
+## 20. Architecture rules
+
+1. The extension is a **projection and intent client**, not the runtime.
+2. Agents/work continue when the browser closes.
+3. Focusa remains canonical for governed work and Evidence.
+4. Wirebot remains the Operating Partner/organization-design surface.
+5. UIAI remains computer-execution authority.
+6. Veragensia remains body/runtime authority.
+7. Entitlement does not imply authority.
+8. Federation does not imply ambient access.
+9. Partner branding does not imply a new protocol identity.
+10. Fleet aggregation does not imply shared reducer state.
+11. First-party operations are structured/API-first; CUA is not normal cross-product integration.
+12. Every actionable projection carries exact source refs and freshness.
+13. No new task, approval, Evidence, memory or entitlement database is created inside the extension.
+
+---
+
+## 21. Redesign implementation direction
+
+Preserve the existing proven core integration modules where sound:
+
+```text
+pairing
+API client
+contracts
+orchestration
+session creation
+SSE / reconnect
+projections
+validation
+```
+
+Evolve the presentation/runtime architecture so multiple surfaces share one Workforce client/event/projection layer rather than each page independently maintaining its own daemon connectivity/state.
+
+A Svelte 5 UI layer is appropriate for the redesign while keeping canonical work semantics outside presentation components.
+
+Suggested vertical slices:
+
+```text
+1. Workstream + Foreman + Direction
+2. Working Now / roster
+3. Needs You
+4. work progression / graph
+5. Evidence / verified closure
+6. UIAI execution / takeover
+7. voice
+8. fleet / topology
+9. Radar
+10. elastic capacity
+```
+
+Each slice must be useful end-to-end and preserve current deployment/rollback safety.
+
+---
+
+## 22. Acceptance
+
+The redesign is architecturally successful when this journey works coherently:
+
+```text
+owner speaks/types to their Operating Partner
+→ Wirebot delegates an accepted outcome
+→ Focusa resolves Workstream/Foreman
+→ Workforce shows live responsible organization
+→ workers execute across Pi/UIAI/Agent Computers
+→ Needs You interrupts only for genuine owner value
+→ owner acts from Wirebot or Workforce
+→ exact execution resumes/reconciles
+→ Evidence verifies/settles the work
+→ accepted outcome appears back at owner altitude
+```
+
+No manual scope rediscovery. No duplicate authority. No fake success. No product boundary collision.
