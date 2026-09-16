@@ -1,96 +1,93 @@
 # AGENTS — Focusa Workforce Build Contract
 
 **Product:** Focusa Workforce  
-**Authoritative repo:** `Startempire-Wire/Focusa-Workforce-Extension`  
 **Execution authority:** `docs/15-build-agent-master-handoff.md`  
-**Full Trajectory:** `docs/14-workforce-full-trajectory.md`  
-**Portable ecosystem doctrine:** ADLBOS `CURRENT_ECOSYSTEM_ARCHITECTURE.md` + `CROSS_PRODUCT_SEAM_CONTRACT.md`
+**Full Trajectory:** `docs/14-workforce-full-trajectory.md`
 
 > **Focusa Workforce operates the workforce.**
 
-The redesign package is sufficiently specified. Build agents are expected to execute it, not redesign it during implementation.
+## Mission
 
-## Read order
-
-Read exactly:
+Build the real product continuously. Process exists only to preserve scope, ownership, truth, and material safety boundaries.
 
 ```text
-ADLBOS OWNER_AUTHORITY_CONSTITUTION.md
-ADLBOS CURRENT_ECOSYSTEM_ARCHITECTURE.md
-ADLBOS CROSS_PRODUCT_SEAM_CONTRACT.md
-ADLBOS AGENTS.md
-
-docs/15-build-agent-master-handoff.md
-docs/14-workforce-full-trajectory.md
-docs/10-workforce-product-requirements-and-proof-matrix.md
-docs/11-workforce-experience-architecture-and-stateflow.md
-docs/12-workforce-screen-and-component-contract.md
-docs/13-workforce-visual-system-and-reference-surfaces.md
-
-docs/00-workforce-canonical-product-and-implementation-spec.md
-docs/05-extension-runtime-data-and-integration-contracts.md
-docs/06-workforce-ux-and-interaction-spec.md
-docs/08-workforce-redesign-blueprint.md
-docs/09-slice-1-workstream-foreman-direction-implementation.md
-docs/07-pre-redesign-baseline-and-agent-handoff.md
-
-current source/tests
-current owning Focusa contracts for the active trajectory node
+Question
+→ Delete
+→ Simplify
+→ Accelerate
+→ Automate last
 ```
 
-Wirebot App is a read-only product/architecture dependency from this workstream. **Do not rewrite Wirebot App documentation.**
+Apply that sequence to both:
 
-## Outcomes over process — controlling execution law
+```text
+the product work
+and
+the machinery/process used to build it
+```
 
-**True working product progress outranks planning, reporting, proof collection, documentation ceremony and process completion.**
+Do not optimize documentation while the product is unfinished.
 
-The trajectory, requirement IDs and acceptance notes exist to keep implementation aimed at the correct outcome. They are not a second job.
+---
+
+## Start here
+
+Read first:
+
+```text
+docs/15-build-agent-master-handoff.md
+docs/14-workforce-full-trajectory.md
+current source/tests
+current Focusa owning contracts for the active Workpoint
+```
+
+Then consult only what the active node needs:
+
+```text
+scope/requirements     → docs/10
+navigation/stateflow   → docs/11
+screen anatomy         → docs/12
+visual implementation  → docs/13
+Slice 1 deep detail    → docs/09
+runtime/data contracts → docs/05
+product/UX context     → docs/00, docs/06, docs/08
+baseline/deployment    → docs/07
+```
+
+ADLBOS/Focusa/UIAI/Veragensia docs are loaded when an active boundary depends on them. Do not preload the whole corpus as ritual.
+
+Wirebot App is read-only from this workstream. Do not rewrite its docs.
+
+---
+
+## Outcomes over process
+
+```text
+understand enough to act
+→ implement real functionality
+→ verify the material behavior/risk
+→ reconcile if needed
+→ continue
+```
 
 Rules:
 
-```text
-implement before elaborating
-reuse valid evidence before creating more
-verify the material risk, not every imaginable assertion
-one check may satisfy many requirements
-never create proof artifacts merely to say proof exists
-do not repeat unchanged tests/builds without a concrete reason
-do not stop ready work for status reports, matrices or documentation updates
-continue independent ready work when one node is blocked
-update docs only when source truth or architecture materially changed
-```
+- implementation outranks planning/reporting/proof collection;
+- reuse existing evidence instead of recreating it;
+- one check may satisfy many requirements;
+- do not rerun unchanged expensive checks without cause;
+- do not stop ready work for status updates or documentation polish;
+- continue independent ready work when one node is blocked;
+- update docs only when architecture/source truth materially changes;
+- clean artifacts you create as you go.
 
-Do **not** spend hours making the trajectory look complete while the product is incomplete.
+Requirement IDs are coverage aids, not ticket bureaucracy.
 
-Do **not** turn requirement IDs into ticket bureaucracy. Use them to preserve coverage and traceability for substantive work; do not annotate every line edit, refactor or obvious implementation step.
+---
 
-Verification is sufficient when removing the check would leave an applicable acceptance condition or material failure risk unverified. Once that is true, advance.
+## Current frontier
 
-## Do not improvise
-
-Do not invent or casually change:
-
-```text
-product scope
-navigation
-screen hierarchy
-visual language
-trajectory semantics
-lifecycle semantics
-attention semantics
-proof semantics
-product ownership
-authority boundaries
-cross-product reference rules
-```
-
-If source reality conflicts with the blueprint, stop only the affected trajectory node, inspect the canonical owner, update the owning blueprint deliberately if necessary, then continue ready unaffected work.
-
-Do not encode a third interpretation in client code.
-
-## Current Short frontier
-
-Start at:
+Start at the Short projection in `docs/14`:
 
 ```text
 HLT-WF-001
@@ -99,30 +96,30 @@ HLT-WF-001
 → WP-0.1.1
 ```
 
-Inspect current Focusa generated/current operations required by Slice 1.
-
-Decision rule:
+Resolve current Focusa operation truth.
 
 ```text
-real owning operation exists
-→ consume it
+real owner operation exists
+→ use it
 
-real equivalent exists
+equivalent real operation exists
 → thin provenance-preserving adapter
 
-owning operation genuinely missing
-→ implement the smallest owning Focusa operation first
-→ verify the owning behavior
+owning operation missing
+→ implement the smallest owning operation
+→ verify that boundary
 → return to Workforce
 ```
 
-Never invent convenient endpoints or client-side canonical state.
+Never invent convenient endpoints or client-owned canonical state.
 
-## Ownership boundaries
+---
+
+## Product ownership
 
 ```text
-Canonical Owner / delegated humans
-  owner-rooted authority
+Owner / delegated human
+  root or bounded human authority
 
 Wirebot / customer-named Operating Partner
   owner relationship, life/business orientation,
@@ -130,22 +127,36 @@ Wirebot / customer-named Operating Partner
 
 Focusa
   Project / Workstream / Foreman / Workpoint,
-  governed work, authority, Evidence, settlement, continuity
+  work authority, continuity, Evidence, settlement
 
 Focusa Workforce
-  browser-resident live workforce operations UX
+  live workforce operations UX
 
 UIAI
-  browser/computer execution, diagnostics, takeover/proof
+  browser/computer execution and takeover
 
 Veragensia
-  body/runtime/Agent Computer/placement/enforcement
+  body/runtime/placement/enforcement
 
 W.I.N.S.
   accepted outcomes
 ```
 
-Never create duplicate canonical state to make the extension easier to build.
+Never duplicate canonical ownership to make UI implementation easier.
+
+Keep distinct:
+
+```text
+owner
+bounded delegated human
+Operating Partner
+Foreman
+worker
+runtime/body
+optional architecture authority
+```
+
+---
 
 ## Technology
 
@@ -153,31 +164,33 @@ Use:
 
 ```text
 Svelte 5
-Vite or equivalent minimal MV3 bundling
+minimal Vite/MV3 bundling
 JavaScript + JSDoc
 ```
 
-Do not introduce SvelteKit.
+No SvelteKit.
 
-Preserve/reuse sound current core modules unless focused evidence requires a change:
+Preserve sound existing core modules unless focused evidence requires a change:
 
 ```text
-src/lib/api-client.mjs
-src/lib/contracts.mjs
-src/lib/orchestration.mjs
-src/lib/orientation.mjs
-src/lib/pairing.mjs
-src/lib/projections.mjs
-src/lib/reconnect.mjs
-src/lib/session-create.mjs
-src/lib/sse-parser.mjs
-src/lib/storage.mjs
-src/lib/validation.mjs
+api-client
+contracts
+orchestration
+orientation
+pairing
+projections
+reconnect
+session-create
+sse-parser
+storage
+validation
 ```
 
-MV3 service-worker suspension is a design constraint. Canonical work must never depend on the worker staying alive.
+MV3 service-worker suspension is normal. Canonical work must not depend on keeping it alive.
 
-## Five-plane UX authority
+---
+
+## UX authority
 
 ```text
 Strategy  → docs/00 + docs/08 + docs/10
@@ -187,158 +200,90 @@ Skeleton  → docs/12
 Surface   → docs/13
 ```
 
-These are build targets, not prompts for fresh design exploration.
+These are implementation targets, not invitations to redesign during construction.
 
-## Full Trajectory law
+If runtime reality makes a target invalid, refine only the affected owner/node and continue other ready work.
 
-`Full`, `Medium`, and `Short` are coverage projections of one source-owned Trajectory.
+---
 
-They are separate from:
+## Core truth laws
+
+Do not collapse:
 
 ```text
+Full / Medium / Short trajectory coverage
 Human / Operations / Technical presentation depth
+lifecycle stage
+authority
+freshness
 ```
 
-and separate from lifecycle stage.
-
-Never infer whole-project completion from current Workpoint or branch completion.
-
-Run `docs/14-workforce-full-trajectory.md` continuously through ready authorized work. Do not pause after each Workpoint for ceremony or permission when the next node is already authorized and ready.
-
-## Shared ecosystem seams
-
-Consume ADLBOS seam families and typed/source-qualified refs. Do not assume bare IDs are globally unique.
-
-Consequential actions must preserve/revalidate current:
-
-```text
-schema/version
-source ref/revision
-owner/environment scope
-actor
-correlation
-freshness/expiry
-idempotency/replay semantics
-```
-
-Unsupported consequential versions fail closed. Ambiguous writes reconcile before retry. Wall-clock time does not establish cross-machine causal order.
-
-## Needs You
-
-Needs You contains only human-value attention. Presenter state is not source resolution.
-
-```text
-seen / hidden / snoozed
-!=
-approved / denied / resolved / cancelled / expired
-```
-
-Refresh source state immediately before consequential action.
-
-## Evidence truth
-
-Never equate:
+Do not equate:
 
 ```text
 agent claim = verified result
-screenshot = accepted outcome
-successful command = product completion
-one deployed branch = full trajectory completion
+successful command = accepted product outcome
+one branch complete = HLT complete
+cached capability = current authority
+presenter acknowledgement = source resolution
 ```
 
-Preserve the owning closure path where applicable:
+Needs You contains only human-value attention.
 
-```text
-activity
-→ Focusa Evidence
-→ verification
-→ settlement / Receipt
-→ accepted outcome / W.I.N.S.
-```
+UIAI remains execution/takeover authority.
 
-Do not manufacture extra Evidence objects when an existing test, receipt, source revision, browser observation or owning-system result already proves the applicable acceptance condition.
+Fleet is one Operator's multi-environment/body aggregation. Federation is cross-Operator/network sharing.
 
-## Security
+Reusable secrets never belong in URLs, Direction, attention cache, Evidence, logs, receipts, or repository files.
 
-Reusable secrets never belong in:
+---
 
-```text
-handoff URLs
-Direction text
-attention objects
-projection cache
-Evidence
-receipts/logs
-repository files
-```
+## Minimum sufficient verification
 
-Credential references are opaque requests/references, not authority.
+Ask:
 
-## Visual target
+> What is the smallest existing or new check that would expose a material defect in what I changed?
 
-Implement `docs/13-workforce-visual-system-and-reference-surfaces.md`.
-
-Canonical redesign is light-first, restrained and operational. Do not substitute a new dashboard/theme/component-library aesthetic during build.
-
-## Verification
-
-Use the **minimum sufficient verification** for the changed behavior.
-
-Typical available checks include:
+Possible checks:
 
 ```text
 focused unit/contract test
-build/MV3 validation
+build/manifest validation
 real browser journey
-stale/degraded path
-negative authority/source case when materially relevant
+relevant stale/degraded case
+relevant authority/source negative case
 ```
 
-Do not automatically run all of them for every edit. Choose the smallest combination that proves the changed acceptance condition and material regression risk.
+Use only the relevant subset.
 
-Reuse still-valid results. Do not rebuild unchanged artifacts or rerun expensive browser journeys solely for ritual completeness.
+Run broader regression/dogfood at meaningful integration/release boundaries, not after every small edit.
 
-For major visual/surface acceptance, verify representative target sizes and accessibility obligations that the change actually affects. Do not turn every component edit into a full responsive/accessibility certification pass.
+---
 
 ## Deployment
 
 ```text
 main + CI
-→ Chromebook/browser dogfood
+→ Chromebook/browser dogfood at meaningful boundary
 → explicit wfx veragensia
-→ atomic Veragensia promotion
-→ os.focusa.dev
+→ atomic promotion
+→ verify changed live journey
 ```
 
-Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj`, public-demo behavior, rollback and health gates unless a deliberate migration changes them.
+Preserve extension ID `ohfbbkpacpcapicpgplnnmifmlnmjggj` unless deliberately migrated.
 
-## Execution loop
+---
+
+## Completion
+
+Keep executing through ready authorized work until:
 
 ```text
-orient once enough to act
-→ implement the current ready Workpoint
-→ verify the material behavior
-→ reconcile only what changed
-→ immediately continue the next ready authorized work
-→ clean artifacts you created as you go
+HLT accepted
+or
+a genuine scoped blocker requires owner input
 ```
 
-Tool failure is route failure when another safe route exists.
+At meaningful milestones report only what works, what materially remains, the real blocker if any, current frontier, and promotion status if relevant.
 
-Do not leave temporary branches, helper workflows, debug files or routine cleanup for the owner.
-
-## Completion reporting
-
-Reporting is terse and does not interrupt execution. At a meaningful milestone or genuine blocker report:
-
-```text
-what now works
-what materially remains
-actual blocker, if any
-current frontier
-live promotion status, if relevant
-```
-
-Requirement IDs, tests and source refs may be included when they materially help handoff/debugging; they are not mandatory ceremony for every change.
-
-Do not substitute process narrative for delivery.
+The deliverable is a working Focusa Workforce, not an immaculate process trail.
