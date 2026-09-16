@@ -283,3 +283,19 @@ test('session output requires and sends the exact target plus paging', async () 
   assert.equal(url.searchParams.get('follow'), 'false');
   assert.equal(seen[0].init.headers['x-focusa-permissions'], 'read:*');
 });
+
+test('roster keeps optional owner-project fields when reported and stays silent when not', () => {
+  const [rich, bare] = rosterFromOwner({
+    data: [
+      { session_id: 's-1', title: 'Build worker', state: 'running', harness: { kind: 'pi' }, run_id: 'r-1', generation: 2, active_config_revision_id: 'rev-9', authority: { state: 'granted' }, workspace: { mode: 'isolated_worktree' } },
+      { session_id: 's-2' },
+    ],
+  });
+  assert.equal(rich.role, 'pi');
+  assert.equal(rich.configRevision, 'rev-9');
+  assert.equal(rich.authority, 'granted');
+  assert.equal(rich.workspace, 'isolated_worktree');
+  assert.equal(bare.role, null);
+  assert.equal(bare.configRevision, null);
+  assert.equal(bare.authority, null);
+});

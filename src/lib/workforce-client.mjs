@@ -319,10 +319,14 @@ export function rosterFromOwner(ownerData) {
     id: row.session_id ?? row.id ?? null,
     label: row.title ?? row.name ?? row.session_id ?? row.id ?? 'session',
     state: row.state ?? row.status ?? null,
-    role: row.role ?? row.profile ?? null,
+    role: row.role ?? row.profile ?? row.harness?.kind ?? null,
     runId: row.active_run_id ?? row.run_id ?? null,
     generation: row.generation ?? row.active_generation ?? null,
     updatedAt: row.updated_at ?? row.last_activity_at ?? null,
+    // Only surfaced when the owner actually reports it.
+    configRevision: row.active_config_revision_id ?? row.config_revision_id ?? null,
+    authority: row.authority?.state ?? row.authority ?? null,
+    workspace: row.workspace?.mode ?? row.workspace?.strategy ?? null,
   }));
 }
 
