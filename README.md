@@ -1,79 +1,73 @@
 # Focusa Workforce
 
-**Focusa Workforce is the browser-resident operations surface for a Focusa-governed AI workforce.**
-
-It answers:
+**Browser-resident operations for a Focusa-governed AI workforce.**
 
 ```text
-Who is working?
-What are they doing?
-What is blocked?
-What needs the owner?
+Who is accountable?
+What is happening now?
+What needs me?
 What is proven?
 Where is work executing?
 What can I direct next?
 ```
 
-The extension is a window over durable work—not the runtime itself. Agents continue in Focusa/owned runtimes when the browser closes.
+Workforce is a projection/intent surface over durable Focusa work. Closing the browser does not stop canonical work.
 
-## Current architecture
+## Architecture
 
 ```text
-Owner
-  ↓
+Owner / delegated human
+        ↓
 Operating Partner / Chief of Staff
-Wirebot implementation family; customer name may be Spock/Athena/etc.
-  ↓
+Wirebot implementation family; customer name may vary
+        ↓
 Focusa
 Project · Workstream · Foreman · Workpoint · authority · Evidence
-  ↓
+        ↓
 Focusa Workforce
-roster · work · Direction · Needs You · Evidence · topology
-  ↓
+Direction · People · Needs You · Work · Evidence · topology
+        ↓
 UIAI / Veragensia / Pi / agents / Agent Computers
 ```
 
-Wirebot App and Focusa Workforce are intentionally distinct:
+Wirebot App owns the owner relationship and Workforce Composer. Focusa Workforce operates already-governed workforce activity. UIAI owns computer/browser execution. Veragensia owns bodies/runtime/enforcement. W.I.N.S. owns accepted outcomes.
 
-- **Wirebot App** runs the owner relationship, life/business orientation, Workforce Composer, owner-wide attention and outcomes.
-- **Focusa Workforce** runs live workforce operations after roles/assignments are governed through Focusa.
+## Build agent: start here
 
-UIAI owns browser/computer execution. Veragensia owns bodies/runtime/enforcement. W.I.N.S. owns accepted outcomes. Startempire Wire federation is optional.
-
-## Product surfaces
-
-- **Side Panel** — immediate collaboration, Direction, Working Now, Needs You.
-- **Full Workforce** — deep roster/work/Evidence/topology operations.
-- **Start Page** — return/orientation briefing.
-- **Wall** — read-only situational view.
-
-## Human-agent operating loop
+Read:
 
 ```text
-Orient
-→ Direct
-→ Interpret / Propose
-→ Delegate
-→ Work
-→ Collaborate / Intervene
-→ Verify
-→ Continue / Learn
+AGENTS.md
+docs/15-build-agent-master-handoff.md
+docs/14-workforce-full-trajectory.md
+current source/tests
 ```
 
-The user should spend attention on direction, judgment and meaningful intervention—not agent machinery.
+Then load only the detail required by the active trajectory node:
+
+```text
+accepted scope          → docs/10
+navigation/stateflow    → docs/11
+screen/component shape  → docs/12
+visual system           → docs/13
+Slice 1 specifics       → docs/09
+runtime/data semantics  → docs/05
+product/UX context      → docs/00, docs/06, docs/08
+baseline/deployment     → docs/07
+```
+
+Do not preload the whole corpus as process ceremony.
 
 ## Full Trajectory
-
-The redesign is governed by one connected Focusa-style Full Trajectory:
 
 ```text
 HLT-WF-001
 │
-├─ MLG-0  Canonical contracts + implementation foundation
+├─ MLG-0  Foundation/contracts
 ├─ MLG-1  Workstream + Foreman + Direction
 ├─ MLG-2  Working Now / People
 ├─ MLG-3  Needs You
-├─ MLG-4  Trajectory / work progression
+├─ MLG-4  Trajectory / progression
 ├─ MLG-5  Evidence / closure
 ├─ MLG-6  UIAI execution / takeover
 ├─ MLG-7  Fleet / topology / capacity
@@ -82,13 +76,15 @@ HLT-WF-001
 └─ MLG-10 Production acceptance
 ```
 
-`Full`, `Medium`, and `Short` are projections of this same trajectory, not separate plans.
+Current Short frontier:
 
-Current Short frontier begins at `MLG-0 / STG-0.1 / WP-0.1.1`: resolve the real current Focusa operations needed by the first slice.
+```text
+MLG-0 → STG-0.1 → WP-0.1.1
+```
 
-## UX design authority
+Resolve the real current Focusa operations required by the first slice, then advance through ready work.
 
-The redesign resolves the five UX planes as build contracts:
+## UX build authorities
 
 ```text
 Strategy  → docs/00 + docs/08 + docs/10
@@ -98,95 +94,54 @@ Skeleton  → docs/12
 Surface   → docs/13
 ```
 
-Build agents are expected to implement these contracts rather than redesign them during construction.
+Implement these; do not redesign them casually during construction.
 
-## Shared ecosystem seams
+## Outcomes over process
 
-Cross-product reference contracts belong to ADLBOS. Workforce consumes them; it does not create another integration database.
+Apply Algorithm² to the product **and** the build machinery:
 
-Cross-product references are source-qualified and do not transfer authority. Capability support, entitlement, activation, authority, health and consent remain distinct.
+```text
+Question
+→ Delete
+→ Simplify
+→ Accelerate
+→ Automate last
+```
 
-## Fleet versus federation
+Build real functionality first. Use minimum sufficient verification. Reuse valid evidence. Continue independent ready work when one node is blocked. Do not turn requirements, trajectory, testing, or documentation into a second project.
 
-One Operator's multiple Focusa daemons/machines/bodies form a **fleet / multi-daemon aggregation**.
+## Technology
 
-**Sovereign federation** is reserved for explicit relationships between independently scoped Operators/nodes.
+```text
+Svelte 5
+minimal Vite/MV3 bundling
+JavaScript + JSDoc
+```
 
-## Source and live deployment
+No SvelteKit.
 
-This repository is the authoritative source after the completed migration.
+Preserve sound existing core logic for pairing, API contracts, orchestration, sessions, SSE/reconnect, projections, storage, and validation unless a concrete defect requires change.
 
-Live deployment flow:
+## Deployment
 
 ```text
 main + CI
-→ Chromebook/browser dogfood
-→ wfx veragensia
+→ meaningful Chromebook/browser dogfood
+→ explicit wfx veragensia
 → atomic Veragensia promotion
 → https://os.focusa.dev
 ```
 
-Current live extension identity is preserved as:
+Stable extension ID:
 
 ```text
 ohfbbkpacpcapicpgplnnmifmlnmjggj
 ```
 
-Pre-redesign behavioral baseline:
+Pre-redesign baseline:
 
 ```text
 baseline/pre-redesign-2026-09-15
 ```
 
-## Implementation direction
-
-Preserve sound core primitives—pairing, API client, contracts, orchestration, session creation, SSE/reconnect, projections and validation—while evolving presentation toward a shared runtime/projection layer and a Svelte 5 + JavaScript/JSDoc UI.
-
-No SvelteKit.
-
-Visual target is defined in `docs/13-workforce-visual-system-and-reference-surfaces.md`: light-first, precise, restrained, modern and operational.
-
-## Build-agent entry point
-
-Start here:
-
-```text
-docs/15-build-agent-master-handoff.md
-```
-
-Then follow the Full Trajectory:
-
-```text
-docs/14-workforce-full-trajectory.md
-```
-
-## Canonical local docs
-
-```text
-00-workforce-canonical-product-and-implementation-spec.md
-05-extension-runtime-data-and-integration-contracts.md
-06-workforce-ux-and-interaction-spec.md
-07-pre-redesign-baseline-and-agent-handoff.md
-08-workforce-redesign-blueprint.md
-09-slice-1-workstream-foreman-direction-implementation.md
-10-workforce-product-requirements-and-proof-matrix.md
-11-workforce-experience-architecture-and-stateflow.md
-12-workforce-screen-and-component-contract.md
-13-workforce-visual-system-and-reference-surfaces.md
-14-workforce-full-trajectory.md
-15-build-agent-master-handoff.md
-```
-
-Wirebot App documentation is a read-only dependency from this workstream and must not be rewritten as part of Workforce implementation.
-
-## Non-negotiable law
-
-```text
-Surfaces are interchangeable; primitives are the platform.
-
-A surface never becomes the source of truth merely because it is the richest UI.
-Entitlement never equals authority.
-Federation never equals ambient access.
-Branding never equals identity or authority.
-Branch/Workpoint completion never equals whole accepted outcome completion.
-```
+Wirebot App documentation is read-only from this workstream.
