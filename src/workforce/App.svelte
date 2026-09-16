@@ -594,17 +594,21 @@
   .needs-you { border-left: 3px solid var(--violet); }
 
   .row { display: flex; gap: var(--space-tight); align-items: flex-end; flex-wrap: wrap; }
-  .field { display: grid; gap: 4px; min-width: 0; }
+  .row > button { flex: 0 0 auto; }
+  /* Fields are the only width-bearing flex items; inputs never exceed their field,
+     which is what let a long placeholder push a button out of the row before. */
+  .field { display: grid; gap: 4px; flex: 1 1 16rem; min-width: 0; }
   .field > span { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: var(--weight-semibold); }
-  .field.grow { flex: 1 1 220px; }
+  .field > input, .field > select { width: 100%; min-width: 0; }
+  .field.grow { flex: 1 1 20rem; }
   input, select, textarea {
     font: inherit; font-size: var(--text-small); color: var(--text-primary);
     background: var(--bg-surface); border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm); padding: var(--space-tight) var(--space-compact);
-    min-height: 32px; min-width: 0; width: 100%;
+    min-height: 32px; min-width: 0;
   }
   input::placeholder, textarea::placeholder { color: var(--text-muted); }
-  textarea { resize: vertical; line-height: var(--leading-body); margin-bottom: var(--space-tight); }
+  textarea { resize: vertical; line-height: var(--leading-body); margin-bottom: var(--space-tight); width: 100%; }
   button {
     font: inherit; font-size: var(--text-small); font-weight: var(--weight-medium);
     color: var(--text-primary); background: var(--bg-surface);
