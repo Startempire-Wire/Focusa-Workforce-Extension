@@ -113,6 +113,17 @@
     <StateNote label="Extension" result={{ state: 'error', note: store.bootError }} />
   {/if}
 
+  {#if store.scopeGuard.level !== 'ok'}
+    <div class="guard {store.scopeGuard.level}" role="status">
+      <strong>{store.scopeGuardLabel}</strong>
+      <ul>
+        {#each store.scopeGuard.reasons as reason (reason.guard)}
+          <li><span class="kind">{reason.guard.replace('_', ' ')}</span> {reason.detail} <span class="muted tiny">via {reason.source}</span></li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
   <!-- Status strip: the four numbers an operator scans first -->
   <ul class="strip">
     <li class="attention">
@@ -257,6 +268,22 @@
             Closest real surface is the Workstream role-profile list below.
           </p>
         {/if}
+        <dl class="facts">
+          <dt>Objective</dt><dd>{store.foremanCard.objective ?? '—'}</dd>
+          <dt>Frontier</dt><dd>{store.foremanCard.frontier ?? '—'}</dd>
+          <dt>Next step</dt><dd>{store.foremanCard.nextStep ?? '—'}</dd>
+          <dt>Proof refs</dt>
+          <dd>
+            {#if store.foremanCard.recentProof.length === 0}—
+            {:else}
+              {#each store.foremanCard.recentProof as proof (`${proof.kind}:${proof.ref}`)}<code>{proof.ref}</code>{/each}
+            {/if}
+          </dd>
+          <dt>Freshness</dt>
+          <dd>{store.foremanCard.freshness ?? 'no owner event yet'}
+            <span class="muted tiny">· source {store.foremanCard.source}</span>
+          </dd>
+        </dl>
         {#if store.foremanProfiles.length === 0}
           <p class="empty">No role profile bound to this Workstream.</p>
         {:else}
@@ -300,7 +327,12 @@
       <!-- Direction -->
       <section class="card" aria-labelledby="wf-direction">
         <h2 id="wf-direction">Direction</h2>
-        {#if !store.workstream}
+        {#if !store.scopeGuard.canDirect}
+          <p class="gap">
+            Direction is held: {store.scopeGuard.reasons.map((r) => r.guard).join(', ') || 'scope not confirmed'}. A consequential
+            owner mutation needs a reachable owner and a confirmed scope.
+          </p>
+        {:else if !store.workstream}
           <p class="empty">Select a Workstream to address Direction.</p>
         {:else if !steerTarget}
           <p class="gap">
@@ -624,6 +656,13 @@
   .muted { font-size: var(--text-small); color: var(--text-secondary); margin: 0; }
   .tiny { font-size: var(--text-micro); }
   .empty { font-size: var(--text-small); color: var(--text-muted); margin: 0; }
+  .guard {
+    border-radius: var(--radius-md); padding: var(--space-compact) var(--space-standard);
+    font-size: var(--text-small); display: grid; gap: var(--space-tight);
+  }
+  .guard.warn { background: var(--warning-subtle); border: 1px solid var(--warning); }
+  .guard.blocked { background: var(--danger-subtle); border: 1px solid var(--danger); }
+  .guard ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .gap {
     border-left: 3px solid var(--warning); background: var(--warning-subtle);
     color: var(--text-primary); padding: var(--space-tight) var(--space-compact);

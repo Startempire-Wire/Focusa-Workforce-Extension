@@ -19,6 +19,7 @@ import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../lib/direction-target.mjs';
 import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { buildNeedsYou } from '../../lib/attention.mjs';
+import { evaluateScopeGuard, describeScopeGuard } from '../../lib/scope-guard.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -131,6 +132,27 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   const evidenceTrail = $derived(buildEvidenceTrail(reads));
   const activity = $derived(reads.events?.state === ResultState.OK ? eventsFromOwner(reads.events.data) : []);
   const needsYou = $derived(buildNeedsYou({ roster, trajectoryView, activity, reads }));
+  const scopeGuard = $derived(evaluateScopeGuard({
+    workstream,
+    health: reads.health ?? null,
+    projectIdentity: reads.project ?? null,
+    projectStatus: reads.projectStatus ?? null,
+    trajectoryView,
+    license: reads.license ?? null,
+  }));
+  const scopeGuardLabel = $derived(describeScopeGuard(scopeGuard));
+  // Foreman card content, from owner-reported values only (the Foreman operation
+  // itself is an owner gap, so this is the Workstream's objective as the owner
+  // reports it, plus its frontier, recent proof and freshness).
+  const foremanCard = $derived({
+    objective: trajectoryView.ladder?.gap ?? null,
+    frontier: trajectoryView.ladder?.currentWorkpoint ?? trajectoryView.ladder?.nextAction ?? null,
+    nextStep: trajectoryView.ladder?.nextAction ?? null,
+    recentProof: evidenceTrail.entries.slice(0, 3),
+    revision: trajectoryView.ladder?.revision ?? null,
+    freshness: lastEventAt ?? null,
+    source: trajectoryView.source,
+  });
   const resolvedTarget = $derived(resolveDirectionTarget({ roster, bound: boundTarget }));
   const directionTarget = $derived(resolvedTarget.target);
   const directionTargetOrigin = $derived(resolvedTarget.origin);
@@ -559,6 +581,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get evidenceTrail() { return evidenceTrail; },
     get activity() { return activity; },
     get needsYou() { return needsYou; },
+    get scopeGuard() { return scopeGuard; },
+    get scopeGuardLabel() { return scopeGuardLabel; },
+    get foremanCard() { return foremanCard; },
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
     get boundTarget() { return boundTarget; },
