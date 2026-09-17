@@ -1,0 +1,291 @@
+# 188 — v0.1 Engineering Decisions and Integration Contracts
+
+**Status:** proposed, implementation-specific decisions under the operator's request for a native Chromebook v0.1; not a grant of canonical architecture authority.
+**Prepared:** 2026-09-04. **Root authority:** Verious Smith III / [185](185-veragensia-architecture-authority-provenance-and-wirebot-identity-policy.md).
+**Release requirements:** [186](186-veragensia-v0.1-native-chromebook-release-spec.md). **Installation:** [187](187-veragensia-chromebook-first-install-runbook.md).
+**Full-profile companions:** [190](190-veragensia-agent-first-software-and-capability-resolution-spec.md), [191](191-veragensia-elastic-agent-computing-and-cloud-runtime-spec.md), [192](192-veragensia-telemetry-and-improvement-plane-spec.md).
+
+## 1. Decision provenance
+
+The operator explicitly selected an agent-first, deeply integrated Veragensia direction, requested real specifications and repository updates, and identified native Omarchy on the arriving Chromebook as the immediate target. The following engineering defaults translate that direction; they must not be presented as previously approved exact architecture decisions beyond the scope stated here.
+
+```yaml
+scope: Veragensia v0.1 native single-owner developer preview
+status: proposed
+canonical_authority: Verious Smith III
+authority_delegation_ref: null
+constitution_ref: docs/185-veragensia-architecture-authority-provenance-and-wirebot-identity-policy.md
+source: operator request for implementable specs and connected-repository updates
+runtime_authority_changes: none
+wirebot_delegation_created: false
+```
+
+No new owner key, principal hash, signed delegation, or constitutional digest is fabricated by this documentation change. Runtime users are represented by their enrolled principal, not hardcoded personal names. Customer/contributor provenance remains advisory.
+
+### 1.1 Scope guard: v0.1 is not the whole Agent Computer
+
+This document deliberately describes a **constrained first native proof**. It does not supersede the canonical full Agent Computer composition now defined in Docs 182/190/191.
+
+Supported full Agent Computer profiles deliberately list:
+
+```text
+Focusa daemon/core
+Focusa Desktop
+Pi + Focusa Pi extension
+UIAI Engine + Cockpit/browser surfaces
+Veragensia session/shell integration
+```
+
+The Chromebook v0.1 MAY omit full-profile surfaces until their dependency, resource and integration gates are ready. Such omission is a preview constraint, not an architectural demotion. In particular:
+
+- UIAI Engine remains a canonical first-party browser/computer execution surface even if v0.1 initially proves only a bounded private browser path;
+- Pi remains the default/reference Focusa-aware harness even if the first OS loop is exposed through a narrower runner;
+- Focusa Desktop remains the default governed full-profile work/cognition presenter even if v0.1 first proves a compact native Work panel.
+
+## 2. Selected engineering defaults
+
+| ID | Selection for implementation | Consequence / rejected alternative |
+|---|---|---|
+| D01 | Stock supported Omarchy plus additive native integration | No deep fork, custom ISO, or replacement DE for v0.1 |
+| D02 | Existing Focusa daemon and existing project/continuity/Workpoint model | No parallel “OS brain,” task database, or new canonical world-state service |
+| D03 | Reuse the existing scoped read adapter; stock Waybar for the first compact Work surface | No standalone shell or new service; a fuller session bridge remains a separate planned slice |
+| D04 | Python 3 stdlib CLI with a thin replaceable presenter | Preserve operations while adapting to verified upstream interfaces under Doc 182b §A.4 |
+| D05 | Explicit user-selected project binding; workspace context advisory | Window focus or folder selection does not assert user intent or ownership |
+| D06 | One isolated local governed run and a reviewable artifact | No unrestricted broad computer-control agent as the first proof; full product computer use remains required under Docs 190/191 |
+| D07 | Pin and verify existing Focusa/Workforce/UIAI/agent artifacts as applicable | No floating latest download, on-device full build, or license bypass |
+| D08 | Local continuity and read-only status work without a model | Provider work is explicit, bounded, and optional for ordinary desktop use |
+| D09 | Installer from a pinned checkout before package distribution | Avoid making signed repository/ISO infrastructure a critical-path dependency |
+| D10 | Cloud providers are later execution adapters | No Fly/account/billing/remote availability required to boot/use v0.1 |
+| D11 | Workcell is a bounded execution-context specialization | Reuse Focusa affordance, permission, resource, reliability, and reversibility concepts |
+| D12 | Observation is opt-in and minimised; consequences governed | No ambient private-content capture merely because an API can read it |
+| D13 | v0.1 is a constrained Agent Computer Profile | Missing full-profile surfaces must be explicit; preview success does not redefine Docs 190/191 |
+| D14 | Reuse UIAI Agent-First Browser and Focusa Pi/reference-harness contracts | No parallel browser authority or Pi-private Focusa state |
+
+These selections are concrete implementation inputs, not an alternative-choice menu or a second task tracker. Work items and dependencies remain in `br`.
+
+## 3. Contracts between owners
+
+- **Omarchy/Linux → bridge:** session/compositor/power observations. The producer owns the physical observation; the bridge does not infer an authorized task from it.
+- **Bridge → Focusa:** validated operation request with explicit scope, using Focusa's existing authentication and generated schema. The bridge does not issue its own grants.
+- **Focusa → bridge:** operational result/projection with revision, evidence, warnings, and canonical/degraded posture preserved.
+- **Bridge → shell:** bounded presentation data, never provider secrets or a raw arbitrary-command surface.
+- **Focusa Desktop → Focusa:** presenter requests/receives shared operations and projections; Desktop does not evaluate entitlement, reducer writes or authority independently.
+- **Pi → Focusa:** reference/default harness-edge typed tools/skills/hooks over the same Focusa daemon/core state; Pi does not become canonical cognition.
+- **UIAI Engine → Focusa/Veragensia:** browser/computer observations, actions, diagnostics, verification and evidence candidates under UIAI runtime ownership and applicable Focusa/application authority.
+- **Focusa runner + OS containment → execution:** one approved run with enforced boundaries and a cancellation handle. Resource control is not a substitute for filesystem/network isolation.
+- **Worker → Focusa:** proposed artifacts/outcomes and evidence. A worker cannot self-approve, expand its input scope, or settle its own unsupported claim as fact.
+
+Focusa's current operational authority is not organizational architecture authority. Linux root is not an architectural signature. Omarchy shell plugins run with user-account access; do not use an unsandboxed plugin or peer UID alone as the security boundary against same-user hostile code.
+
+## 4. Public CLI and implemented read-only subset
+
+The operator's 2026-09-08 adjustment preserves operations while replacing unsupported
+QML-host assumptions with the verified Waybar seam. Doc 182b §A.4 owns the upstream
+change rule; do not infer future support from planned releases.
+
+`doctor` and `resume` remain available. `status --project-root PATH --continuity-id ID
+--json` now reuses `resume`'s unchanged, canonical scoped Focusa envelope, **not** the
+full proposed session/IPC schema below. `--waybar` renders bounded, markup-escaped
+mission/state/next-slice text and checkpoint time. It labels checkpoint/stale data,
+not live worker health, and clears to unavailable on failed/foreign/noncanonical
+reads. Unknown display fields remain unknown. JSON retains the existing blocked
+exit code; Waybar returns zero for a successfully emitted unavailable frame, not
+for dependency health or completed work. No cache, service or model is introduced.
+
+Watch, open/full-view launch, run, pause, stop and the fuller bridge contracts below
+remain planned; this slice does not delete or claim to implement those operations.
+`config/waybar-work.jsonc` requires explicit local scope and deliberate integration;
+it does not install itself or change the selected project.
+
+The product's existing short form is **Veragens**; use `veragens`, not a second competing `veragensctl` name. The remaining target interface is specified below; implementation status is bounded by the subset above.
+
+| Command | Meaning | Side-effect rule |
+|---|---|---|
+| `veragens doctor --json` | Platform, dependency, auth, compatibility, profile and release-gate report | No install, enrollment, network-exposure, or repair side effects |
+| `veragens status --project-root PATH --continuity-id ID --json` | One bounded scoped continuation projection | Read-only; exact scope required; Waybar presentation available with `--waybar` |
+| `veragens status --watch` | JSON Lines projection stream | Bounded subscriber; no model calls |
+| `veragens open` | Summon the native Work panel | No change of project, grant, or agent state |
+| `veragens resume --project-root PATH --continuity-id ID` | Read the scoped Focusa continuation | Does not resume execution automatically |
+| `veragens run --request FILE` | Submit a strict, previewable, bounded run request | Requires existing Focusa authority and a compatible runner |
+| `veragens pause RUN_ID` | Prevent further dispatch at the supported safe boundary | Does not claim arbitrary processes are frozen |
+| `veragens stop RUN_ID` | Request cancellation of this owned run | Confirm worker exit or return stop_pending/unknown |
+
+Do not accept arbitrary shell command strings as a convenient implementation of `run`. `FILE` is data validated against the selected run schema. A CLI consumer must not build commands by concatenating project names, filenames, model output, or agent-supplied arguments.
+
+Exit codes: `0` fulfilled; `2` invalid input/schema; `3` unavailable/degraded dependency; `4` unsupported platform/version; `5` authority or entitlement denied; `6` timeout/uncertain outcome; `7` release evidence incomplete. A watch stream reports changing health in frames; it does not terminate merely because one sample is degraded.
+
+Future full-profile CLI may expose profile/capability/app-resolution inspection from Doc 190. That later surface must not be guessed into v0.1 before the descriptor/resolver contracts exist.
+
+## 5. Local wire contract v1
+
+Transport: newline-delimited UTF-8 JSON over the private Unix socket. Maximum request line 16 KiB, maximum response frame 64 KiB, maximum 4 simultaneous subscribers. Reject malformed UTF-8, unknown top-level properties, invalid enums, traversal in local file parameters, over-limit messages, and unexpected schema majors. No generic proxy-to-any-Focusa-route method.
+
+Requests carry `schema`, `request_id`, `operation`, and a strict operation-specific `params`. Peer context is obtained from the local transport, not trusted from a claimed UID inside JSON. Mutation requests require the existing Focusa authorization and current scope in addition to transport identity.
+
+Example read request:
+
+```json
+{
+  "schema": "veragensia.request.v1",
+  "request_id": "example-read-001",
+  "operation": "status.read",
+  "params": {}
+}
+```
+
+Projection response (illustrative values, not test evidence):
+
+```json
+{
+  "schema": "veragensia.session.v1",
+  "bridge_epoch": "example-epoch",
+  "sequence": 1,
+  "health": "unavailable",
+  "freshness": "unknown",
+  "source_revision": null,
+  "scope": null,
+  "workpoint": null,
+  "run": null,
+  "resource_mode": "unknown",
+  "errors": [{"code": "daemon_unavailable", "retryable": true}]
+}
+```
+
+`health`: `ready | degraded | unavailable | incompatible`.
+`freshness`: `fresh | stale | unknown`.
+`resource_mode`: map the selected Focusa descriptor's actual enum; `unknown` is a presentation fallback, never an invented Focusa mode.
+`scope`, when present: explicit `project_root`, `continuity_id`, and existing principal/workset references as available. Filesystem paths remain private local data and are redacted from shared receipts.
+`workpoint`, when present: Workpoint ID, canonical/degraded flags, summary, warnings, and bounded evidence references from Focusa. A summary must not strip negative scope/authority warnings.
+`run`, when present: run ID, principal ref, runner ref, execution state, bounded progress summary, output refs, and cancellation state. No credentials, full prompt, or raw transcript.
+
+Sequence numbers are monotonic only within `bridge_epoch`. On bridge restart, change epoch; consumers discard old assumptions and request a fresh snapshot. On event gap/disconnect, mark stale and resnapshot. A fresh cache receipt does not make its underlying old source fresh. Default stale threshold is 10 seconds without a successful health/projection refresh; use monotonic timing locally. On reconnect, never replay a mutation just to reconstruct UI state.
+
+## 6. Binding to existing Focusa operations
+
+The selected published candidate has these documented mappings:
+
+```text
+focusa_workpoint_resume
+  REST POST /v1/workpoint/resume
+  fields: project_root, continuity_id, mode=operator_summary
+  optional workpoint_id/session_id/current_ask per descriptor
+
+focusa_resource_mode
+  REST GET /v1/resource/mode for read
+  REST POST /v1/resource/mode for governed control
+
+focusa_work_loop_control
+  REST POST /v1/work-loop/enable|pause|resume|stop
+  exact body and writer/preflight semantics from the descriptor
+```
+
+The bridge must not assume a Pi-session default in an OS process. Explicit scope is mandatory for project-bound calls. Pi remains the reference harness; that does not permit native OS processes to depend on hidden Pi session state.
+
+Resolve exact project-binding, Workset, evidence, approvals, and runner operations from the selected release's generated registry and persist their descriptor hashes in the compatibility evidence. A route name in current `main` documentation is not proof of a compatible published binary.
+
+Work-loop control is documented as non-idempotent. Do not automatically retry it after an ambiguous network response. Inspect actual state and correlate the original request first. Do not use a global loop-stop route to terminate an unrelated session. Endpoint scope and actual worker cancellation must be integration-tested before exposing `veragens stop` as working.
+
+No existing contract means `unsupported_capability`, not a silently invented endpoint or direct state-file mutation.
+
+## 7. Run request and lifecycle
+
+A run request must bind an existing project/continuity and task/principal/authorization reference; input revision and allowlisted input paths; isolated execution context; output location; approved provider policy; maximum wall time, turns, retries and output size; and a verification policy. The adapter must use Focusa-owned task/session identity, not issue a competing canonical task ID.
+
+Native projection states:
+
+```text
+requested → preflight → awaiting_approval → queued → running
+running → verifying → review_ready
+running → pausing → paused
+running/paused → stopping → stopped
+any nonterminal → failed | unknown
+```
+
+Transitions are observations/projections of the owning runner and Focusa, not a second durable reducer. `review_ready` requires validated artifacts and evidence. `stopped` requires termination confirmation; `failed` and `unknown` never become success based on elapsed time. Reconcile after process/daemon restart using the owning runtime's identity and status.
+
+Verification binds the output to its input revision. Changes to source invalidate direct application; present a conflict. For v0.1, writes stay in the approved output/copy area. Original-file replacement and external effects require separate authorization and tests.
+
+The broader full-product lifecycle—mixed local/cloud Agent Computers, workcells, Agent Apps, Silent Session teams, Agent Assist and suspend/retire—is owned by Doc 191 and is not implied by this v0.1 state machine.
+
+## 8. Browser/computer execution contract
+
+UIAI Engine is the deliberately listed first-party browser/computer execution and proof surface for supported full Agent Computer profiles.
+
+For browser work, Veragensia should reuse existing UIAI Agent-First Browser contracts instead of defining its own parallel semantic automation system. That includes capability discovery, versioned observations, observation-bound actions, semantic refs, Focusa-directed verification, provenance/influence controls, execution capsules and Cockpit/FPV oversight.
+
+The execution preference is:
+
+```text
+structured UIAI/native capability
+→ semantic browser/application automation
+→ visual computer use
+```
+
+Visual computer use remains required as a fallback, but v0.1 D06 intentionally limits the first native proof to a bounded governed run.
+
+## 9. Pi and Focusa Desktop contracts
+
+### Pi
+
+Pi + the Focusa Pi extension is the default/reference Focusa-aware harness on supported Agent Computer profiles.
+
+- Pi consumes Focusa-generated capability/state contracts.
+- Pi does not become the reducer, ontology authority, durable project memory or grant authority.
+- Native Veragensia state must not depend on Pi-private copies.
+- Non-Pi harnesses remain compatible through thin adapters over the same Focusa authority.
+
+### Focusa Desktop
+
+Focusa Desktop is the default governed full-profile human work/cognition presenter.
+
+- It consumes/forwards shared Focusa operations and projections.
+- It does not evaluate entitlement or authorization locally.
+- It does not write reducer/storage state directly.
+- The compact native v0.1 Work panel is complementary ambient OS integration, not a replacement Desktop authority.
+
+## 10. Three initial reflex rules
+
+Implement deterministic rules through existing Focusa signal/governance paths, not model-generated self-modifying code:
+
+| Trigger | Bounded response | Forbidden escalation |
+|---|---|---|
+| Daemon or event connection lost | Mark UI stale/unavailable; disable new mutations; reconnect with bounded backoff | Start a duplicate daemon or replay a lost mutation |
+| Resource pressure/battery policy reached | Defer new expensive work; request existing bounded pause/resource-mode operation when authorized | Kill canonical persistence or switch providers/data destinations without permission |
+| Locked/suspending session | Preserve continuity; follow previously granted run policy; require confirmed checkpoint/stop where needed | Treat user absence as broader authority or imply sleeping hardware still executes |
+
+Each observer result includes cause/correlation identity so a response does not repeatedly trigger itself. Debounce/coalesce observations; retained raw observations are bounded and short-lived. Surface meaningful state changes, not every event.
+
+Secondary cognition uses existing Focusa workers when justified by a bounded task. Ontology extensions, trust/reliability evidence, and RDF/semantic verification remain Focusa-owned mechanisms; this release projects their results rather than reimplementing them in a presenter or the bridge.
+
+## 11. Install transaction details
+
+Stages: `inspect → validate → stage → backup_owned_entries → activate → verify → commit`.
+
+Record exact source revision, dependency digests, owned files, prior config fragments and hashes, activation result, and rollback reference. Do not overwrite a nonempty destination that is not recorded as Veragensia-owned. Reject unsafe symlinks and concurrent config changes; recheck hashes before commit. If another application edited a shared config during installation, abort and preserve both states for resolution.
+
+Only integrate through supported user/plugin hooks. Keep `/usr/share/omarchy` unchanged. No automatic firmware/disk/system-package changes; list prerequisites when missing. Service activation must not enable linger or start model work. Browser pairing is a separate private action.
+
+On failure, restore only this transaction's owned changes. Do not use a blanket `git reset`, home-directory cleanup, or root snapshot as an overlay rollback. Test interrupted staging, failed plugin validation, failed daemon auth, failed activation, repeated install, and user edits before uninstall.
+
+Future full-profile installation/application resolution is governed by Doc 190. The v0.1 installer must not pretend that copying a binary proves the Agent App descriptor, entitlement, profile capability, UIAI/Cockpit, Pi/plugin or Focusa Desktop integration is ready.
+
+## 12. Machine-readable release gate
+
+`config/v0.1-release-candidate.json` records inspected source/dependency facts and missing test evidence. It is a **candidate inventory**, not a credential, signed attestation, or executable policy grant. A release evaluator must reject unknown schema majors, mismatched dependency hashes, missing compatibility pins, absent installer/runner/browser artifacts, and any gate without passed evidence.
+
+Status words have exact meaning: `not_run` is not `pass`; `candidate` is not `compatible`; `published_dependency` is not `Veragensia_released`; `base_ready` is not `integration_ready`.
+
+Spec-validation can pass while release readiness remains false. Publishing these specifications does not produce a native binary, installation test, hardware qualification, full Agent Computer profile, cloud runtime or software catalog. Release evidence must name the tested revision, not merely a mutable branch name.
+
+## 13. Source references
+
+- [Omarchy plugin API and unsandboxed-code warning](https://omarchy.org/manual/shell-plugins/).
+- [Omarchy supported user configuration and hooks](https://omarchy.org/manual/dotfiles/).
+- [Pinned Workpoint contract](https://github.com/Startempire-Wire/focusa/blob/v0.9.191/docs/focusa-tools/tools/focusa_workpoint_resume.md).
+- [Pinned resource-mode contract](https://github.com/Startempire-Wire/focusa/blob/v0.9.191/docs/focusa-tools/tools/focusa_resource_mode.md).
+- [Pinned loop-control contract](https://github.com/Startempire-Wire/focusa/blob/v0.9.191/docs/focusa-tools/tools/focusa_work_loop_control.md).
+- [190 — agent-first software](190-veragensia-agent-first-software-and-capability-resolution-spec.md).
+- [191 — Elastic Agent Computing](191-veragensia-elastic-agent-computing-and-cloud-runtime-spec.md).
+- [192 — telemetry and improvement](192-veragensia-telemetry-and-improvement-plane-spec.md).
+
+Infrastructure-provider ideas remain design inspiration/adapters, not operational dependencies or new sources of authority for v0.1.
