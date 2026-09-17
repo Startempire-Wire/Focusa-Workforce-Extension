@@ -56,13 +56,22 @@ current Workforce source/tests
 current owning Focusa contract/source for the active frontier
 ```
 
-Pull detail only when the current work needs it:
+When touching **any visible extension face**, also load:
+
+```text
+docs/16-extension-all-faces-experience-completion-contract.md
+```
+
+It is the cross-face completion authority for the toolbar/action entry, Side Panel, private/public Start Page, Full Workforce routes, pairing/connections, Wall, page-context flow, keyboard entry, deep-link/handoff ingress and all degraded/recovery states. No visible face is implementation glue.
+
+Pull other detail only when the current work needs it:
 
 ```text
 accepted scope          → docs/10
 navigation/stateflow    → docs/11
 screen/component shape  → docs/12
 visual system           → docs/13
+all visible faces       → docs/16
 Slice 1 detail          → docs/09
 runtime/data semantics  → docs/05
 product context         → docs/00, docs/06, docs/08
@@ -85,6 +94,7 @@ Trajectory semantics
 Needs You semantics
 Evidence / settlement meaning
 top-level information architecture
+face-specific purpose and hierarchy
 core visual language
 security/privacy boundaries
 ```
@@ -191,14 +201,19 @@ Canonical work must survive MV3 service-worker suspension.
 The five planes are settled inputs:
 
 ```text
-Strategy  → docs/00 + docs/08 + docs/10
-Scope     → docs/10
-Structure → docs/11
-Skeleton  → docs/12
-Surface   → docs/13
+Strategy   → docs/00 + docs/08 + docs/10
+Scope      → docs/10
+Structure  → docs/11
+Skeleton   → docs/12
+Surface    → docs/13
+All faces  → docs/16
 ```
 
 Implement their intent. Do not reopen design exploration during construction.
+
+`docs/16` closes the previous cross-surface gap: **every user-visible face and entry path is part of the designed product**, including Chrome toolbar action behavior, Side Panel, private Start Page, public Start Page, Full Workforce route faces, pairing/connections, Wall, active-tab/page-context flow, keyboard commands, deep-link/handoff ingress and recovery/degraded states.
+
+Do not treat a face as complete merely because it renders. Its purpose, content/action hierarchy, states, return behavior, responsiveness and visual semantics must match the resolved contract.
 
 Do not mistake exact example layouts for mandatory accidental pixels: preserve hierarchy, behavior, responsive intent and visual language while using sound implementation judgment.
 
@@ -291,4 +306,4 @@ Requirement IDs/source refs/test names are included only when they materially he
 
 ## Final directive
 
-> **Use the blueprint as rails, not shackles. Make the product real. Exercise engineering judgment aggressively inside resolved product boundaries. Delete ceremony, preserve truth, compound proven leverage, keep advancing, and do not stop until the accepted outcome is actually achieved or a genuine owner decision is required.**
+> **Use the blueprint as rails, not shackles. Make the product real. Exercise engineering judgment aggressively inside resolved product boundaries. Every face of the extension is part of the product. Delete ceremony, preserve truth, compound proven leverage, keep advancing, and do not stop until the accepted outcome is actually achieved or a genuine owner decision is required.**
