@@ -2,6 +2,7 @@
 
 **Execution authority:** `docs/15-build-agent-master-handoff.md`  
 **Trajectory:** `docs/14-workforce-full-trajectory.md`  
+**All-faces UX authority:** `docs/16-extension-all-faces-experience-completion-contract.md`  
 **Architecting standard applied:** Focusa Spec 120A + software-engineering profile `120A-SWE`
 
 > **Build Focusa Workforce to completion. Do not turn the build process into the work.**
@@ -42,13 +43,20 @@ current source/tests
 current owning Focusa contracts needed by the active frontier
 ```
 
-Load detail only when needed:
+When touching **any visible extension face**, load:
+
+```text
+docs/16-extension-all-faces-experience-completion-contract.md
+```
+
+Load other detail only when needed:
 
 ```text
 scope                 → docs/10
 navigation/stateflow  → docs/11
 screen anatomy        → docs/12
 visual system         → docs/13
+all visible faces     → docs/16
 Slice 1 detail        → docs/09
 runtime/data          → docs/05
 product context       → docs/00, docs/06, docs/08
@@ -71,6 +79,7 @@ Trajectory semantics
 Needs You source semantics
 Evidence / settlement meaning
 top-level information architecture
+face-specific purpose/content hierarchy/state behavior
 core visual language
 security/privacy boundaries
 ```
@@ -260,14 +269,17 @@ MV3 suspension is normal. Canonical work cannot depend on the extension worker r
 ## UX construction authority
 
 ```text
-Strategy  → docs/00 + docs/08 + docs/10
-Scope     → docs/10
-Structure → docs/11
-Skeleton  → docs/12
-Surface   → docs/13
+Strategy   → docs/00 + docs/08 + docs/10
+Scope      → docs/10
+Structure  → docs/11
+Skeleton   → docs/12
+Surface    → docs/13
+All faces  → docs/16
 ```
 
-These resolve product design so the build agent can execute. They are not pixel-law where a simpler implementation preserves the same intended hierarchy, behavior and visual system.
+`docs/16` is mandatory when implementing any visible face or entry path. It makes the toolbar/action, Side Panel, private/public Start Page, Full Workforce route faces, pairing/connections, Wall, browser/page-context flow, keyboard commands, deep-link ingress and recovery states explicit product surfaces rather than implementation glue.
+
+These docs resolve product design so the build agent can execute. They are not pixel-law where a simpler implementation preserves the same intended hierarchy, behavior and visual system.
 
 ## Truth boundaries
 
