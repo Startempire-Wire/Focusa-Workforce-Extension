@@ -1,3 +1,0 @@
-/* Public Work view styling. Loaded ONLY by the ?public-work=1 branch, so the
-   legacy public-view rules cannot leak into the orientation surface. */
-@import '../startpage.css';

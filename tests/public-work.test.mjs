@@ -64,15 +64,21 @@ test('public mount hides private areas and exposes only read-only refresh',async
   assert.ok(document.host.textContent.includes(sample().mission));
 });
 test('explicit public bootstrap never reads private storage; normal route is retained',async()=>{
-  const entry=await readFile(new URL('../src/startpage-app/main.js',import.meta.url),'utf8');
-  const anchor="const isPublicWork = new URL(window.location.href).searchParams.get('public-work') === '1';";
-  assert.ok(entry.includes(anchor), 'the start page decides public mode before touching extension state');
-  // Public mode must be a closed branch: it mounts the public view and never
-  // constructs the Workforce store (no connections, notifications or layout reads).
-  const publicBranch=entry.slice(entry.indexOf('if (isPublicWork)'), entry.indexOf('} else {'));
-  assert.match(publicBranch, /import\('\.\/public-work\.css'\)/, 'public mode loads only the public stylesheet');
-  assert.match(publicBranch, /mountPublicWork\(document, chrome\.runtime\.getURL\('public-work\.json'\)\)/, 'public mode mounts the curated snapshot');
-  assert.ok(!/createWorkforceStore/.test(publicBranch), 'public mode never builds the private runtime client');
+  const original=await readFile(new URL('../src/startpage.mjs',import.meta.url),'utf8');
+  const anchor="if (new URL(window.location.href).searchParams.get('public-work') === '1') {";
+  assert.ok(original.includes(anchor));
+  const source=original.replace(/^import .*;\n/gm,'').replace(anchor,
+    "renderStartNotifications=()=>{};renderWidgets=()=>{};renderNotifPrefToggles=()=>{};bind=()=>{};clock=()=>{};startLiveUpdates=()=>events.push('private-runtime');startFleetEventStream=()=>{};\n"+anchor);
+  for(const publicMode of [true,false]) {
+    const events=[], document=dom();
+    const context={events,document,URL,console,Intl,setInterval(){},
+      window:{location:{href:'chrome-extension://test/startpage.html'+(publicMode?'?public-work=1':'')},addEventListener(){}},
+      chrome:{runtime:{getURL:path=>'chrome-extension://test/'+path},storage:{local:{get:async()=>{events.push('storage');return {};}}}},
+      mountPublicWork:async()=>events.push('public'),listNotifications:async()=>{events.push('notifications');return [];}};
+    await vm.runInNewContext('(async()=>{'+source+'})()',context);
+    if(publicMode)assert.deepEqual(events,['public']);
+    else {assert.ok(events.includes('private-runtime'));assert.ok(events.includes('storage'));assert.ok(!events.includes('public'));}
+  }
 });
 
 test('real start-page module graph links and renders without private reads',async()=>{
@@ -84,8 +90,7 @@ test('real start-page module graph links and renders without private reads',asyn
   const originals=new Map(Object.keys(replacements).map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
   try {
     for(const [key,value] of Object.entries(replacements))Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});
-    const { mountPublicWork } = await import(new URL('../src/lib/public-work.mjs',import.meta.url));
-    await mountPublicWork(document, 'chrome-extension://test/public-work.json');
+    await import(new URL('../src/startpage.mjs?public-work-module-test',import.meta.url));
     assert.ok(document.host.textContent.includes(sample().mission));
     assert.ok(document.host.textContent.includes(sample().next_action));
   } finally {

@@ -1,9 +1,0 @@
-/* Start page (orientation surface) — shared tokens only. The public Work view's
-   stylesheet is loaded dynamically by the public branch in main.js. */
-@import '../tokens.css';
-
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--bg-app); color: var(--text-primary); }
-body { font-family: var(--font-sans); font-size: var(--text-body); line-height: var(--leading-body); -webkit-font-smoothing: antialiased; }
-:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
