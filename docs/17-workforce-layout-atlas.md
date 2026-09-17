@@ -2,7 +2,7 @@
 
 **Status:** CURRENT layout authority  
 **Purpose:** remove layout invention from downstream implementation.  
-**Use with:** `docs/11` Structure, `docs/12` Skeleton, `docs/13` Surface, `docs/16` all-faces coverage.  
+**Use with:** `docs/11` Structure, `docs/12` Skeleton, `docs/13` Surface, `docs/16` all-faces JJG completion.  
 **Rule:** preserve the geometry, hierarchy, collapse order and content priority below. Low-level CSS mechanics remain implementation discretion.
 
 ## 1. Global construction rules
@@ -109,6 +109,10 @@ Designed first for **320–480px width** and variable browser height.
 
 Horizontal padding: 16px. Section separators may be whitespace or one subtle border; do not box every section.
 
+Direction remains in normal document flow directly below Foreman. It is **not sticky** in the current design.
+
+The microphone is rendered only when the canonical voice adapter is available and enabled for the current scope. Otherwise the input ends with the send control only.
+
 ### Height pressure
 
 If viewport height is short:
@@ -131,6 +135,8 @@ Connect Focusa
 Pair an environment to operate your workforce here.
 [ Open pairing ]
 ```
+
+`Open pairing` routes to `workforce.html#/settings?section=connections`.
 
 Do not show empty workforce cards.
 
@@ -203,6 +209,8 @@ Foreman/frontier metadata   max 1 concise line each
 
 `Needs You N` and `Open Workforce` are secondary/tertiary actions.
 
+`Needs You N` routes to `workforce.html#/needs-you`.
+
 ## Medium — 600–899px
 
 Same hierarchy. Summary remains 2 columns when each can retain >=260px; otherwise stack.
@@ -234,7 +242,7 @@ Pair a Focusa environment to make this new tab your operating return point.
 [ Pair Focusa ]
 ```
 
-Centered vertically within upper 60% of viewport. No empty sections below.
+Centered vertically within upper 60% of viewport. No empty sections below. `Pair Focusa` routes to `workforce.html#/settings?section=connections`.
 
 ### Connected, no Workstream
 
@@ -346,6 +354,8 @@ Viewport-filling application.
 └──────────────┴──────────────────────────────────────┴────────────────┘
 ```
 
+`Needs You` is not a primary-nav item. Header/context-rail attention controls route to `#/needs-you`.
+
 Outer application has no arbitrary centered marketing-page max width; the MAIN region may constrain prose/detail sections internally.
 
 ## 860–1179px
@@ -371,9 +381,12 @@ No desktop three-column shell squeezed onto narrow screens.
 
 # 7. Full Workforce — Overview
 
+No time-of-day greeting.
+
 Desktop main content:
 
 ```text
+WORKFORCE
 ┌──────────────────────────────────────┬──────────────────────────┐
 │ CURRENT FOCUS                        │ NEEDS YOU                │
 │ Workstream / objective / Foreman     │ top 3                    │
@@ -398,6 +411,8 @@ No generic dashboard metrics above Current Focus.
 
 # 8. Full Workforce — Work index
 
+Always use grouped rows/list; do not switch to a card mosaic based on Workstream count.
+
 ```text
 WORK                                   Search       Filters
 
@@ -410,8 +425,6 @@ Project A
 Project B
 ...
 ```
-
-Use list/rows rather than a mosaic of large cards when >4 Workstreams. Cards are acceptable for <=4 if density remains consistent.
 
 No percent-complete unless the source owns a legitimate denominator.
 
@@ -443,6 +456,8 @@ This is the deepest primary operations face.
 │ current-frontier proof                │ bodies / UIAI / exceptions│
 └──────────────────────────────────────┴───────────────────────────┘
 ```
+
+`Working Now` uses the responsibility tree only in the current HLT; no list/tree toggle.
 
 At <1100px the final two-column sections stack. Direction never disappears below the trajectory.
 
@@ -496,9 +511,18 @@ On narrow layouts, preserve Current responsibility first.
 
 # 11. Full Workforce — Needs You
 
-## Index/drawer
+Canonical routes:
 
-Max readable width 760–900px even when opened in full page.
+```text
+#/needs-you
+#/needs-you/detail?env=<key>&ref=<typed-ref>
+```
+
+The routes are addressable/history-bearing even when wide layouts visually use the context-rail/drawer language.
+
+## Index
+
+Max readable width 760–900px.
 
 ```text
 NEEDS YOU
@@ -580,6 +604,8 @@ ACCEPTED OUTCOME link if present
 
 # 13. Full Workforce — Topology
 
+Canonical group order:
+
 ```text
 TOPOLOGY
 
@@ -629,6 +655,8 @@ Single vertical causal timeline. Technical raw events are a secondary verbosity 
 
 ## Settings
 
+Canonical route: `#/settings`.
+
 Readable content width 900–1040px.
 
 ```text
@@ -644,6 +672,8 @@ Advanced / debug
 Each section is a simple settings group, not a card dashboard.
 
 ## Connections / pairing
+
+Canonical address: `#/settings?section=connections`.
 
 Desktop >=1000px:
 
@@ -664,7 +694,7 @@ Desktop >=1000px:
 
 Ratio ~1fr : 1fr. At <900px stack environments first, pairing second.
 
-On successful pairing: select environment, refresh source, and route toward Workstream selection/Overview. Do not leave a static success card as the endpoint.
+On successful pairing: select environment, refresh source, restore or request Workstream selection, then route to `#/overview`. Do not leave a static success card as the endpoint.
 
 ---
 
@@ -710,7 +740,16 @@ At <900px: Current Focus → Needs You → Working Now → Verified; one column.
 
 # 17. Page-context / orientation flow
 
-This is an explicit transient face, preferably drawer/sheet inside Side Panel or Full Workforce.
+This is an explicit transient face with a fixed container by origin.
+
+```text
+Side Panel      → full-height subview below product header; Back restores prior Side Panel state
+Full Workforce  → right-side context drawer; 420px target / 480px max; <900px full-width sheet
+```
+
+Never use a modal dialog and never create a new top-level route.
+
+Content:
 
 ```text
 PAGE CONTEXT
@@ -751,12 +790,14 @@ When an external/internal handoff opens Workforce:
 6. enable action only after current authorization
 ```
 
-If ambiguous:
+If ambiguous, render the disambiguation in the MAIN content region of the existing shell:
 
 ```text
 Choose destination
 <two or more exact candidates>
 ```
+
+No modal and no new route is invented for disambiguation.
 
 If revoked/forbidden:
 
@@ -793,7 +834,22 @@ Use concise empty statement + one useful next action. Empty is never used when r
 
 ---
 
-# 20. Layout acceptance invariant
+# 20. Keyboard / focus construction rules
+
+```text
+D             focus Direction on Work detail when not typing
+Esc           close current drawer/sheet/subview; never cancel canonical work
+Cmd/Ctrl+Enter submit Direction when valid
+/             focus an existing local search on Work/People/Evidence/Audit; otherwise no-op
+```
+
+A global command palette is not part of the current HLT. Do not add `Cmd/Ctrl+K` unless future accepted scope introduces one.
+
+All interactive elements are Tab reachable with visible focus treatment.
+
+---
+
+# 21. Layout acceptance invariant
 
 The downstream builder may choose CSS Grid/Flex details, component boundaries and DOM implementation, but MUST NOT invent:
 
@@ -806,6 +862,8 @@ collapse/stack order
 what disappears first under space pressure
 which state replaces which region
 which face owns which level of detail
+addressability of a face
+screen-vs-drawer semantics
 ```
 
 If implementation constraints make one of those impossible, change this atlas deliberately rather than silently improvising a different product.
