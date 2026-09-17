@@ -96,15 +96,23 @@ not started) · `blocked` (named dependency) · `unresolved` (owned resolution s
 scope or contract not yet determined).
 
 ```text
-MLG-0   done        contracts resolved + foundation built (WP-0.1.1, STG-0.2, part of STG-0.3)
-MLG-1   active      slice 1 surface live; Direction needs an owner session instance
-MLG-2   ready       People/responsibility — same client, owner `silent-sessions` is real
-MLG-3   blocked     Needs You — owner gap UP-03 (no attention operation)
-MLG-4   active      Trajectory consumes `trajectory/view` + `workpoint/*` + `work-loop/status`
-MLG-5   ready       Evidence — owner `evidence/capture` + `workpoint/link-evidence` are real
-MLG-6   ready       UIAI handoff/takeover; session create→start→steer path identified
+MLG-0   done        contracts resolved + foundation built (WP-0.1.1, STG-0.2, STG-0.3)
+MLG-1   done        environment (local + in-page pairing), per-environment Workstream restore,
+                    project discovery/selection, Foreman card, frontier, Direction over exact
+                    targets with session controls and live output
+MLG-2   active      People roster + per-person owner status; responsibility detail still thin
+                    until the owner reports role/harness per session
+MLG-3   active      Needs You derived from owner-reported signals (stopgap, auto-cutover);
+                    blocked from being authoritative until UP-03 provides attention
+MLG-4   active      Frontier consumes `trajectory/view` + `workpoint/*` + `work-loop/status`
+                    through the labelled stopgap; authoritative path auto-engages after #621
+MLG-5   active      Evidence trail from owner-reported `evidence_refs`/`receipt_refs`
+                    (stopgap, auto-cutover); owner exposes writes but no evidence read yet
+MLG-6   active      exact-target output read + session controls live; session *creation*
+                    waits on owner role profile / agent identity
 MLG-7   blocked     Fleet/multi-environment — owner gap UP-06 (no presence projection)
-MLG-8   ready       Surface/visual/accessibility completion (STG-0.3 tokens, docs 12/13)
+MLG-8   done        token layer shared by all four surfaces, dark mapping, responsive,
+                    focus/reduced-motion/labels/aria-live (STG-8.1)
 MLG-9   unresolved  Voice/Radar — owner scope decision required before implementation
 MLG-10  blocked     Production acceptance depends on the branches above
 ```
@@ -629,13 +637,16 @@ table — expand in §16 and `docs/10`.
 The current executable slice, with retained ancestry:
 
 ```text
-HLT-WF-001 → MLG-0 (accepted) → MLG-1 → STG-1.3 (Direction) → WP-1.3.3 (typed submit)
+HLT-WF-001 → MLG-0 (done) → MLG-1 (done) → MLG-6 (session creation) → WP-1.3.3 VERIFY-OUTCOME
 ```
 
 ```text
-exact gap            Direction is implemented and governed, but no owner silent-session
-                     instance exists on the dev device, so there is no exact target
-                     (session_id + run_id + generation) to address it to.
+exact gap            Session *creation* needs an owner role profile + agent identity that
+                     Focusa does not yet hold for this Workstream (0 profiles reported), so
+                     Direction has no owner-created target. Direction itself, session
+                     controls and output reading are implemented and exercised end to end
+                     through the owned operations; an operator-bound exact target is the
+                     labelled stopgap in the meantime.
 owner evidence       GET /v1/silent-sessions → data: [] ; owner tables
                      runtime_silent_sessions = 0 rows, runs = 0, leases = 0, approvals = 0.
                      Capability is present (profiles "Local Pi RPC session in an isolated
@@ -805,6 +816,19 @@ trajectory depth  Short (this section is compact and discloses omissions above)
 Work completed in the current run (evidence-backed):
 
 ```text
+Guards     WP-1.1.4 scope/freshness guard (5 tests) — Direction held when the owner is
+                    unreachable or no Workstream is selected; warn-level owner reasons shown
+Foreman    WP-1.2.3 objective / frontier / next step / proof refs / freshness on the card
+Attention  Needs You derived from owner signals + auto-cutover (3 tests)
+Evidence   evidence trail from owner-reported refs + auto-cutover (4 tests)
+Direction  exact-target binding + governed start/pause/resume/cancel + live output
+People     roster with owner-reported role/workspace/config revision + per-person status
+Notify     owner-event notification pipeline shared with the side panel
+Visual     status strip, two-column responsive layout, count chips, semantic chips,
+           dark theme mapping, border-box fix found by rendering the page
+```
+
+```text
 WP-0.1.1  owner contract resolution            src/lib/owner-contracts.mjs + tests
 STG-0.2   Svelte 5 + minimal Vite/MV3, page     dist/workforce.html, hashed bundles
 STG-0.2.3 shared runtime client + live stream   src/lib/workforce-client.mjs
@@ -814,6 +838,14 @@ MLG-1     environment, project discovery/selection, Workstream axes, Foreman gap
 DELIVERY  live build loop + visible build stamp; staged refresh deploys; CI green
 ```
 
-Nearest ready next action: **wire orientation → session create/preflight/start → steer**
-so Direction converges on a real owner target, then return to MLG-1 STG-1.3 for
-VERIFY-OUTCOME on the live browser surface.
+Nearest ready next action: **unify the side panel onto the shared runtime client**
+(Leverage²: remove its duplicated health/roster/work-loop reads), then extend People
+responsibility detail from the owner's role profiles. Both are independent of the two
+upstream items (focusa#621 projection; role profile / agent identity).
+
+Owner inputs still required:
+
+```text
+HTL commitment              the daemon's own gate refuses to promote an agent-written HLT
+role profile / agent identity   canonical identity Workforce must not invent
+```
