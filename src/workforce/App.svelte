@@ -517,6 +517,31 @@
         <StateNote label="Events" result={store.resultOf('events')} />
       </section>
 
+      <!-- Notifications: the owner-event attention pipeline (shared with the side panel) -->
+      <section class="card" aria-labelledby="wf-notifications">
+        <div class="card-head">
+          <h2 id="wf-notifications">Notifications</h2>
+          <span class="count-chip">{store.unreadCount} unread</span>
+        </div>
+        {#if store.notifications.length === 0}
+          <p class="empty">No owner event has required attention yet.</p>
+        {:else}
+          <ul class="items compact">
+            {#each store.notifications.slice(0, 8) as item (item.id ?? `${item.event_type}-${item.timestamp}`)}
+              <li class:unread={!item.read}>
+                <span class="kind {item.severity ?? ''}">{item.severity ?? 'info'}</span>
+                <strong>{item.title}</strong>
+                <span class="detail">{item.body}</span>
+                <span class="muted tiny">{item.timestamp}</span>
+              </li>
+            {/each}
+          </ul>
+          {#if store.unreadCount > 0}
+            <button type="button" class="wf-btn" onclick={() => store.markAllRead()}>Mark all read</button>
+          {/if}
+        {/if}
+      </section>
+
       <!-- Evidence -->
       <section class="card" aria-labelledby="wf-evidence">
         <div class="card-head">
@@ -690,6 +715,11 @@
     border: 1px solid var(--border-default); border-radius: var(--radius-pill);
     padding: 0 var(--space-tight); background: var(--bg-subtle); white-space: nowrap;
   }
+  .items li.unread strong { font-weight: var(--weight-bold); }
+  .kind.info { color: var(--info); border-color: var(--info); background: var(--info-subtle); }
+  .kind.success { color: var(--success); border-color: var(--success); background: var(--success-subtle); }
+  .kind.warning { color: var(--warning); border-color: var(--warning); background: var(--warning-subtle); }
+  .kind.danger { color: var(--danger); border-color: var(--danger); background: var(--danger-subtle); }
   .kind.evidence { color: var(--info); border-color: var(--info); background: var(--info-subtle); }
   .kind.receipt, .kind.projection { color: var(--settled); border-color: var(--settled); background: var(--settled-subtle); }
 

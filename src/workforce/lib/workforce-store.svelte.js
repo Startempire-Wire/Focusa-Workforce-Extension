@@ -20,6 +20,7 @@ import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../
 import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { buildNeedsYou } from '../../lib/attention.mjs';
 import { evaluateScopeGuard, describeScopeGuard } from '../../lib/scope-guard.mjs';
+import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from '../../lib/notifications.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -101,6 +102,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let boundTarget = $state(/** @type {any} */ (null));
   // In-page pairing (the side panel's proven flow, available on the full page).
   let selectedSessionId = $state('');
+  let notifications = $state(/** @type {any[]} */ ([]));
   let outputCursor = $state(/** @type {string|null} */ (null));
   let outputLines = $state(/** @type {string[]} */ ([]));
   let pairing = $state(/** @type {any} */ (null));
@@ -132,6 +134,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   const evidenceTrail = $derived(buildEvidenceTrail(reads));
   const activity = $derived(reads.events?.state === ResultState.OK ? eventsFromOwner(reads.events.data) : []);
   const needsYou = $derived(buildNeedsYou({ roster, trajectoryView, activity, reads }));
+  const unreadCount = $derived(unreadNotificationCount(notifications));
   const scopeGuard = $derived(evaluateScopeGuard({
     workstream,
     health: reads.health ?? null,
@@ -241,8 +244,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
         initialCursor: cursors[environment.id] ?? null,
         signal: streamAbort.signal,
         onState: (state) => { streamState = { phase: state.phase, cursor: state.cursor, attempt: state.attempt }; },
-        onEvent: () => {
+        onEvent: (event) => {
           lastEventAt = new Date().toISOString();
+          ingestNotification(event).catch(() => {});
           if (refreshTimer) clearTimeout(refreshTimer);
           refreshTimer = setTimeout(() => {
             refreshOwner().catch(() => {});
@@ -327,6 +331,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     selection = await loadSelection(chromeApi, id);
     await refreshOwner();
     await loadBoundTarget();
+    await refreshNotifications();
     await startStream();
   }
 
@@ -466,6 +471,26 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     }
   }
 
+  /**
+   * Ingest one owner event into the notification store using the proven
+   * primitive (the side panel and this page share one pipeline).
+   * @param {any} event
+   */
+  async function ingestNotification(event) {
+    const notification = notificationFromEvent(event);
+    if (!notification) return;
+    await saveNotification(notification, chromeApi).catch(() => {});
+    notifications = await listNotifications(chromeApi).catch(() => notifications);
+  }
+
+  async function refreshNotifications() {
+    notifications = await listNotifications(chromeApi).catch(() => []);
+  }
+
+  async function markAllRead() {
+    notifications = await markNotificationsRead(chromeApi).catch(() => notifications);
+  }
+
   async function loadBoundTarget() {
     try {
       const all = (await chromeApi?.storage?.local?.get(TARGET_KEY))?.[TARGET_KEY] ?? {};
@@ -581,6 +606,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get evidenceTrail() { return evidenceTrail; },
     get activity() { return activity; },
     get needsYou() { return needsYou; },
+    get notifications() { return notifications; },
+    get unreadCount() { return unreadCount; },
     get scopeGuard() { return scopeGuard; },
     get scopeGuardLabel() { return scopeGuardLabel; },
     get foremanCard() { return foremanCard; },
@@ -619,6 +646,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     cancelPairing,
     selectSession,
     loadOutput,
+    refreshNotifications,
+    markAllRead,
     prepareSession,
     controlSession,
     direct,
