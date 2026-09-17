@@ -3,59 +3,64 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root=path.resolve(new URL('..',import.meta.url).pathname,'src');
-const html=fs.readFileSync(path.join(root,'startpage.html'),'utf8');
-const js=fs.readFileSync(path.join(root,'startpage.mjs'),'utf8');
-const css=fs.readFileSync(path.join(root,'startpage.css'),'utf8');
+const root = path.resolve(new URL('..', import.meta.url).pathname, 'src');
+const appDir = path.join(root, 'startpage-app');
+const html = fs.readFileSync(path.join(appDir, 'startpage.html'), 'utf8');
+const entry = fs.readFileSync(path.join(appDir, 'main.js'), 'utf8');
+const app = fs.readFileSync(path.join(appDir, 'App.svelte'), 'utf8');
 
-test('start page exposes high-level work view and widgetized controls',()=>{
-  for(const id of ['dashboard','customize','widget-drawer','widget-toggles','open-panel','orient-now','new-work','pause-work','activity-list']) assert.match(html,new RegExp(`id="${id}"`),id);
-  for(const widget of ['focus','workforce','controls','activity','notifications','brief']) assert.match(html,new RegExp(`data-widget="${widget}"`),widget);
-  assert.match(html,/chrome_url_overrides|Start page/);
+// docs/11 §2 + §19 and docs/10 WF-SUR-003: the start page is a concise
+// return/orientation surface, not a widget dashboard.
+test('start page is the built orientation entry, not the legacy widget page', () => {
+  assert.match(html, /wf-start-root/);
+  assert.match(html, /main\.js/);
+  assert.ok(!fs.existsSync(path.join(root, 'startpage.mjs')), 'the widget dashboard module is retired');
+  assert.ok(!fs.existsSync(path.join(root, 'startpage.html')), 'the widget markup is retired');
+  assert.ok(!/data-widget=/.test(html), 'no widget grid is shipped');
 });
 
-test('start page persists widget visibility locally and routes actions to the command panel',()=>{
-  assert.match(js,/focusa_startpage_widgets/);
-  assert.match(js,/state\[id\]=!state\[id\]/);
-  assert.match(js,/chrome\.tabs\.create/);
+test('start page loads connection posture, current Workstream, attention, work summary and proof', () => {
+  for (const fact of ['Connection', 'Workstream', 'Needs You', 'Working', 'Recent proof', 'Scope']) {
+    assert.ok(app.includes(`>${fact}<`) || app.includes(`${fact}</dt>`) || app.includes(fact), `orientation fact present: ${fact}`);
+  }
+  assert.match(app, /createWorkforceStore/, 'it reads the same shared runtime client as every other surface');
+  assert.match(app, /refreshEnvironments\(\)/);
+  assert.match(app, /refreshOwner\(\)/);
 });
 
-test('start page imports and consumes the canonical Work Loop projection',()=>{
-  assert.match(js,/import \{ fetchBrowserFleet, fetchWorkLoop, ProjectionRequestError \} from '\.\/lib\/api-client\.mjs';/);
-  assert.match(js,/listConnections/);
-  assert.match(js,/Runtime unavailable/);
-  assert.match(js,/projection\.status/);
+test('start page primary action continues the current Workstream, secondaries hand off', () => {
+  assert.match(app, /Continue current Workstream/);
+  assert.match(app, /Open Needs You/);
+  assert.match(app, /Open Workforce/);
 });
 
-test('start page binds its shared UI handlers exactly once',()=>{
-  assert.equal((js.match(/\bbind\(\);/g)||[]).length,1);
+test('start page offers a simple pairing call to action when unconfigured', () => {
+  assert.match(app, /Pair Focusa/);
+  assert.match(app, /no Focusa environment is paired/i);
 });
 
-test('start page refreshes from governed SSE events and stops on page hide',()=>{
-  assert.match(js,/runReliableEventStream/);
-  assert.match(js,/initialCursor:streamCursor/);
-  assert.match(js,/commitCursor:async\(cursor\)=>/);
-  assert.match(js,/window\.addEventListener\('pagehide'/);
-  assert.match(js,/streamAbort\?\.abort/);
+test('start page labels staleness from the owner stream instead of assuming freshness', () => {
+  assert.match(app, /staleness/);
+  assert.match(app, /stale/);
+  assert.match(app, /last confirmed/);
 });
 
-test('start page and sidepanel share persisted notification projections',()=>{
-  assert.match(js,/notificationFromEvent/);
-  assert.match(js,/saveNotification/);
-  assert.match(js,/markNotificationsRead/);
-  assert.match(js,/start-notifications/);
+test('start page performs no consequential mutation', () => {
+  for (const forbidden of ['orchestrateAction', 'createPreflightedSession', 'preflightSafeSession', 'controlSession', 'projectUse']) {
+    assert.ok(!app.includes(forbidden), `orientation surface must not call ${forbidden}`);
+  }
 });
 
-test('start page keeps daemon source explicit and selection persistent',()=>{
-  assert.match(html,/id="daemon-select"/);
-  assert.match(js,/loadSelectedConnection/);
-  assert.match(js,/focusa_startpage_connection\.v1/);
-  assert.match(js,/liveConnection\?\.label/);
+test('public Work mode is decided before any extension state is touched', () => {
+  const gate = entry.indexOf("searchParams.get('public-work') === '1'");
+  const storeUse = entry.indexOf('mount(App');
+  assert.ok(gate > -1 && gate < storeUse, 'the public gate precedes the private app mount');
 });
 
-test('start page has responsive widget grid and accessible motion/theme handling',()=>{
-  assert.match(css,/grid-template-columns/);
-  assert.match(css,/@media\(max-width:850px\)/);
-  assert.match(css,/prefers-reduced-motion:reduce/);
-  assert.match(css,/prefers-color-scheme:light/);
+test('orientation surface uses the shared token layer and respects motion preferences', () => {
+  const css = fs.readFileSync(path.join(appDir, 'startpage.css'), 'utf8');
+  assert.match(css, /@import '\.\.\/tokens\.css'/, 'tokens come first so the import is honoured');
+  assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /:focus-visible/);
+  assert.ok(!/data-widget/.test(css), 'legacy widget styling is not part of the surface');
 });

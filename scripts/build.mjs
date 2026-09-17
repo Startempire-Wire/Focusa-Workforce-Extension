@@ -37,7 +37,11 @@ await writeFile(resolve(dist, 'manifest.json'), `${JSON.stringify(manifest, null
 // its Svelte source tree is excluded from the shipped extension.
 const staticEntries = await readdir(resolve(root, 'src'), { withFileTypes: true });
 for (const entry of staticEntries) {
-  if (entry.name === 'workforce') continue;
+  // Both Svelte entry trees are built artifacts, not shipped sources.
+  if (entry.name === 'workforce' || entry.name === 'startpage-app') continue;
+  // The legacy start page markup is superseded by the built start-page entry
+  // (the public Work view's stylesheet is kept and imported by that entry).
+  if (entry.name === 'startpage.html') continue;
   await cp(resolve(root, 'src', entry.name), resolve(dist, entry.name), { recursive: true });
 }
 
@@ -55,9 +59,14 @@ if (!hasVite) {
   console.warn('WARN: vite toolchain absent; workforce.html not bundled (run npm install)');
 } else {
   const { build } = await import('vite');
-  await build({ configFile: resolve(root, 'vite.config.mjs'), logLevel: 'warn' });
+  // One build per entry tree (the start page is its own surface, not a widget page).
+  for (const app of ['workforce', 'startpage']) {
+    await build({ configFile: resolve(root, 'vite.config.mjs'), logLevel: 'warn', mode: app });
+  }
   const built = await readFile(resolve(dist, 'workforce.html'), 'utf8');
   if (!/workforce-assets\//.test(built)) throw new Error('workforce.html was built without its bundled assets');
+  const startBuilt = await readFile(resolve(dist, 'startpage.html'), 'utf8');
+  if (!/workforce-assets\//.test(startBuilt)) throw new Error('startpage.html was built without its bundled assets');
   await rm(resolve(dist, 'src'), { recursive: true, force: true });
   uiBundled = true;
 }
