@@ -43,13 +43,20 @@ docs/14-workforce-full-trajectory.md
 current source/tests
 ```
 
-Then load only the detail required by the active trajectory node:
+When touching **any visible extension face**, also read:
+
+```text
+docs/16-extension-all-faces-experience-completion-contract.md
+```
+
+Then load only the other detail required by the active trajectory node:
 
 ```text
 accepted scope          → docs/10
 navigation/stateflow    → docs/11
 screen/component shape  → docs/12
 visual system           → docs/13
+all extension faces     → docs/16
 Slice 1 specifics       → docs/09
 runtime/data semantics  → docs/05
 product/UX context      → docs/00, docs/06, docs/08
@@ -57,6 +64,26 @@ baseline/deployment     → docs/07
 ```
 
 Do not preload the whole corpus as process ceremony.
+
+## Extension face inventory
+
+Every one of these is part of the designed product, not implementation glue:
+
+```text
+Chrome toolbar/action entry
+Side Panel
+Private Start Page / new tab
+Public Start Page / public Work snapshot
+Full Workforce shell + route faces
+Pairing / Connections
+Wall
+Page-context / active-tab orientation flow
+Keyboard entry flows
+Deep-link / specialist-handoff ingress
+Loading / stale / degraded / forbidden / unsupported / reconciling states
+```
+
+`docs/16` completes the cross-face Strategy → Scope → Structure → Skeleton → Surface contract for them.
 
 ## Full Trajectory
 
@@ -76,22 +103,17 @@ HLT-WF-001
 └─ MLG-10 Production acceptance
 ```
 
-Current Short frontier:
-
-```text
-MLG-0 → STG-0.1 → WP-0.1.1
-```
-
-Resolve the real current Focusa operations required by the first slice, then advance through ready work.
+Use the current Short projection in `docs/14`; the trajectory is a coverage/dependency map, not a ticket ceremony.
 
 ## UX build authorities
 
 ```text
-Strategy  → docs/00 + docs/08 + docs/10
-Scope     → docs/10
-Structure → docs/11
-Skeleton  → docs/12
-Surface   → docs/13
+Strategy   → docs/00 + docs/08 + docs/10
+Scope      → docs/10
+Structure  → docs/11
+Skeleton   → docs/12
+Surface    → docs/13
+All faces  → docs/16
 ```
 
 Implement these; do not redesign them casually during construction.
