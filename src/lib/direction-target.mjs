@@ -98,12 +98,36 @@ export function describeTarget(target) {
 /**
  * Resolve the target Direction should use.
  *
- * @param {{roster?: any[], bound?: any}} input
- * @returns {{target: object|null, origin: 'owner_roster'|'operator_binding'|null}}
+ * Priority is authoritative-first:
+ *   1. the owner's own roster projection
+ *   2. the exact target the owner returned when it created the session
+ *   3. an operator binding (labelled stopgap)
+ *
+ * @param {{roster?: any[], created?: any, bound?: any}} input
+ * @returns {{target: object|null, origin: 'owner_roster'|'owner_create'|'operator_binding'|null}}
  */
-export function resolveDirectionTarget({ roster = [], bound = null } = {}) {
+export function resolveDirectionTarget({ roster = [], created = null, bound = null } = {}) {
   const fromRoster = firstTargetFromRoster(roster);
   if (fromRoster) return { target: fromRoster, origin: 'owner_roster' };
+  if (isValidExactTarget(created)) return { target: { ...created }, origin: 'owner_create' };
   if (isValidExactTarget(bound)) return { target: { ...bound }, origin: 'operator_binding' };
   return { target: null, origin: null };
+}
+
+/**
+ * Exact target from an owner create response (`session` + `run`).
+ * The owner is the authority here: no field is inferred.
+ *
+ * @param {{session?: any, run?: any}} created owner create result
+ * @returns {{session_id: string, run_id: string, generation: number}|null}
+ */
+export function targetFromCreatedSession(created) {
+  const candidate = {
+    session_id: created?.session?.id ?? null,
+    run_id: created?.run?.id ?? null,
+    generation: created?.run?.generation ?? null,
+  };
+  return isValidExactTarget(candidate)
+    ? Object.freeze({ session_id: candidate.session_id, run_id: candidate.run_id, generation: candidate.generation })
+    : null;
 }

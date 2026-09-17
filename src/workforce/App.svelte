@@ -26,6 +26,7 @@
   let pairLabel = $state('');
   let sessionName = $state('');
   let sessionPreparation = $state(null);
+  let sessionCreation = $state(null);
 
   const liveMessage = $derived(
     store.streamState
@@ -354,7 +355,9 @@
             <span>run <code>{steerTarget.run_id}</code></span>
             <span>gen <code>{steerTarget.generation}</code></span>
             <span class="origin {store.directionTargetOrigin}">
-              {store.directionTargetOrigin === 'owner_roster' ? 'Focusa roster (authoritative)' : 'operator binding (stopgap)'}
+              {store.directionTargetOrigin === 'owner_roster' ? 'Focusa roster (authoritative)'
+                : store.directionTargetOrigin === 'owner_create' ? 'Focusa create response (authoritative)'
+                : 'operator binding (stopgap)'}
             </span>
             {#if store.directionTargetOrigin === 'operator_binding'}
               <button type="button" class="wf-btn" onclick={() => store.clearBoundTarget()}>clear</button>
@@ -469,8 +472,16 @@
         </div>
         {#if sessionPreparation?.ok}
           <p class="source authoritative">
-            preflight accepted · config {sessionPreparation.preflight.redacted_config_hash.slice(0, 12)}… — creation is a separate governed step
+            preflight accepted · config {sessionPreparation.preflight.redacted_config_hash.slice(0, 12)}…
           </p>
+          <div class="row">
+            <button
+              type="button"
+              class="wf-btn wf-btn-primary"
+              onclick={async () => { sessionCreation = await store.createSession({ preflight: sessionPreparation.preflight, idempotencyKey: `create:${crypto.randomUUID()}` }); }}
+            >Create session</button>
+            <span class="muted tiny">governed owner creation; the returned target becomes Direction's target</span>
+          </div>
         {:else if sessionPreparation?.blocker}
           <p class="gap">
             {sessionPreparation.blocker.reason}
@@ -478,6 +489,13 @@
           </p>
         {:else if sessionPreparation?.error}
           <p class="gap">{sessionPreparation.error}</p>
+        {/if}
+        {#if sessionCreation?.ok}
+          <p class="source authoritative">
+            Focusa created the session{#if sessionCreation.target} · target {sessionCreation.target.session_id} run {sessionCreation.target.run_id} gen {sessionCreation.target.generation}{/if}{#if sessionCreation.warning} · {sessionCreation.warning}{/if}
+          </p>
+        {:else if sessionCreation?.error}
+          <p class="gap">Focusa rejected creation: {sessionCreation.error}</p>
         {/if}
 
         {#if store.sessionProfiles.length || store.sessionPresets.length}
@@ -729,7 +747,7 @@
 
   .target { display: flex; flex-wrap: wrap; gap: var(--space-tight); align-items: center; font-size: var(--text-small); margin: 0; color: var(--text-secondary); }
   .target .origin { border-radius: var(--radius-pill); padding: 0 var(--space-tight); font-size: var(--text-micro); border: 1px solid currentColor; }
-  .target .origin.owner_roster { color: var(--success); }
+  .target .origin.owner_roster, .target .origin.owner_create { color: var(--success); }
   .target .origin.operator_binding { color: var(--warning); }
 
   .output {

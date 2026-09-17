@@ -57,3 +57,18 @@ test('targets are described, not dumped', () => {
   assert.equal(describeTarget(EXACT), 's-1 · run r-7 · gen 3');
   assert.equal(describeTarget(null), 'no exact target');
 });
+
+test('an owner create response yields the exact target, and outranks an operator binding', async () => {
+  const { targetFromCreatedSession } = await import('../src/lib/direction-target.mjs');
+  const created = { session: { id: 's-9' }, run: { id: 'r-4', generation: 2 } };
+  assert.deepEqual(targetFromCreatedSession(created), { session_id: 's-9', run_id: 'r-4', generation: 2 });
+  assert.equal(targetFromCreatedSession({ session: { id: 's-9' }, run: { id: 'r-4' } }), null, 'no generation means no target');
+  assert.equal(targetFromCreatedSession({ session: { id: 's-9' }, run: { id: 'r-4', generation: 0 } }), null);
+
+  const resolved = resolveDirectionTarget({ roster: [], created: targetFromCreatedSession(created), bound: EXACT });
+  assert.equal(resolved.origin, 'owner_create');
+  assert.deepEqual(resolved.target, { session_id: 's-9', run_id: 'r-4', generation: 2 });
+
+  const rosterWins = resolveDirectionTarget({ roster: [{ id: 's-2', runId: 'r-9', generation: 1 }], created: targetFromCreatedSession(created) });
+  assert.equal(rosterWins.origin, 'owner_roster');
+});

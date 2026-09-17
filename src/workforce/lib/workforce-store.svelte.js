@@ -16,7 +16,7 @@ import { startPairing, pollPairing } from '../../lib/pairing.mjs';
 import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
-import { parseExactTarget, resolveDirectionTarget, describeTarget } from '../../lib/direction-target.mjs';
+import { parseExactTarget, resolveDirectionTarget, describeTarget, targetFromCreatedSession } from '../../lib/direction-target.mjs';
 import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { buildNeedsYou } from '../../lib/attention.mjs';
 import { evaluateScopeGuard, describeScopeGuard } from '../../lib/scope-guard.mjs';
@@ -100,6 +100,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // Operator-bound exact target per environment (a reference only; the owner
   // roster wins the moment it reports one). Stopgap for the missing session.
   let boundTarget = $state(/** @type {any} */ (null));
+  // Exact target returned by the owner when it created the session.
+  let createdTarget = $state(/** @type {any} */ (null));
+  let createdSession = $state(/** @type {any} */ (null));
   // In-page pairing (the side panel's proven flow, available on the full page).
   let selectedSessionId = $state('');
   let notifications = $state(/** @type {any[]} */ ([]));
@@ -156,7 +159,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     freshness: lastEventAt ?? null,
     source: trajectoryView.source,
   });
-  const resolvedTarget = $derived(resolveDirectionTarget({ roster, bound: boundTarget }));
+  const resolvedTarget = $derived(resolveDirectionTarget({ roster, created: createdTarget, bound: boundTarget }));
   const directionTarget = $derived(resolvedTarget.target);
   const directionTargetOrigin = $derived(resolvedTarget.origin);
   const trajectoryView = $derived(resolveTrajectorySource({
@@ -465,7 +468,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
         provider, model, auth_profile_ref: authProfileRef,
       });
       const preflight = await preflightSafeSession(config, { baseUrl: active.baseUrl, token: active.token });
-      return { ok: true, preflight, target: null };
+      return { ok: true, preflight, config, target: null };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -489,6 +492,33 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   async function markAllRead() {
     notifications = await markNotificationsRead(chromeApi).catch(() => notifications);
+  }
+
+  /**
+   * Create the session the owner preflighted, then adopt the exact target the
+   * owner returns so Direction can address it immediately.
+   *
+   * @param {{preflight: any, idempotencyKey: string}} input
+   */
+  async function createSession({ preflight, idempotencyKey }) {
+    if (!active) return { ok: false, error: 'no active environment' };
+    try {
+      const created = await createPreflightedSession({
+        preflight,
+        idempotency_key: idempotencyKey,
+        idempotencyStore: intentStore(chromeApi),
+        requestOptions: { baseUrl: active.baseUrl, token: active.token },
+      });
+      createdSession = created;
+      createdTarget = targetFromCreatedSession(created);
+      await refreshOwner();
+      if (!createdTarget) {
+        return { ok: true, created, warning: 'owner created the session but returned no exact run/generation target yet' };
+      }
+      return { ok: true, created, target: createdTarget };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   async function loadBoundTarget() {
@@ -613,6 +643,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get foremanCard() { return foremanCard; },
     get directionTarget() { return directionTarget; },
     get directionTargetOrigin() { return directionTargetOrigin; },
+    get createdSession() { return createdSession; },
     get boundTarget() { return boundTarget; },
     get selectedSessionId() { return selectedSessionId; },
     get outputLines() { return outputLines; },
@@ -649,6 +680,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     refreshNotifications,
     markAllRead,
     prepareSession,
+    createSession,
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,
