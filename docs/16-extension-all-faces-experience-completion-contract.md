@@ -280,7 +280,32 @@ Navigation never carries reusable credentials or cached authority.
 
 ---
 
-## 10. JJG completion test
+## 10. Responsive closure law
+
+Responsive behavior is part of Skeleton/Surface completion, not implementation polish.
+
+For every applicable face the blueprint owns:
+
+```text
+breakpoint/collapse behavior
+stacking order
+what compresses/disappears first
+narrow-list transformation
+short-height behavior where relevant
+zoom/reflow behavior
+long-content overflow behavior
+drawer/sheet transformation
+focus return across overlays
+state placement after reflow
+```
+
+Canonical authority: `docs/17 §21`.
+
+A builder may implement those rules with CSS Grid/Flex/container logic of its choice, but may not decide a different responsive hierarchy.
+
+---
+
+## 11. JJG completion test
 
 A face is not complete until all five planes are resolved and a user can encounter materially applicable states without the implementation inventing:
 
