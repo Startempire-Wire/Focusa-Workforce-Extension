@@ -684,7 +684,23 @@ Whitespace and typography should create hierarchy; do not put boxes around every
 
 ---
 
-## 24. Surface acceptance
+## 24. Responsive/accessibility surface resilience
+
+Surface styling must survive layout reflow rather than merely match desktop screenshots.
+
+- Do not encode meaning by color alone; retain state text/icons/borders.
+- Primary interactive targets on narrow/touch layouts should provide approximately 44px usable target size where practical.
+- Long primary labels wrap; machine identifiers break safely only in technical/detail contexts.
+- Visible focus must remain visible in normal, high-contrast and forced-color environments.
+- Hover is enhancement only; required actions and state cannot depend on hover.
+- At 200% browser/text zoom, typography may reflow but no required label, action, state or evidence cue may disappear.
+- At 320 CSS px reflow width, ordinary product content has no page-level horizontal scroll.
+- Technical two-dimensional content may use an internally scrollable/pannable region when unavoidable.
+- Responsive stacking preserves semantic reading order; CSS visual reordering must not create a contradictory keyboard/screen-reader order.
+
+---
+
+## 25. Surface acceptance
 
 Before calling the Surface plane resolved in implementation:
 
@@ -695,6 +711,9 @@ Before calling the Surface plane resolved in implementation:
 5. no screen introduces an unapproved visual pattern for canonical state;
 6. keyboard focus and WCAG 2.2 AA contrast pass;
 7. reduced motion is honored;
-8. screenshots/reference snapshots are captured in tests or review artifacts for the core reference surfaces.
+8. screenshots/reference snapshots are captured in tests or review artifacts for the core reference surfaces;
+9. 320px reflow and 200% zoom preserve all required content/actions without page-level horizontal overflow;
+10. long content, forced/high-contrast mode, and keyboard focus remain legible and usable;
+11. responsive visual order matches semantic/keyboard reading order.
 
 This visual system is the build target. Significant changes require updating this document rather than improvising screen-by-screen.
