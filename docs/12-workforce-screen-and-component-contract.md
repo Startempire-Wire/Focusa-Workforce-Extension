@@ -600,8 +600,8 @@ Route: `#/topology`
 
 ```text
 Interactive
-Compute
 Browser execution
+Compute
 Other bodies
 ```
 
@@ -716,22 +716,27 @@ Never optimistically claim failure/success until source resolves.
 
 ## 14. Responsive skeleton
 
-### 320–479px Side Panel/narrow
+Detailed construction authority is `docs/17 §21`. These are the Skeleton-level invariants:
+
+### 320–479px / reflow
 
 ```text
-single column
+single semantic column
 16px horizontal content padding
-sticky Direction optional only when it does not obscure Needs You
-full-width action buttons where consequence matters
+no page-level horizontal scrolling for ordinary content
+primary action remains reachable
+drawers become full-width sheets where docs/16/17 require
 ```
+
+Side Panel keeps its canonical order and uses one primary vertical scroll region. Direction is **not sticky**.
 
 ### 480–859px
 
-Single-column content with compact drawers and secondary data collapsed.
+Single-column content with compact drawers/sheets. Dense list rows become stacked semantic rows rather than horizontally scrolling tables.
 
 ### 860–1179px
 
-Full Workforce uses compact left navigation and main content; context rail becomes drawer.
+Full Workforce uses compact left navigation and main content; context rail becomes a drawer.
 
 ### 1180–1599px
 
@@ -741,6 +746,10 @@ Three-region Full Workforce shell.
 
 Max content width 1520px. Do not stretch prose/cards indefinitely; increase gutters instead.
 
+### Reflow continuity
+
+Responsive transitions do not mutate scope, lose selected objects, discard Direction drafts, resolve attention, or create browser-history entries. At 200% zoom/text enlargement, content and controls remain available. Long/unbroken machine strings cannot force page width.
+
 ---
 
 ## 15. Keyboard contract
@@ -748,8 +757,7 @@ Max content width 1520px. Do not stretch prose/cards indefinitely; increase gutt
 Minimum shortcuts:
 
 ```text
-/           focus Workstream/global search when not typing
-Cmd/Ctrl+K  command/navigation palette if implemented
+/           focus an existing local search on Work/People/Evidence/Audit when not typing; otherwise no-op
 D           focus Direction when Workstream detail active and not typing
 Esc         close drawer/dialog; never cancel source work implicitly
 Enter       submit only in single-line controls; Direction textarea uses Cmd/Ctrl+Enter
@@ -758,7 +766,8 @@ Enter       submit only in single-line controls; Direction textarea uses Cmd/Ctr
 All interactive elements reachable by Tab.
 Visible focus ring mandatory.
 
-Do not ship shortcut conflicts with existing extension commands (`Alt+Shift+F`, `Alt+Shift+W`).
+A global command palette is not in the current HLT. Do not add Cmd/Ctrl+K.
+Do not ship shortcut conflicts with existing extension commands (`Alt+Shift+F`, `Alt+Shift+W`, `Alt+Shift+K`).
 
 ---
 
