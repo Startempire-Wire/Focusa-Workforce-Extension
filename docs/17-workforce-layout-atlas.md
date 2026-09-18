@@ -849,7 +849,177 @@ All interactive elements are Tab reachable with visible focus treatment.
 
 ---
 
-# 21. Layout acceptance invariant
+# 21. Responsive resilience contract
+
+Breakpoints are expressed in **CSS pixels**. Resizing, browser zoom, split-window use and text enlargement are presentation changes only; they MUST NOT mutate Focusa scope, discard a Direction draft, change the selected object, resolve attention, or lose an incoming/return handoff.
+
+## 21.1 Reflow and zoom
+
+The extension-owned UI MUST remain usable at:
+
+```text
+Side Panel                 320 CSS px minimum supported width
+Full-page faces            320 CSS px minimum reflow width
+Browser/text zoom          200% with no lost content or function
+WCAG reflow target         320 CSS px equivalent without page-level horizontal scroll
+```
+
+At narrow/reflow widths:
+
+- preserve the canonical information order from this atlas;
+- stack regions instead of shrinking them into unreadable columns;
+- never hide the primary action solely because width changed;
+- never require page-level horizontal scrolling for ordinary product content;
+- technical graph/table content that is intrinsically two-dimensional may scroll/pan **inside its own labeled region** while the surrounding page remains stable;
+- do not use zoom detection to create a different product mode.
+
+## 21.2 Long and unpredictable content
+
+Human-facing primary identity and outcome text wraps; it is not silently replaced by ellipsis.
+
+```text
+Workstream / person / role titles      wrap up to 2 lines in summary faces
+Objectives / attention why-now         wrap to the face-specific content cap
+Primary action labels                  wrap only if necessary; never clip
+Technical refs / hashes / URLs         break safely in Technical/detail views
+```
+
+If a summary face needs truncation beyond its cap, provide the full value in the destination/detail surface and an accessible full label/description. Never truncate two distinct Workstreams or people into indistinguishable labels.
+
+Unbroken machine strings must use safe word breaking in technical regions and MUST NOT widen the page.
+
+## 21.3 Height-constrained Side Panel
+
+The Side Panel uses **one primary vertical scroll region** below the compact product/scope header. Avoid nested vertical scroll areas except the Direction textarea after its max height.
+
+At viewport height below ~600px:
+
+```text
+Header / scope remain compact
+Foreman remains before Direction
+Direction remains before Needs You
+Needs You remains before Working Now
+Verified Recently compresses/collapses first
+Footer remains reachable through the same scroll flow
+```
+
+Do not make Direction sticky. Do not pin a footer that obscures attention or work content.
+
+## 21.4 Full Workforce narrow behavior by face
+
+When Full Workforce is below 860px, the shell becomes single-column and the following face-specific rules apply:
+
+```text
+Overview
+  Current Focus → Needs You → Working Now → Verified → Workstreams → exception
+
+Work index
+  each row becomes a stacked semantic row:
+  Workstream/objective → Foreman/state → Needs You/proof/freshness
+  filters wrap above the list; no horizontal table
+
+Work detail
+  identity/objective → Foreman → scoped Needs You → Direction → Trajectory
+  → Working Now → Evidence → Execution posture
+
+People index
+  role groups stay intact; each person row stacks:
+  identity/role → responsibility → Workstream/state → proof/location
+
+Person detail
+  responsibility/current work first
+  → role/reporting → authority → execution → Evidence → history
+
+Needs You
+  one readable column; action area follows decision context
+  primary source action becomes full width when controls cannot fit safely
+
+Evidence
+  claim/proof → supporting Evidence → provenance/related work
+  → verification → settlement/correction
+
+Topology
+  groups preserve canonical order; body cards become one column as needed
+
+Audit
+  vertical timeline remains one column; filters wrap/collapse above it
+
+Settings / Connections
+  settings groups stay single column
+  Connections: environments first → pairing second
+```
+
+No narrow face becomes a horizontally scrolling desktop table.
+
+## 21.5 Drawers, sheets and focus after reflow
+
+For any context rail/drawer/sheet transition caused by width:
+
+- opening moves keyboard focus to the drawer/sheet heading or first meaningful control;
+- content behind the overlay is not keyboard-focusable while open;
+- `Esc` closes presentation-only overlays;
+- closing returns focus to the invoking control when it still exists;
+- resizing across a breakpoint preserves the selected object and internal context;
+- if a right drawer becomes a full-width sheet, it remains the **same semantic surface**, not a new navigation event.
+
+Responsive transformation MUST NOT add/remove browser-history entries by itself.
+
+## 21.6 Pointer, touch and hover independence
+
+Interactive behavior must not rely on hover.
+
+```text
+narrow/touch primary controls     >=44px target dimension where practical
+icon-only controls                accessible name + visible focus
+dense desktop controls            may remain visually compact but retain usable hit area
+```
+
+Hover may add affordance; it may never be the only way to reveal a required action or state.
+
+## 21.7 High-contrast and forced-color resilience
+
+Semantic meaning cannot depend on color alone. Status, proof, freshness and attention retain text/icon/shape cues.
+
+When browser/OS forced-color or high-contrast modes override palette values:
+
+- borders/focus indicators remain perceivable;
+- selected navigation remains distinguishable;
+- disabled controls remain distinguishable from enabled controls;
+- proof/attention states still expose their textual labels.
+
+Do not disable system forced colors merely to preserve branding.
+
+## 21.8 Responsive state continuity test
+
+For each primary face, verify at minimum:
+
+```text
+320px
+480px
+768px
+1024px
+1440px
+200% browser/text zoom
+short Side Panel height
+live resize across 860px and 1180px shell thresholds
+```
+
+During those transitions confirm:
+
+```text
+no scope mutation
+no lost Direction draft
+no selected-object loss
+no false empty state
+no page-level horizontal overflow
+no inaccessible primary action
+no focus loss into browser chrome/body
+no hidden stale/forbidden/reconciling state
+```
+
+---
+
+# 22. Layout acceptance invariant
 
 The downstream builder may choose CSS Grid/Flex details, component boundaries and DOM implementation, but MUST NOT invent:
 
@@ -864,6 +1034,8 @@ which state replaces which region
 which face owns which level of detail
 addressability of a face
 screen-vs-drawer semantics
+zoom/reflow semantics
+focus behavior during responsive transformations
 ```
 
 If implementation constraints make one of those impossible, change this atlas deliberately rather than silently improvising a different product.
