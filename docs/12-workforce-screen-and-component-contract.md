@@ -485,7 +485,9 @@ Do not expose raw grant internals by default.
 
 ### 8.1 Index
 
-Can be a dedicated drawer/screen invoked globally, while still appearing contextually.
+Canonical addressable route: `#/needs-you`. It is not a primary-navigation item. It is entered from the header/context rail, Start Page, Side Panel, Overview and Work detail; wide layouts may visually present it with the established context-rail/drawer language without changing route/history semantics.
+
+Canonical detail route: `#/needs-you/detail?env=<key>&ref=<typed-ref>`.
 
 Sections ordered:
 
