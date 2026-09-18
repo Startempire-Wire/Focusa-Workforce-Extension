@@ -59,12 +59,18 @@ Use client-side hash routing so MV3 does not require route rewrites:
 #/work/detail
 #/people
 #/people/detail
+#/needs-you
+#/needs-you/detail
 #/evidence
 #/evidence/detail
 #/topology
 #/audit
 #/settings
 ```
+
+`#/needs-you` and `#/needs-you/detail` are canonical addressable contextual routes but are not primary-navigation items. They are entered from attention-bearing contexts such as the header/context rail, Start Page, Side Panel, Overview and Work detail.
+
+Connections remain `#/settings?section=connections`, not a separate top-level route.
 
 Context is carried separately from route identity.
 
@@ -228,7 +234,7 @@ No generic KPI grid.
 
 Show Workstreams grouped by Project where Project exists.
 
-Each row/card:
+Each row:
 
 ```text
 Workstream name
@@ -436,7 +442,8 @@ Group/order:
 ```text
 Foremen
 Managers
-Workers / Specialists / Verifiers
+Workers / Specialists
+Verifiers
 ```
 
 Filters:
@@ -514,10 +521,10 @@ Primary actions are source-owned inspection/verification operations only where c
 Default view is organizational:
 
 ```text
-Interactive surfaces
-Cloud/remote workers
-Browser contexts
-Build/compute bodies
+Interactive
+Browser execution
+Compute
+Other bodies
 ```
 
 Only show health/capacity exceptions in primary summary.
