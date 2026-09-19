@@ -16,13 +16,20 @@
  * @module workforce/lib/router
  */
 
-/** Exact route list from docs/11 §3. */
+/**
+ * Exact route list (docs/11 §3 + docs/18 §4 JJG closures). Needs You is an
+ * addressable non-nav route: it is reachable by deep link and from the context
+ * rail, but is NOT a primary-nav item (docs/18: "Needs You = addressable
+ * non-nav route").
+ */
 export const ROUTES = Object.freeze([
   '#/overview',
   '#/work',
   '#/work/detail',
   '#/people',
   '#/people/detail',
+  '#/needs-you',
+  '#/needs-you/detail',
   '#/evidence',
   '#/evidence/detail',
   '#/topology',
@@ -131,8 +138,9 @@ export function buildRoute(route, context = {}) {
   return suffix ? `${base}?${suffix}` : base;
 }
 
-/** Which primary-nav item owns a route (docs/11 §4 nav). */
+/** Which item owns a route (docs/18 §4 nav). Needs You is its own non-nav group. */
 export function navItemForRoute(route) {
+  if (route.startsWith('#/needs-you')) return 'Needs You';
   if (route.startsWith('#/work')) return 'Work';
   if (route.startsWith('#/people')) return 'People';
   if (route.startsWith('#/evidence')) return 'Evidence';
