@@ -1,0 +1,31 @@
+{
+  "aliases": [],
+  "beads_prefix": "project",
+  "canonical_name": "Focusa Workforce Extension",
+  "created_at": "2026-09-19T00:14:37Z",
+  "genesis_binding": {
+    "continuity_id": "37574af3709baa6b",
+    "receipt_id": "ready-fa80e460895aa87c1eac",
+    "schema": "focusa.project_genesis.v1",
+    "status": "ready",
+    "trajectory_id": "trajectory-fa80e460895aa87c1eac",
+    "workpoint_id": "fa80e460-895a-587c-9eac-ea29c9a49c5f"
+  },
+  "project_id": "focusa-workforce-extension",
+  "project_root": "/home/verioussmith/src/focusa-workforce-extension",
+  "schema": "focusa.project.v2",
+  "trajectory_integrity_guard": {
+    "causal_chain_valid": true,
+    "ladder_links_complete": false,
+    "minimum_ladder_complete": false,
+    "no_placeholder_values": false,
+    "project_scope_fingerprint": "project-fnv1a64:78a4e3ed5bac800c",
+    "projection_matches_ledger": false,
+    "repair_route": "focusa trajectory define-goal --confirm",
+    "required": true,
+    "schema_supported": true,
+    "status": "HLT_IMPASSE",
+    "unresolved_conflicts": []
+  },
+  "workspace_kind": "rust-monorepo"
+}
