@@ -76,6 +76,28 @@
   let sessionPreparation = $state(null);
   let sessionCreation = $state(null);
 
+  /* ---- Work detail presentation (docs/17 §9): projection-only chips. Selecting a
+     granularity or category changes how this face presents — never scope, authority
+     or any owner state (docs/12 layout-only reflow; no percent-complete, docs/17 §8). ---- */
+  let granularity = $state('full');
+  let category = $state('O');
+
+  const verdictGroups = $derived(
+    (() => {
+      const groups = { needs: [], settled: [], stale: [] };
+      for (const entry of store.evidenceTrail.entries) {
+        const group =
+          entry.kind === 'receipt' || entry.kind === 'projection'
+            ? 'settled'
+            : entry.kind === 'corrected' || entry.kind === 'revoked' || entry.kind === 'stale'
+              ? 'stale'
+              : 'needs';
+        groups[group].push(entry);
+      }
+      return groups;
+    })(),
+  );
+
   const liveMessage = $derived(
     store.streamState
       ? `owner stream ${store.streamState.phase}${store.lastEventAt ? `, last event ${store.lastEventAt}` : ''}`
@@ -403,11 +425,8 @@
           {/if}
         </section>
 
-      {:else if route === '#/work' || route === '#/work/detail'}
-        <!-- ============ WORK (docs/17 §4) ============ -->
-        {#if route === '#/work/detail' && routeCtx.params.env}
-          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
-        {/if}
+      {:else if route === '#/work'}
+        <!-- ============ WORK INDEX (docs/17 §8: grouped rows; no card mosaic) ============ -->
 
         <!-- Workstream scope -->
         <section class="card" id="wf-workstream" aria-labelledby="wf-workstream-h">
@@ -562,6 +581,175 @@
             </p>
           {/if}
         </section>
+
+      {:else if route === '#/work/detail'}
+        <!-- ============ WORK DETAIL (docs/17 §9 / docs/18 §Work detail) ============ -->
+        {#if routeCtx.params.env}
+          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
+        {/if}
+
+        <!-- §1 header: project / workstream · objective · lifecycle · fresh -->
+        <section class="card" aria-labelledby="wf-wd-head">
+          <div class="wd-head">
+            <div class="wd-head-text">
+              <p class="wd-context">{store.workstream ? `Workstream ${store.workstream.continuityId}` : 'No Workstream bound yet'}</p>
+              <h2 id="wf-wd-head">{store.foremanCard.objective ?? 'Work objective not reported by the owner yet'}</h2>
+              <p class="muted tiny">lifecycle · {store.streamState?.phase ?? 'idle'} · fresh {freshLabel}</p>
+            </div>
+            <div class="chips" role="group" aria-label="Objective granularity and category (projection only)">
+              {#each ['full', 'medium', 'short'] as g (g)}
+                <button type="button" class="chip {granularity === g ? 'on' : ''}" onclick={() => (granularity = g)}>{g}</button>
+              {/each}
+              <span class="chips-sep" aria-hidden="true">|</span>
+              {#each ['H', 'O', 'T'] as c (c)}
+                <button type="button" class="chip {category === c ? 'on' : ''}" onclick={() => (category = c)}>{c}</button>
+              {/each}
+            </div>
+          </div>
+          <p class="muted tiny">Granularity and category chips are projection-only (docs/17 §8): they select how this face presents, never scope, authority or any owner state.</p>
+        </section>
+
+        <!-- §2 Foreman + scoped Needs You (stack under 1100px) -->
+        <div class="wd-split">
+          <section class="card" aria-labelledby="wf-wd-foreman">
+            <div class="card-head">
+              <h2 id="wf-wd-foreman">Foreman</h2>
+              <span class="count-chip">{store.foremanProfiles.length}</span>
+            </div>
+            <dl class="facts">
+              <dt>Role</dt>
+              <dd>{store.foremanProfiles[0]?.role ?? store.foremanProfiles[0]?.role_profile_id ?? 'accountable role — owner not reported'}</dd>
+              <dt>Objective</dt><dd>{store.foremanCard.objective ?? '—'}</dd>
+              <dt>Frontier</dt><dd>{store.foremanCard.frontier ?? '—'}</dd>
+              <dt>Proof</dt>
+              <dd>
+                {#if store.foremanCard.recentProof.length === 0}—
+                {:else}{#each store.foremanCard.recentProof as proof (`${proof.kind}:${proof.ref}`)}<code>{proof.ref}</code>{/each}{/if}
+              </dd>
+              <dt>Freshness</dt>
+              <dd>{store.foremanCard.freshness ?? 'no owner event yet'} <span class="muted tiny">· source {store.foremanCard.source}</span></dd>
+            </dl>
+            {#if store.ownerGaps.includes('foreman')}<p class="gap">Owner gap: no Project Foreman operation — Workforce will not invent one.</p>{/if}
+          </section>
+
+          <section class="card needs-you" aria-labelledby="wf-wd-needs">
+            <div class="card-head">
+              <h2 id="wf-wd-needs">Needs You</h2>
+              <span class="count-chip">{counts.needsYou}</span>
+            </div>
+            {#if store.needsYou.items.length === 0}
+              <p class="empty">Nothing needs a human decision in this scope right now.</p>
+            {:else}
+              <ul class="items compact">
+                {#each store.needsYou.items as item (`${item.kind}:${item.label}`)}
+                  <li><span class="kind">{item.kind.replace('_', ' ')}</span><strong>{item.label}</strong>{#if item.detail}<span class="detail">{item.detail}</span>{/if}<span class="muted tiny">via {item.source}</span></li>
+                {/each}
+              </ul>
+            {/if}
+          </section>
+        </div>
+
+        <!-- §3 Direction (never disappears below the trajectory) -->
+        <section class="card" aria-labelledby="wf-wd-direct">
+          <h2 id="wf-wd-direct">Direction</h2>
+          {#if !store.scopeGuard.canDirect}
+            <p class="gap">Direction is held: {store.scopeGuard.reasons.map((r) => r.guard).join(', ') || 'scope not confirmed'}. A consequential owner mutation needs a reachable owner and a confirmed scope.</p>
+          {:else if !store.workstream}
+            <p class="empty">Select a Workstream to address Direction.</p>
+          {:else if !steerTarget}
+            <p class="gap">Focusa reports no session instance yet — bind an exact owner target on the Work index to direct now.</p>
+          {:else}
+            <p class="target">
+              <code>{steerTarget.session_id}</code><span>run <code>{steerTarget.run_id}</code></span><span>gen <code>{steerTarget.generation}</code></span>
+              <span class="origin {store.directionTargetOrigin}">{store.directionTargetOrigin === 'owner_roster' ? 'Focusa roster (authoritative)' : store.directionTargetOrigin === 'owner_create' ? 'Focusa create response (authoritative)' : 'operator binding (stopgap)'}</span>
+            </p>
+            <form onsubmit={submitDirection}>
+              <textarea rows="3" aria-label="Direction instruction" placeholder="Direct this work…" bind:value={instruction} disabled={store.directing}></textarea>
+              <div class="row">
+                <button type="submit" class="wf-btn wf-btn-primary" disabled={store.directing || !instruction.trim()}>{store.directing ? 'Submitting…' : 'Send Direction'}</button>
+                {#each ['start', 'pause', 'resume', 'cancel'] as action (action)}
+                  <button type="button" class="wf-btn" disabled={store.directing} onclick={() => store.controlSession({ action, target: steerTarget })}>{action}</button>
+                {/each}
+              </div>
+            </form>
+          {/if}
+          {#if store.lastDirection}
+            <p class="muted tiny">{#if store.lastDirection.ok}Focusa accepted {store.lastDirection.action}{#if store.lastDirection.status} · {store.lastDirection.status}{/if}{:else}Focusa rejected: {store.lastDirection.kind} — {store.lastDirection.message}{/if}</p>
+          {/if}
+          <StateNote label="Output" result={store.resultOf('output')} />
+        </section>
+
+        <!-- §4 Trajectory: desired outcome → current → next → unresolved (parallel only if the owner reports it) -->
+        <section class="card" aria-labelledby="wf-wd-trajectory">
+          <div class="card-head">
+            <h2 id="wf-wd-trajectory">Trajectory</h2>
+            <StateNote label="Trajectory" result={store.resultOf('trajectory')} />
+          </div>
+          <p class="source {store.trajectoryView.authoritative ? 'authoritative' : 'stopgap'}">{store.trajectoryView.disclosure}</p>
+          <ol class="trajectory">
+            <li><span class="t-kind">desired outcome</span><span class="t-value">{store.foremanCard.objective ?? '— not reported'}</span></li>
+            <li><span class="t-kind">current</span><span class="t-value">{store.trajectoryView.ladder.currentWorkpoint ?? '—'}</span></li>
+            <li><span class="t-kind">parallel</span><span class="t-value">{store.trajectoryView.ladder.parallel?.length ? store.trajectoryView.ladder.parallel.join(' · ') : '— none reported'}</span></li>
+            <li><span class="t-kind">next</span><span class="t-value">{store.trajectoryView.ladder.nextAction ?? '—'}</span></li>
+            <li><span class="t-kind">unresolved</span><span class="t-value">{store.trajectoryView.ladder.clarityBlocking.length ? store.trajectoryView.ladder.clarityBlocking.join(' · ') : '— none reported'}</span></li>
+          </ol>
+          {#if store.trajectoryView.authoritative}
+            <dl class="facts">
+              <dt>HLT</dt><dd>{store.trajectoryView.ladder.hltRef ?? '—'}</dd>
+              <dt>Current</dt><dd>{store.trajectoryView.ladder.current?.id ?? store.trajectoryView.ladder.current ?? '—'}</dd>
+              <dt>Next</dt><dd>{store.trajectoryView.ladder.next?.id ?? store.trajectoryView.ladder.next ?? '—'}</dd>
+              <dt>Revision</dt><dd>{store.trajectoryView.ladder.revision ?? '—'}</dd>
+            </dl>
+          {/if}
+          <StateNote label="Workpoint" result={store.resultOf('workpoint')} />
+          <StateNote label="Work loop" result={store.resultOf('workLoop')} />
+        </section>
+
+        <!-- §5 Working Now: responsibility tree, current HLT only, no list/tree toggle (docs/17 §9) -->
+        <section class="card" aria-labelledby="wf-wd-working">
+          <h2 id="wf-wd-working">Working Now</h2>
+          <p class="gap">Owner gap: Focusa reports no responsibility tree for the current HLT yet (docs/18 §Work detail 5) — Workforce will not invent one.</p>
+          <StateNote label="Working Now" result={store.resultOf('workLoop')} />
+        </section>
+
+        <!-- §6 + §7 Evidence | Execution posture (stack under 1100px) -->
+        <div class="wd-split">
+          <section class="card" aria-labelledby="wf-wd-evidence">
+            <div class="card-head">
+              <h2 id="wf-wd-evidence">Evidence</h2>
+              <span class="count-chip">{counts.evidence}</span>
+            </div>
+            <p class="source {store.evidenceTrail.authoritative ? 'authoritative' : 'stopgap'}">{store.evidenceTrail.disclosure}</p>
+            {#if store.evidenceTrail.entries.length === 0}
+              <p class="empty">Focusa has not reported an evidence or receipt reference for this scope.</p>
+            {:else}
+              <dl class="verdicts">
+                {#if verdictGroups.needs.length}
+                  <div class="verdict"><dt>Needs verification</dt><dd>{#each verdictGroups.needs as e (`${e.kind}:${e.ref}`)}<code>{e.ref}</code>{/each}</dd></div>
+                {/if}
+                {#if verdictGroups.settled.length}
+                  <div class="verdict"><dt>Settled</dt><dd>{#each verdictGroups.settled as e (`${e.kind}:${e.ref}`)}<code>{e.ref}</code>{/each}</dd></div>
+                {/if}
+                {#if verdictGroups.stale.length}
+                  <div class="verdict"><dt>Stale / corrected</dt><dd>{#each verdictGroups.stale as e (`${e.kind}:${e.ref}`)}<code>{e.ref}</code>{/each}</dd></div>
+                {/if}
+              </dl>
+            {/if}
+          </section>
+
+          <section class="card" aria-labelledby="wf-wd-posture">
+            <div class="card-head">
+              <h2 id="wf-wd-posture">Execution posture</h2>
+            </div>
+            <dl class="facts">
+              <dt>Environment</dt><dd>{store.environments.map((e) => e.label).join(', ') || 'none paired'}</dd>
+              <dt>Bodies</dt><dd>owner-reported only</dd>
+              <dt>UIAI</dt><dd>owner-reported only</dd>
+              <dt>Exceptions</dt><dd>{store.scopeGuard.reasons.length ? store.scopeGuard.reasons.map((r) => r.guard).join(', ') : 'none in scope'}</dd>
+            </dl>
+            <p class="muted tiny">Execution/body state is owner-owned (docs/18 §Work detail 7); Workforce shows bodies and UIAI only when the owner reports them.</p>
+          </section>
+        </div>
 
       {:else if route === '#/people' || route === '#/people/detail'}
         <!-- ============ PEOPLE (docs/17 §9) ============ -->
@@ -1144,6 +1332,32 @@
   .capability { font-size: var(--text-small); }
   .capability summary { cursor: pointer; color: var(--text-secondary); margin-bottom: var(--space-tight); }
 
+  /* ---------- Work detail (docs/17 §9) ---------- */
+  .wd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-standard); flex-wrap: wrap; min-width: 0; }
+  .wd-head-text { min-width: 0; }
+  .wd-context { margin: 0 0 2px; font-size: var(--text-micro); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); overflow-wrap: anywhere; }
+  .chips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .chip {
+    min-height: 24px; padding: 0 var(--space-compact); font-size: var(--text-micro);
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--weight-semibold);
+    border-radius: var(--radius-pill); color: var(--text-secondary); background: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+  }
+  .chip:hover { background: var(--bg-hover); }
+  .chip.on { color: var(--text-inverse); background: var(--accent); border-color: var(--accent); }
+  .chips-sep { color: var(--text-muted); padding: 0 2px; }
+  .wd-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-standard); align-items: start; }
+  .trajectory { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: step; }
+  .trajectory li { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--space-tight); align-items: baseline; padding: var(--space-tight) 0; border-bottom: 1px solid var(--border-default); }
+  .trajectory li:last-child { border-bottom: 0; }
+  .t-kind { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: var(--weight-semibold); }
+  .t-value { font-size: var(--text-small); color: var(--text-primary); overflow-wrap: anywhere; }
+  .verdicts { display: grid; gap: var(--space-tight); margin: 0; }
+  .verdict { display: grid; gap: 4px; }
+  .verdict dt { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: var(--weight-semibold); }
+  .verdict dd { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-tight); }
+  .verdict code { font-family: var(--font-mono); font-size: var(--text-micro); background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 0 var(--space-tight); overflow-wrap: anywhere; }
+
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
      layout-only: it never mutates scope/selection/drafts/attention and never
@@ -1205,4 +1419,12 @@
   @media (prefers-reduced-motion: reduce) {
     .rail { transition: none; }
   }
+
+  /* Work detail stacking: under 1100px the two-column sections stack (docs/17 §9).
+     Stacks at a higher threshold than the shell rail breakpoints because the split
+     columns carry the deep proof + posture panels. */
+  @media (max-width: 1099px) {
+    .wd-split { grid-template-columns: minmax(0, 1fr); }
+  }
+
 </style>
