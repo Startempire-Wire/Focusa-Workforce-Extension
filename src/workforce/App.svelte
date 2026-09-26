@@ -21,7 +21,7 @@
   import { onMount } from 'svelte';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
   import StateNote from './components/StateNote.svelte';
-  import RosterList from './components/RosterList.svelte';
+  import { groupRoster, personFacts, distinctStates } from './lib/roster-groups.js';
   import {
     ROUTES,
     INTENTS,
@@ -119,6 +119,28 @@
 
   const verifiedCount = $derived(
     store.evidenceTrail.entries.filter((e) => e.kind === 'receipt' || e.kind === 'projection').length,
+  );
+
+  /* ---- People face state (docs/17 §10) ---- */
+  let peopleStateFilter = $state('');
+  const peopleStates = $derived(distinctStates(store.roster));
+  const peopleGroups = $derived(
+    groupRoster(
+      peopleStateFilter
+        ? store.roster.filter((entry) => entry.state === peopleStateFilter)
+        : store.roster,
+    ),
+  );
+  const personForDetail = $derived(
+    (() => {
+      const { refState, ref } = routeCtx;
+      if (refState === 'ok' && ref) {
+        const refId = ref.session_id ?? ref.id ?? ref.workpoint_id ?? null;
+        const hit = store.roster.find((entry) => entry.id === refId || entry.id === ref);
+        if (hit) return hit;
+      }
+      return store.roster.find((entry) => entry.id === store.selectedSessionId) ?? null;
+    })(),
   );
 
   const freshLabel = $derived(
@@ -751,22 +773,58 @@
           </section>
         </div>
 
-      {:else if route === '#/people' || route === '#/people/detail'}
-        <!-- ============ PEOPLE (docs/17 §9) ============ -->
-        {#if route === '#/people/detail' && routeCtx.params.env}
-          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
-        {/if}
+      {:else if route === '#/people'}
+        <!-- ============ PEOPLE INDEX (docs/17 §10) ============ -->
         <section class="card" aria-labelledby="wf-people-h">
           <div class="card-head">
             <h2 id="wf-people-h">People</h2>
             <span class="count-chip">{counts.people}</span>
           </div>
-          <RosterList
-            roster={store.roster}
-            result={store.resultOf('sessions')}
-            selectedId={store.selectedSessionId}
-            onSelect={(entry) => store.selectSession(entry.id ?? '')}
-          />
+          {#if store.resultOf('sessions') && store.resultOf('sessions').state !== 'ok'}
+            <p class="empty">Owner roster unavailable ({store.resultOf('sessions').state}).</p>
+          {:else if store.roster.length === 0}
+            <p class="empty">No owner-reported sessions in this Workstream scope.</p>
+          {:else}
+            <div class="row people-tools">
+              <label class="field people-filter">
+                <span>State filter</span>
+                <select value={peopleStateFilter} onchange={(e) => (peopleStateFilter = e.currentTarget.value)}>
+                  <option value="">All states</option>
+                  {#each peopleStates as state (state)}
+                    <option value={state}>{state}</option>
+                  {/each}
+                </select>
+              </label>
+              <p class="muted tiny">Location filter: the owner reports no execution location yet, so it is not invented (docs/17 §10 row-priority).</p>
+            </div>
+            {#each peopleGroups as group (group.role)}
+              <section class="tier">
+                <div class="tier-title">
+                  <h3>{group.role}</h3>
+                  <span class="count-chip">{group.entries.length}</span>
+                </div>
+                <ul class="items person-rows">
+                  {#each group.entries as entry (entry.id ?? entry.label)}
+                    <li class="person-row">
+                      <a class="person-main" href="#/people/detail" onclick={(e) => { e.preventDefault(); store.selectSession(entry.id ?? ''); navigate('#/people/detail'); }}>
+                        <strong>{entry.label}</strong>
+                        {#if entry.state}<span class="state-sig">{entry.state}</span>{/if}
+                      </a>
+                      <span class="person-meta">
+                        {#if entry.role}<span class="cap">{entry.role}</span>{/if}
+                        {#if entry.runId}<span>run <code>{entry.runId}</code>{#if Number.isSafeInteger(entry.generation) && entry.generation >= 1} · gen <code>{entry.generation}</code>{/if}</span>{/if}
+                        {#if entry.workspace}<span>ws <code>{entry.workspace}</code></span>{/if}
+                        {#if entry.authority}<span>authority <code>{entry.authority}</code></span>{/if}
+                        {#if entry.configRevision}<span>cfg <code>{entry.configRevision}</code></span>{/if}
+                        {#if entry.updatedAt}<span class="muted tiny">{entry.updatedAt}</span>{/if}
+                      </span>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/each}
+            <p class="muted tiny">Row priority docs/17 §10: identity/role · state · run · workstream · authority/config · last proof. Current responsibility and last proof render only when the owner reports them.</p>
+          {/if}
           <StateNote label="Selected person" result={store.resultOf('sessionStatus')} />
           <StateNote label="Session profiles" result={store.resultOf('profiles')} />
 
@@ -819,6 +877,78 @@
             </details>
           {/if}
         </section>
+
+      {:else if route === '#/people/detail'}
+        <!-- ============ PERSON DETAIL (docs/17 §10) ============ -->
+        {#if routeCtx.params.env}
+          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
+        {/if}
+        {#if personForDetail}
+          {@const person = personForDetail}
+          {@const facts = personFacts(person)}
+          <section class="card" aria-labelledby="wf-person-h">
+            <div class="card-head">
+              <h2 id="wf-person-h">{person.label}</h2>
+              <button type="button" class="wf-btn" onclick={() => navigate('#/people')}>All People</button>
+            </div>
+            <p class="source {person.role ? 'authoritative' : 'stopgap'}">
+              {person.role ? `role ${person.role}` : 'role not reported by the owner'} · state {person.state ?? 'not reported'}
+            </p>
+            <dl class="facts">
+              {#each facts as fact (fact.label)}
+                <dt>{fact.label}</dt><dd>{fact.value}</dd>
+              {/each}
+            </dl>
+          </section>
+
+          <div class="wd-split">
+            <section class="card" aria-labelledby="wf-person-current">
+              <h2 id="wf-person-current">Current responsibility</h2>
+              {#if person.runId || person.workspace || person.authority}
+                <dl class="facts">
+                  {#if person.runId}<dt>Run</dt><dd>{person.runId}{#if Number.isSafeInteger(person.generation) && person.generation >= 1} · gen {person.generation}{/if}</dd>{/if}
+                  {#if person.workspace}<dt>Workstream</dt><dd>{person.workspace}</dd>{/if}
+                  {#if person.authority}<dt>Authority</dt><dd>{person.authority}</dd>{/if}
+                </dl>
+              {:else}
+                <p class="empty">Owner has not reported current work details for this person.</p>
+              {/if}
+              <StateNote label="Person status" result={store.resultOf('sessionStatus')} />
+            </section>
+
+            <section class="card" aria-labelledby="wf-person-evidence">
+              <div class="card-head">
+                <h2 id="wf-person-evidence">Recent evidence</h2>
+                <span class="count-chip">{counts.evidence}</span>
+              </div>
+              {#if store.evidenceTrail.entries.length === 0}
+                <p class="empty">No owner-reported evidence for this scope.</p>
+              {:else}
+                <ul class="items compact">
+                  {#each store.evidenceTrail.entries.slice(0, 5) as entry (`${entry.kind}:${entry.ref}`)}
+                    <li><span class="kind {entry.kind}">{entry.kind}</span><code>{entry.ref}</code><span class="muted tiny">via {entry.source}</span></li>
+                  {/each}
+                </ul>
+              {/if}
+              <p class="muted tiny">Scope-level evidence; person-scoped proof appears when the owner scopes it.</p>
+            </section>
+          </div>
+
+          <section class="card" aria-labelledby="wf-person-links">
+            <h2 id="wf-person-links">Activity / Audit</h2>
+            <div class="row">
+              <a class="wf-btn" href="#/audit" onclick={(e) => { e.preventDefault(); navigate('#/audit'); }}>Open Audit</a>
+              <a class="wf-btn" href="#/evidence" onclick={(e) => { e.preventDefault(); navigate('#/evidence'); }}>Open Evidence</a>
+            </div>
+            <p class="muted tiny">Person-attributed activity shows when the owner attributes activity to a session.</p>
+          </section>
+        {:else}
+          <section class="card" aria-labelledby="wf-person-none">
+            <h2 id="wf-person-none">Person not found</h2>
+            <p class="gap">No owner-reported session matches this detail reference ({routeCtx.refReason ?? 'no reference'}). Workforce renders no invented person.</p>
+            <button type="button" class="wf-btn" onclick={() => navigate('#/people')}>Back to People</button>
+          </section>
+        {/if}
 
       {:else if route === '#/needs-you' || route === '#/needs-you/detail'}
         <!-- ============ NEEDS YOU (docs/17 §21; non-nav route) ============ -->
@@ -1357,6 +1487,25 @@
   .verdict dt { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: var(--weight-semibold); }
   .verdict dd { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-tight); }
   .verdict code { font-family: var(--font-mono); font-size: var(--text-micro); background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 0 var(--space-tight); overflow-wrap: anywhere; }
+
+  /* ---------- People (docs/17 §10) ---------- */
+  .people-tools { align-items: center; }
+  .people-filter { flex: 0 1 14rem; }
+  .tier { display: grid; gap: var(--space-tight); }
+  .tier-title { display: flex; align-items: center; gap: var(--space-tight); }
+  .tier-title h3 { margin: 0; font-size: var(--text-micro); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .person-rows { margin: 0; }
+  .person-row { display: grid; gap: var(--space-tight); }
+  .person-main { display: flex; flex-wrap: wrap; gap: var(--space-tight); align-items: center; text-decoration: none; color: inherit; }
+  .person-main strong { font-size: var(--text-body); }
+  .person-main:hover strong { text-decoration: underline; }
+  .state-sig {
+    font-size: var(--text-micro); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.06em;
+    border: 1px solid currentColor; border-radius: var(--radius-pill); padding: 0 var(--space-tight); color: var(--text-secondary);
+  }
+  .person-meta { display: flex; flex-wrap: wrap; gap: var(--space-compact); font-size: var(--text-small); color: var(--text-secondary); align-items: baseline; }
+  .person-meta .cap { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--weight-semibold); color: var(--violet); }
+  .person-meta code { font-family: var(--font-mono); font-size: var(--text-micro); background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 0 var(--space-tight); }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
