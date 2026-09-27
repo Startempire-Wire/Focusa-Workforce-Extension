@@ -377,7 +377,7 @@
           {#if store.projects?.projects?.length}
             <p class="muted tiny">{store.projects.projects.length} project(s) connected to this daemon. Choosing one scopes the whole workforce.</p>
             <ul class="items">
-              {#each store.projects.projects as project (project.id ?? project.root)}
+              {#each store.projects.projects as project (`${project.id ?? ''}:${project.root ?? ''}`)}
                 <li>
                   <strong>{project.name}</strong>
                   <code>{project.root ?? '—'}</code>
@@ -411,7 +411,7 @@
           {#if store.discovered.length === 0}
             <p class="empty">No project discovered yet — scan a directory or pick one on the Work face.</p>
           {:else}
-            {#each store.discovered as project (project.root ?? project.id)}
+            {#each store.discovered as project (`${project.root ?? ''}:${project.id ?? ''}`)}
               <div class="project-group">
                 <h3 class="project-title">{project.name}</h3>
                 <table class="wtable">

@@ -319,3 +319,17 @@ test('workstream selection is stored per environment so scopes cannot bleed', as
   if (!createWorkforceStore) return; // store requires the Svelte compiler; covered by the browser check
   assert.ok(true);
 });
+
+test('projects without a project_id still get a stable unique identity', async () => {
+  // The owner may omit project_id; a list keyed on null duplicates and the row
+  // has nothing stable to open, so the projection must fall back.
+  const { projectsFromOwner } = await import('../src/lib/workforce-client.mjs');
+  const projected = projectsFromOwner({ projects: [
+    { canonical_name: 'Veragensia', project_root: '/src/veragensia' },
+    { canonical_name: 'kh-infra', project_root: '/src/kh-infra' },
+  ] });
+  const ids = projected.projects.map((p) => p.id);
+  assert.equal(new Set(ids).size, 2, 'ids are unique');
+  assert.ok(ids.every(Boolean), 'no project is left without an identity');
+  assert.equal(projected.projects[0].name, 'Veragensia');
+});

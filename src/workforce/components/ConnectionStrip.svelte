@@ -56,6 +56,31 @@
 
 {#if show}
   <div class="strip" data-state={d.state} transition:fade={{ duration: dur }}>
+    <!-- The tailnet roster, read from the tailnet itself (Tailscale LocalAPI on
+         this host's loopback, so it works on any OS the tailnet runs on). A peer
+         that is not granted yet cannot be probed - a browser may only fetch
+         origins it holds - so each machine is one click that grants exactly it. -->
+    {#if store.tailnet?.available && d.state !== 'connected'}
+      <div class="tailnet-line">
+        <span class="tl-label"><Icon name="link" size={13} /> Tailnet</span>
+        <ul class="tailnet-list">
+          {#each store.tailnet.connectable ?? [] as peer (`${peer.name}:${peer.ips?.[0] ?? ''}`)}
+            <li class="peer" class:off={!peer.online} class:granted={peer.granted}>
+              <span class="pn">{peer.name}</span>
+              <span class="pip">{peer.ips?.[0] ?? ''}</span>
+              {#if peer.online}<span class="pd" aria-hidden="true"></span>{/if}
+              <button
+                type="button"
+                class="pbtn"
+                onclick={() => store.connectTailnetPeer(peer)}
+                title={peer.granted ? 'Connect to this machine' : 'Allow access to this one machine, then connect'}
+              >{peer.granted ? 'Connect' : 'Allow & connect'}</button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
     {#if d.state === 'discovering'}
       <div class="strip-body searching" in:fly={{ y: 4, duration: out }}>
         <span class="pulse" aria-hidden="true"></span>
@@ -81,7 +106,10 @@
         </span>
         {#if live}
           <span class="telemetry">
-            <b>{live.batches ?? '—'}</b> writes · <b>{live.failures ?? '—'}</b> failures · <b>{live.projectCount ?? '—'}</b> projects
+            {#if live.version}<b>{live.version}</b> · {/if}
+            {#if live.uptimeMs != null}<b>{Math.max(1, Math.round(live.uptimeMs / 60000))}m</b> up · {/if}
+            {#if live.sessions != null}<b>{live.sessions}</b> live session{live.sessions === 1 ? '' : 's'} · {/if}
+            {live.projects?.length ? live.projects.join(' · ') : 'no project chosen yet'}
           </span>
         {/if}
         <button type="button" class="quiet" onclick={() => store.disconnect()} title="Detach this browser from the daemon">
@@ -94,7 +122,7 @@
         <span class="beat" class:live={d.alive} aria-hidden="true"></span>
         <strong>{daemons.length > 1 ? `${daemons.length} Focusa daemons` : 'Focusa is live'}</strong>
         <ul class="daemons">
-          {#each daemons as daemon (daemon.baseUrl)}
+          {#each daemons as daemon (`${daemon.baseUrl}`)}
             {@const preview = daemon.preview ?? store.previews?.[daemon.baseUrl] ?? null}
             <li class="daemon" class:lead={daemon.baseUrl === d.baseUrl} class:parent={daemon.authoritative}>
               <div class="dhead">
@@ -224,6 +252,27 @@
     background: var(--accent-weak); color: var(--accent); font: var(--text-micro);
   }
   .daemon.parent { border-color: var(--accent-edge); }
+  .tailnet-line {
+    display: grid; gap: 6px; width: 100%;
+    padding: 10px 14px; border-top: 1px solid var(--border-subtle);
+  }
+  .tl-label { display: inline-flex; align-items: center; gap: 6px; font: var(--text-micro); color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+  .tailnet-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .peer {
+    display: inline-flex; align-items: center; gap: 7px; padding: 4px 6px 4px 10px;
+    border-radius: var(--radius-pill); background: var(--bg-subtle);
+    border: 1px solid transparent; font: var(--text-micro); color: var(--text-secondary);
+  }
+  .peer.granted { border-color: var(--border-default); }
+  .peer.off { opacity: .6; }
+  .pn { font-weight: 600; color: var(--text-primary); }
+  .pip { color: var(--text-muted); }
+  .pd { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .pbtn {
+    border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--text-primary);
+    border-radius: var(--radius-pill); padding: 2px 9px; font: var(--text-micro); cursor: pointer;
+  }
+  .pbtn:hover { background: var(--accent-weak); color: var(--accent); border-color: transparent; }
   .bookline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; font: var(--text-micro); color: var(--text-muted); }
   .bookentry { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-subtle); color: var(--text-secondary); }
   .bookx { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; font: inherit; }

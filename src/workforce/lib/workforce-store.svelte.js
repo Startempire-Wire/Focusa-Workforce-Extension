@@ -25,7 +25,9 @@ import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPe
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
 import { trustedHosts, readHostBook, addHost, removeHost } from '../../lib/host-book.mjs';
-import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter, previewDaemon } from '../../lib/discovery.mjs';
+import { readTailscaleTopology } from '../../lib/tailscale.mjs';
+import { tailnetRoster, peerOrigins } from '../../lib/discovery.mjs';
+import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter, previewDaemon, probeDaemon } from '../../lib/discovery.mjs';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -313,6 +315,14 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function connectDiscovered(target) {
     const origin = typeof target === 'string' ? target : (target?.baseUrl ?? discovery.baseUrl);
     if (!origin) return null;
+    // Prove a daemon is actually there before attaching. Choosing a machine from
+    // the tailnet roster must never leave the surface attached to something that
+    // is not a Focusa daemon.
+    const answer = await probeDaemon(origin).catch(() => ({ ok: false, baseUrl: origin }));
+    if (!answer.ok) {
+      discovery = { ...discovery, notAnswering: origin };
+      return null;
+    }
     // An origin the manifest already grants is attached with no permission call
     // and no prompt at all. Only an origin this device has never been granted
     // asks Chrome — and then for that single origin.
@@ -334,7 +344,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     } else {
       await attachDaemon(origin, 'Focusa daemon');
     }
-    discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString() };
+    discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString(), notAnswering: null };
     stopLiveness?.();
     stopLiveness = watchLiveness(origin, (beat) => {
       discovery = { ...discovery, alive: beat.ok, lastSeenAt: beat.at };
@@ -741,8 +751,35 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // The tailnet host book: which remote hosts to look for on every launch.
   let hostBook = $state(/** @type {any[]} */ ([]));
 
+  // The tailnet roster, read from the tailnet itself, so the surface can show
+  // which machines are out there - not just the ones that happen to answer.
+  let tailnet = $state(/** @type {any} */ ({ available: false, self: null, peers: [], connectable: [] }));
+
+  async function loadTailnet() {
+    const topology = await readTailscaleTopology().catch(() => null);
+    if (!topology) { tailnet = { available: false, self: null, peers: [], connectable: [] }; return tailnet; }
+    // Machines the tailnet reports that are not granted yet: they cannot be
+    // probed (a browser may only fetch granted origins), so each is offered as a
+    // single click that grants exactly that machine.
+    const reachable = await reachableOriginFilter(chromeApi);
+    const connectable = [];
+    for (const peer of topology.peers) {
+      if (peer.isSelf) continue;
+      const origins = peerOrigins(peer);
+      const allowed = [];
+      for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
+      connectable.push({
+        name: peer.name, dnsName: peer.dnsName, ips: peer.ips, online: peer.online, os: peer.os,
+        granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]],
+      });
+    }
+    tailnet = { available: true, self: topology.self, peers: topology.peers, connectable, backend: topology.backend };
+    return tailnet;
+  }
+
   async function loadHostBook() {
     hostBook = [...(await readHostBook(chromeApi))];
+    await loadTailnet();
     return hostBook;
   }
 
@@ -966,6 +1003,16 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get capabilities() { return capabilities; },
     get previews() { return previews; },
     get hostBook() { return hostBook; },
+    get tailnet() { return tailnet; },
+    /** Grant one tailnet machine and attach: the single click remote attach needs. */
+    async connectTailnetPeer(peer) {
+      const entry = (tailnet.connectable ?? []).find((item) => item.name === (peer?.name ?? peer));
+      const origin = entry?.origins?.[0] ?? peerOrigins(entry ?? peer)[0];
+      if (!origin) return null;
+      await connectDiscovered(origin);
+      await loadTailnet();
+      return origin;
+    },
     addTailnetHost,
     removeTailnetHost,
     get needsYou() { return needsYou; },

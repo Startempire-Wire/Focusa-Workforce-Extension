@@ -19,7 +19,9 @@ if ('content_scripts' in manifest) throw new Error('content scripts are forbidde
 // is ever typed). Least-privilege preserved: loopback, this device's crosvm veth
 // bridge, its UIAI bridge and this device's own tailnet node. Any other network
 // peer still needs that one origin granted on connect.
-const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*', 'http://100.127.113.90/*'];
+// 127.0.0.1:41112 is the Tailscale LocalAPI: it is how the tailnet tells the
+// extension who its peers are. Loopback, one port, no remote host.
+const localOrigins = ['http://127.0.0.1/*', 'http://127.0.0.1:41112/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*', 'http://100.127.113.90/*'];
 if (JSON.stringify([...(manifest.host_permissions ?? [])].sort()) !== JSON.stringify([...localOrigins].sort())) {
   throw new Error(`host permissions must be exactly ${localOrigins.join(', ')} (local daemon origins only)`);
 }

@@ -341,7 +341,9 @@ export function projectsFromOwner(ownerData) {
   const selected = body.selected ?? body.effective_project ?? null;
   return Object.freeze({
     projects: Object.freeze(list.map((p) => Object.freeze({
-      id: p.project_id ?? null,
+      // An owner that omits project_id must still yield a STABLE, unique id:
+      // a list keyed on null duplicates, and the row has nothing stable to open.
+      id: p.project_id ?? p.project_root ?? p.canonical_name ?? null,
       name: p.canonical_name ?? p.project_id ?? p.project_root ?? 'project',
       root: p.project_root ?? null,
       stack: p.stack ?? null,
