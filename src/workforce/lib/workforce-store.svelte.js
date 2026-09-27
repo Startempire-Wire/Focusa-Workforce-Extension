@@ -23,6 +23,8 @@ import { evaluateScopeGuard, describeScopeGuard } from '../../lib/scope-guard.mj
 import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from '../../lib/notifications.mjs';
 import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
+import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
+import { promptBodyFor } from '../../lib/page-context.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
 
 const SELECTION_KEY = 'focusa.workforce.selection.v1';
@@ -105,6 +107,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let createdSession = $state(/** @type {any} */ (null));
   // In-page pairing (the side panel's proven flow, available on the full page).
   let selectedSessionId = $state('');
+  // Browser-sourced page captures (MLG-6.3): local staging only — never daemon items.
+  const PAGE_CAPTURES_KEY = 'focusa.workforce.page_captures.v1';
+  let pageCaptures = $state(/** @type {any[]} */ ([]));
+  let pageWorkBusy = $state(false);
+  let pageWorkOutcomes = $state(/** @type {Record<string, any>} */ ({}));
   let notifications = $state(/** @type {any[]} */ ([]));
   let outputCursor = $state(/** @type {string|null} */ (null));
   let outputLines = $state(/** @type {string[]} */ ([]));
@@ -185,6 +192,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   }
 
   async function refreshEnvironments() {
+    await loadPageCaptures();
     try {
       const paired = (await listConnections(chromeApi)).map((c) => ({
         id: c.connection_id, kind: 'paired', label: c.label, baseUrl: c.base_url, token: c.token, scopes: c.granted_scopes,
@@ -558,6 +566,67 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     } catch { /* ignore */ }
   }
 
+  function pageWorkOutcomeFor(id) { return pageWorkOutcomes[id] ?? null; }
+
+  async function loadPageCaptures() {
+    try {
+      const raw = (await chromeApi?.storage?.local?.get(PAGE_CAPTURES_KEY))?.[PAGE_CAPTURES_KEY] ?? [];
+      pageCaptures = Array.isArray(raw) ? raw : [];
+    } catch { pageCaptures = []; }
+  }
+
+  async function persistPageCaptures() {
+    try { await chromeApi.storage.local.set({ [PAGE_CAPTURES_KEY]: pageCaptures }); } catch { /* non-fatal */ }
+  }
+
+  async function stagePageCapture(record) {
+    pageCaptures = [record, ...pageCaptures].slice(0, 40);
+    await persistPageCaptures();
+  }
+
+  async function removePageCapture(id) {
+    pageCaptures = pageCaptures.filter((item) => item.id !== id);
+    await persistPageCaptures();
+  }
+
+  /**
+   * Submit a staged page capture to the work-loop driver through the governed
+   * path (focusa.agent_execution.prompt). Honest failure classes surface when
+   * daemon gaps apply (scope_mismatch / daemon_unroutable). The capture stays
+   * staged on any failure; on success the outcome records the session/status
+   * the owner reported.
+   */
+  async function submitPageWork(id) {
+    if (!active) { pageWorkOutcomes = { ...pageWorkOutcomes, [id]: { ok: false, kind: 'no_environment', message: 'no active environment selected' } }; return; }
+    const capture = pageCaptures.find((item) => item.id === id);
+    if (!capture) { pageWorkOutcomes = { ...pageWorkOutcomes, [id]: { ok: false, kind: 'not_found', message: 'capture no longer staged' } }; return; }
+    if (!selection.projectRoot || !selection.continuityId) {
+      pageWorkOutcomes = { ...pageWorkOutcomes, [id]: { ok: false, kind: 'scope_missing', message: 'select a Workstream (project root + continuity) before submitting' } };
+      return;
+    }
+    pageWorkBusy = true;
+    try {
+      const body = promptBodyFor(capture);
+      const result = await promptWorkLoop({
+        ...body,
+        projectRoot: selection.projectRoot,
+        continuityId: selection.continuityId,
+        idempotency_key: `page-work:${id}`,
+        idempotencyStore: intentStore(chromeApi),
+        requestOptions: { baseUrl: active.baseUrl, token: active.token },
+      });
+      pageWorkOutcomes = { ...pageWorkOutcomes, [id]: { ok: true, replayed: result.replayed === true, session_id: result.session_id ?? null, status: result.status ?? null, at: new Date().toISOString() } };
+      await refreshOwner();
+    } catch (error) {
+      pageWorkOutcomes = {
+        ...pageWorkOutcomes,
+        [id]: { ok: false, kind: error?.kind ?? 'error', message: error instanceof Error ? error.message : String(error), at: new Date().toISOString() },
+      };
+    } finally {
+      pageWorkBusy = false;
+    }
+  }
+
   async function setSelection({ projectRoot, continuityId }) {
     selection = {
       projectRoot: projectRoot ?? selection.projectRoot,
@@ -668,6 +737,13 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get lastEventAt() { return lastEventAt; },
     get directing() { return directing; },
     get lastDirection() { return lastDirection; },
+    get pageCaptures() { return pageCaptures; },
+    get pageWorkBusy() { return pageWorkBusy; },
+    pageWorkOutcomeFor,
+    loadPageCaptures,
+    stagePageCapture,
+    removePageCapture,
+    submitPageWork,
     get bootError() { return bootError; },
     refreshEnvironments,
     refreshOwner,

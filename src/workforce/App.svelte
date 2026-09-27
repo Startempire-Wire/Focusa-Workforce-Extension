@@ -335,6 +335,11 @@
     instruction = '';
   }
 
+  function useCaptureAsDirection(capture) {
+    instruction = (capture.instruction ?? capture.message ?? capture.note ?? `Page: ${capture.title ?? capture.source ?? ''}`).trim();
+    document.querySelector('[data-direction]')?.focus();
+  }
+
   async function connectLocal() {
     environmentError = '';
     // The browser sees a different loopback than the container: probe the
@@ -800,6 +805,45 @@
                 Focusa rejected: {store.lastDirection.kind} — {store.lastDirection.message}
               {/if}
             </p>
+          {/if}
+
+          {#if store.pageCaptures.length}
+            <section id="wf-incoming" aria-labelledby="wf-incoming-title">
+              <h2 id="wf-incoming-title">Incoming page work</h2>
+              <p class="muted tiny">
+                Captured locally by this extension from the browser context menu — never a daemon item until an owner
+                operation accepts it. Submitting routes the page context to the work-loop driver
+                (focusa.agent_execution.prompt, scoped to the selected Workstream).
+              </p>
+              <ul class="capture-list">
+                {#each store.pageCaptures as capture (capture.id)}
+                  {#if !store.pageWorkOutcomeFor(capture.id)?.ok}
+                    <li>
+                      <p class="flow">
+                        <strong>{capture.title}</strong>
+                        <a href={capture.source} target="_blank" rel="noreferrer">Open source</a>
+                        <span></span>
+                      </p>
+                      <p class="muted tiny">{(capture.note || capture.selection || capture.instruction || '').slice(0, 240)}</p>
+                      <div class="row">
+                        <button type="button" class="wf-btn" onclick={() => useCaptureAsDirection(capture)} disabled={store.directing}>Use as Direction</button>
+                        <button type="button" class="wf-btn" onclick={() => store.submitPageWork(capture.id)} disabled={store.pageWorkBusy}>Submit to work-loop driver</button>
+                        <button type="button" class="wf-btn" onclick={() => store.removePageCapture(capture.id)}>Dismiss</button>
+                        {#if store.pageWorkOutcomeFor(capture.id)}
+                          <span class="muted tiny {store.pageWorkOutcomeFor(capture.id).ok ? '' : 'wf-err'}">
+                            {#if store.pageWorkOutcomeFor(capture.id).ok}
+                              Driver accepted{store.pageWorkOutcomeFor(capture.id).replayed ? ' (idempotent replay)' : ''}{store.pageWorkOutcomeFor(capture.id).session_id ? ` · session ${store.pageWorkOutcomeFor(capture.id).session_id}` : ''}
+                            {:else}
+                              {store.pageWorkOutcomeFor(capture.id).kind} — {store.pageWorkOutcomeFor(capture.id).message}
+                            {/if}
+                          </span>
+                        {/if}
+                      </div>
+                    </li>
+                  {/if}
+                {/each}
+              </ul>
+            </section>
           {/if}
         </section>
 

@@ -20,9 +20,11 @@
     "default_path": "sidepanel.html"
   },
   "permissions": [
-    "storage",
+    "activeTab",
+    "contextMenus",
+    "scripting",
     "sidePanel",
-    "activeTab"
+    "storage"
   ],
   "optional_host_permissions": [
     "http://*/*",
