@@ -179,6 +179,19 @@
     })(),
   );
 
+  /* ---- Topology face (docs/17 §13: bodies, grouped) ---- */
+  const topologyGroups = $derived(
+    (() => {
+      const byKind = new Map();
+      for (const env of store.environments) {
+        const role = env.kind === 'paired' ? 'Paired Focusa environment' : 'Local daemon (this device)';
+        if (!byKind.has(role)) byKind.set(role, []);
+        byKind.get(role).push(env);
+      }
+      return [...byKind.entries()].map(([role, bodies]) => ({ role, bodies }));
+    })(),
+  );
+
   const freshLabel = $derived(
     store.foremanCard.freshness ?? (store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'),
   );
@@ -1178,24 +1191,57 @@
         {/if}
 
       {:else if route === '#/topology'}
-        <!-- ============ TOPOLOGY (bodies) ============ -->
-        <section class="card" aria-labelledby="wf-env">
-          <h2 id="wf-env">Environment</h2>
+        <!-- ============ TOPOLOGY (docs/17 §13: bodies, grouped) ============ -->
+        <section class="card" aria-labelledby="wf-topology">
+          <div class="card-head">
+            <h2 id="wf-topology">Topology</h2>
+            <span class="count-chip">{store.environments.length}</span>
+          </div>
+          <p class="source stopgap">source: paired/local bodies Workforce knows (owner-reported); Interactive/Browser-execution/Compute classification is NOT owner-reported — not invented (docs/17 §13).</p>
+
           {#if store.environments.length === 0}
-            <p class="empty">No paired Focusa environment.</p>
+            <p class="empty">No paired Focusa environment — pair one below.</p>
           {:else}
+            {#each topologyGroups as group (group.role)}
+              <h3 class="bucket">{group.role}</h3>
+              <div class="body-grid">
+                {#each group.bodies as body (body.id)}
+                  <article class="body-card {body.id === store.activeId ? 'active' : ''}">
+                    <div class="body-head">
+                      <strong>{body.label}</strong>
+                      {#if body.id === store.activeId}<span class="state-sig">active</span>{/if}
+                    </div>
+                    <p class="muted tiny">role in workforce: {body.kind}</p>
+                    {#if body.id === store.activeId}
+                      <StateNote label="Health" result={store.resultOf('health')} />
+                      <StateNote label="Entitlement" result={store.resultOf('license')} />
+                    {:else}
+                      <p class="muted tiny">owner reports health/entitlement for the active body only.</p>
+                    {/if}
+                    <details class="capability">
+                      <summary>Technical detail</summary>
+                      <dl class="facts">
+                        <dt>Base URL</dt><dd><code>{body.baseUrl}</code></dd>
+                        <dt>Scopes</dt><dd>{body.scopes?.join(' · ') ?? '—'}</dd>
+                        <dt>Auth</dt><dd>{body.token ? 'token stored' : 'no token (local)'}</dd>
+                      </dl>
+                    </details>
+                  </article>
+                {/each}
+              </div>
+            {/each}
+            <p class="muted tiny">Body cards show owner-reported facts; CPU/RAM stay out of headlines unless they are the reason you are here (docs/17 §13).</p>
+          {/if}
+
+          <div class="row">
             <label class="field">
               <span>Active</span>
               <select value={store.activeId} onchange={(e) => store.setEnvironment(e.currentTarget.value)}>
                 {#each store.environments as env (env.id)}
-                  <option value={env.id}>{env.label} — {env.baseUrl}</option>
+                  <option value={env.id}>{env.label}{#if env.kind === 'local'} (local){/if}</option>
                 {/each}
               </select>
             </label>
-          {/if}
-          <StateNote label="Health" result={store.resultOf('health')} />
-          <StateNote label="Entitlement" result={store.resultOf('license')} />
-          <div class="row">
             <button type="button" class="wf-btn" onclick={connectLocal} disabled={store.environments.some((e) => e.kind === 'local')}>
               {store.environments.some((e) => e.kind === 'local') ? 'Local daemon connected' : 'Use the daemon on this device'}
             </button>
@@ -1226,6 +1272,8 @@
             {/if}
             {#if store.pairingError}<p class="gap">{store.pairingError}</p>{/if}
           </details>
+
+          <p class="muted tiny">Workstream bindings for each body appear when the owner assigns them; the selection above is this extension's active body choice.</p>
         </section>
 
       {:else if route === '#/audit'}
@@ -1690,6 +1738,14 @@
   .evidence-index { max-width: 1000px; }
   .evidence-tools { align-items: center; }
   .evidence-filter { flex: 0 1 14rem; }
+  .body-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-standard); }
+  .body-card {
+    background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+    padding: var(--space-compact) var(--space-roomy); display: grid; gap: var(--space-tight); min-width: 0;
+    box-shadow: var(--elevation-card);
+  }
+  .body-card.active { border-color: var(--accent); }
+  .body-head { display: flex; align-items: center; gap: var(--space-tight); justify-content: space-between; }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
