@@ -40,12 +40,17 @@ export async function runReliableEventStream({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   signal,
   maxReconnects = Number.POSITIVE_INFINITY,
+  // An endpoint that cannot be reached at all is reported once and then left
+  // alone, instead of being retried forever in the background. The owner
+  // refreshes (or the environment changes) to try again.
+  maxUnreachableAttempts = 3,
 }) {
   if (typeof fetchImpl !== 'function' || typeof onEvent !== 'function' || typeof commitCursor !== 'function') {
     throw new TypeError('fetchImpl, onEvent and commitCursor are required');
   }
   let cursor = initialCursor;
   let attempt = 0;
+  let unreachable = 0;
 
   while (!signal?.aborted) {
     onState(Object.freeze({ phase: cursor ? 'replaying' : 'live', cursor, attempt }));
@@ -80,11 +85,22 @@ export async function runReliableEventStream({
       if (!(error instanceof MalformedSseEventError) && error?.name === 'AbortError') throw error;
     }
     if (signal?.aborted) break;
-    if (!acknowledgedOnConnection) attempt += 1;
+    if (!acknowledgedOnConnection) {
+      attempt += 1;
+      // A connection that never delivered an event is "unreachable", which is a
+      // different condition from a stream that dropped mid-flight.
+      unreachable += 1;
+    } else {
+      unreachable = 0;
+    }
     if (attempt > maxReconnects) break;
+    if (unreachable >= maxUnreachableAttempts) {
+      onState(Object.freeze({ phase: 'unavailable', cursor, attempt, delay_ms: null }));
+      break;
+    }
     const delay_ms = reconnectDelay(Math.max(0, attempt - 1));
     onState(Object.freeze({ phase: 'reconnecting', cursor, attempt, delay_ms }));
     await sleep(delay_ms);
   }
-  return Object.freeze({ cursor, stopped: signal?.aborted === true });
+  return Object.freeze({ cursor, stopped: signal?.aborted === true, unreachable: unreachable >= maxUnreachableAttempts });
 }

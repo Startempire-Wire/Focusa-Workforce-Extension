@@ -239,13 +239,11 @@ h3.sub { font: var(--text-body-strong); color: var(--text-primary); }
 }
 
 /* Face transition: each region settles in as it becomes the current face. */
-.face { display: contents; }
-@media (prefers-reduced-motion: no-preference) {
-  @keyframes wfx-face-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
-  .main > .face > * { animation: wfx-face-in 220ms cubic-bezier(.2, .7, .3, 1) both; }
-  .main > .face > *:nth-child(2) { animation-delay: 26ms; }
-  .main > .face > *:nth-child(3) { animation-delay: 46ms; }
-}
+/* The face region. Its enter AND leave transitions are driven from the markup
+   (see the keyed block in App.svelte) so attaching and detaching a daemon
+   cross-fade instead of snapping, and reduced motion collapses both to zero. */
+.face { display: flex; flex-direction: column; gap: var(--space-loose); min-width: 0; }
+
 .places { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 0; }
 .place { display: inline-flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--text-muted); }
 .place .dot {

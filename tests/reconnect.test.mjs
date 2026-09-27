@@ -74,3 +74,18 @@ test('401 and 403 stop without retry', async () => {
 test('backoff is bounded at 15 seconds', () => {
   assert.deepEqual([0,1,2,3,4,5,20].map(reconnectDelay), [1000,2000,4000,8000,15000,15000,15000]);
 });
+
+test('an unreachable stream is reported once and then left alone', async () => {
+  const states = [];
+  const result = await runReliableEventStream({
+    baseUrl: 'http://127.0.0.1:8787', token: null,
+    fetchImpl: async () => new Response('', { status: 503 }),
+    onEvent: async () => {},
+    commitCursor: async () => {},
+    onState: (state) => states.push(state.phase),
+    sleep: async () => {},            // no real waiting in the test
+  });
+  assert.equal(result.unreachable, true);
+  assert.equal(states.at(-1), 'unavailable', 'the owner is told it is unavailable');
+  assert.equal(states.filter((p) => p === 'reconnecting').length, 2, 'it does not retry forever');
+});

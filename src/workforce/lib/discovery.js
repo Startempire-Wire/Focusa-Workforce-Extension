@@ -27,11 +27,19 @@
 
 const PORT = 8787;
 const HEALTH_PATH = '/v1/health';
+
+/**
+ * Focusa does not always listen on 8787. For a host this device already knows,
+ * a small, fixed set of plausible ports is tried — this is a handful of requests
+ * to an address the operator already owns, never a sweep of a network.
+ */
+export const PORT_VARIANTS = Object.freeze([8787, 8788, 8789, 18787]);
 import { listLocalEnvironments } from '../../lib/storage.mjs';
+import { daemonSchemeForHost } from '../../lib/validation.mjs';
 
 const REMEMBERED_KEY = 'focusa.workforce.discovered.v1';
 
-/** Browser loopback, the crosvm veth bridge, and this host's tailnet node. */
+/** Browser loopback, this device's local bridges, and its own tailnet node. */
 export const DEVICE_CANDIDATES = Object.freeze([
   `http://127.0.0.1:${PORT}`,
   `http://localhost:${PORT}`,
@@ -92,13 +100,59 @@ export async function forgetDaemon(chromeApi, baseUrl) {
 }
 
 /**
- * The full candidate list: remembered first, then this device, then the tailnet.
+ * Turn a learned host into its candidate origins, trying each known Focusa port.
+ * Loopback keeps a single port: aliases and ports there are the same daemon.
+ * @param {string} host
+ */
+export function hostCandidates(host) {
+  const clean = String(host ?? '').trim().replace(/^[a-z]+:\/\//i, '').replace(/\/.*$/, '');
+  if (!clean) return [];
+  if (isLoopbackHost(clean)) return [`http://${clean}:${PORT}`];
+  // The scheme follows the same rule as origin validation, so a tailnet literal
+  // speaks HTTP while every other host (and every name) speaks HTTPS.
+  const scheme = clean.includes(':') ? '' : daemonSchemeForHost(clean);
+  return PORT_VARIANTS.map((port) => `${scheme}//${clean}:${port}`);
+}
+
+function isLoopbackHost(host) {
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+}
+
+/**
+ * Every candidate worth probing: hosts this device has learned (each on its
+ * known Focusa ports), remembered daemons, then this device.
  * @param {any} chromeApi
  */
 export async function discoveryCandidates(chromeApi) {
   const remembered = await readRemembered(chromeApi);
-  const ordered = [...remembered.map((item) => item.baseUrl), ...DEVICE_CANDIDATES];
+  const learned = new Set();
+  for (const record of remembered) {
+    try { learned.add(new URL(record.baseUrl).hostname); } catch { /* skip junk */ }
+  }
+  const fromLearned = [...learned].flatMap((host) => hostCandidates(host));
+  const ordered = [...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
   return Object.freeze([...new Set(ordered)]);
+}
+
+/**
+ * Turn something a person typed — a MagicDNS name, an IP, or a full URL, with
+ * or without a port — into origins to probe. Anything off this device and off
+ * the tailnet must be HTTPS, so a plain name resolves to HTTPS and a bare IP
+ * keeps whatever the operator typed.
+ *
+ * @param {string} input
+ * @returns {string[]} candidate origins
+ */
+export function seedCandidates(input) {
+  const raw = String(input ?? '').trim();
+  if (!raw) return [];
+  const withScheme = /^[a-z]+:\/\//i.test(raw)
+    ? raw
+    : `${daemonSchemeForHost(raw.split(':')[0])}//${raw}`;
+  let parsed;
+  try { parsed = new URL(withScheme); } catch { return []; }
+  if (parsed.port) return [`${parsed.protocol}//${parsed.host}`];
+  return hostCandidates(parsed.hostname);
 }
 
 /**
@@ -170,8 +224,8 @@ function collapseAliases(found) {
   return [preferred, ...rest];
 }
 
-export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
-  const candidates = await discoveryCandidates(chromeApi);
+export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [] } = {}) {
+  const candidates = [...new Set([...extra, ...(await discoveryCandidates(chromeApi))])];
   const answers = await Promise.all(candidates.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs })));
   const found = collapseAliases(answers
     .filter((answer) => answer.ok)
@@ -190,8 +244,8 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
  * @param {any} chromeApi
  * @param {{fetchImpl?: function, timeoutMs?: number}} [options]
  */
-export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
-  const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs });
+export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [] } = {}) {
+  const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs, extra });
   let paired = [];
   try {
     const { listConnections } = await import('../../lib/storage.mjs');

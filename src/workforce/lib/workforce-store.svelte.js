@@ -24,7 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
-import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness } from './discovery.js';
+import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates } from './discovery.js';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -263,16 +263,21 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
    * shows and opens an owner stream, so it is always one deliberate click. The
    * operator never types an address and never meets a configuration form here.
    */
-  async function discover() {
-    discovery = { state: 'discovering', baseUrl: null, answers: [] };
+  async function discover({ extra = [] } = {}) {
+    discovery = { state: 'discovering', baseUrl: null, answers: [], daemons: [] };
     const returning = await hasKnownDaemon(chromeApi);
-    const { found, answers } = await discoverDaemons(chromeApi);
+    const { found, answers } = await discoverDaemons(chromeApi, { extra });
     if (!found.length) {
       discovery = { state: 'not_found', baseUrl: null, answers, daemons: [] };
       return null;
     }
     const connected = found[0];
     const permitted = await hasDaemonOriginPermission(connected.baseUrl).catch(() => false);
+    // Every daemon that answered is learned, so the next cold start already
+    // knows about the whole estate — including hosts on other ports.
+    for (const daemon of found) {
+      await rememberDaemon(chromeApi, { baseUrl: daemon.baseUrl, label: daemon.kindLabel });
+    }
     discovery = { state: 'found', baseUrl: connected.baseUrl, answers, daemons: found, returning, permitted, alive: true, lastSeenAt: new Date().toISOString() };
     // While the operator decides, keep proving the daemon is alive so the
     // connect affordance can breathe on fact rather than on hope.
@@ -287,11 +292,14 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function connectDiscovered(target) {
     const origin = typeof target === 'string' ? target : (target?.baseUrl ?? discovery.baseUrl);
     if (!origin) return null;
-    // Local/tailnet origins are already permitted, so this is a single click
-    // with no permission prompt at all. A peer origin outside those asks Chrome
-    // for that one origin and nothing else.
-    const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
-    if (!granted) return null;
+    // An origin the manifest already grants is attached with no permission call
+    // and no prompt at all. Only an origin this device has never been granted
+    // asks Chrome — and then for that single origin.
+    const alreadyAllowed = await hasDaemonOriginPermission(origin).catch(() => false);
+    if (!alreadyAllowed) {
+      const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
+      if (!granted) return null;
+    }
     stopLiveness?.();
     stopLiveness = null;
     // A daemon this browser is already paired with keeps its stored token; a
@@ -301,12 +309,30 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       await refreshEnvironments();
       activeId = paired.connection_id;
       await refreshOwner();
-      await startStream();
+      startStream().catch(() => {});
     } else {
       await attachDaemon(origin, 'Focusa daemon');
     }
     discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString() };
     return origin;
+  }
+
+  /**
+   * Look for a daemon the operator named: a MagicDNS name, an IP, or a URL with
+   * its own port. One field, one probe, no wizard — this is how a daemon on a
+   * non-standard port or a different tailnet is reached without scanning.
+   */
+  async function addSeed(seed) {
+    const extra = seedCandidates(seed);
+    if (!extra.length) {
+      discovery = { ...discovery, state: 'not_found', seedError: 'That does not look like a host name or address' };
+      return [];
+    }
+    await discover({ extra });
+    if (discovery.state === 'not_found') {
+      discovery = { ...discovery, seedError: 'No Focusa daemon answered on that address' };
+    }
+    return discovery.daemons ?? [];
   }
 
   /**
@@ -338,7 +364,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     await refreshEnvironments();
     activeId = record.environment_id;
     await refreshOwner();
-    await startStream();
+    // The owner stream is opened in the background: connecting must feel instant,
+    // and the stream reaching "open" is reported separately by the Live chip.
+    startStream().catch(() => {});
     return record.environment_id;
   }
 

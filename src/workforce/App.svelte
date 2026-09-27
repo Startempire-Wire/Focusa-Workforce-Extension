@@ -12,8 +12,10 @@
    *   - nothing the owner does not report is invented.
    */
   import { onMount } from 'svelte';
+  import { fade, fly } from 'svelte/transition';
   import StateNote from './components/StateNote.svelte';
   import Icon from './components/Icon.svelte';
+  import ConnectionStrip from './components/ConnectionStrip.svelte';
   import { buildRoute, navItemForRoute, parseRoute, ROUTES, INTENTS } from './lib/router.js';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
   import { localDaemonCandidates } from './lib/local-daemon.js';
@@ -23,6 +25,13 @@
   import { matchingMembers } from './lib/roster-groups.js';
 
   const store = createWorkforceStore(chrome);
+
+  // docs/17 §21.7: when the OS asks for less motion, every transition collapses
+  // to zero duration rather than merely being shorter.
+  const reduceMotion = typeof matchMedia === 'function'
+    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const enterMs = $derived(reduceMotion ? 0 : 260);
+  const enterDy = $derived(reduceMotion ? 0 : 6);
 
   let route = $state(parseRoute(location.hash).route);
   let ctx = $state(parseRoute(location.hash));
@@ -130,6 +139,9 @@
   onMount(async () => {
     window.addEventListener('hashchange', onHashChange);
     document.addEventListener('keydown', onKeyDown);
+    // Preview/debug hook: exposed ONLY outside the packaged extension, so a
+    // renderer can drive or inspect the store while building a face.
+    if (!globalThis.chrome?.runtime?.id) globalThis.focusaWorkforce = store;
     await store.refreshEnvironments();
     if (store.active) {
       await store.refreshOwner();
@@ -233,57 +245,12 @@
     </nav>
 
     <div class="main" id="wf-main" tabindex="-1">
-      {#key route}<div class="face">
+      <ConnectionStrip {store} reduce={reduceMotion} />
+      <!-- Keyed on route AND on daemon presence: moving between faces and
+           attaching/detaching a daemon both cross-fade, in both directions. -->
+      {#key `${route}|${store.active ? 'live' : 'off'}`}
+      <div class="face" in:fly={{ y: enterDy, duration: enterMs }} out:fade={{ duration: reduceMotion ? 0 : 160 }}>
       {#if store.bootError}<StateNote label="Extension" result={{ state: 'error', note: store.bootError }} />{/if}
-
-      <!-- Discovery: silent and read-only. Attaching is one deliberate click, so
-           the surface never changes under the operator without being asked. -->
-      {#if store.discovery.state === 'discovering'}
-        <div class="connect-bar searching" role="status">
-          <p class="connect-lead">Looking for Focusa</p>
-          <ul class="places">
-            {#each discoveryPlaces as place (place.label)}
-              <li class="place" class:ok={place.ok}><span class="dot" aria-hidden="true"></span>{place.label}</li>
-            {/each}
-          </ul>
-        </div>
-      {/if}
-      {#if store.discovery.state === 'found' && !store.active}
-        <div class="connect-bar found" role="status">
-          <p>
-            <span class="beat" class:live={store.discovery.alive} aria-hidden="true"></span>
-            <strong>{store.discovery.daemons?.length > 1 ? `${store.discovery.daemons.length} Focusa daemons available` : 'Focusa is live'}</strong>
-          </p>
-          <ul class="daemons">
-            {#each store.discovery.daemons ?? [] as daemon (daemon.baseUrl)}
-              <li class="daemon" class:primary={daemon.baseUrl === store.discovery.baseUrl}>
-                <Icon name={daemon.kind === 'remote' ? 'globe' : daemon.kind === 'tailnet' ? 'link' : 'monitor'} size={16} />
-                <span class="daemon-name">{daemon.kindLabel}{daemon.paired ? '' : ' · answering'}</span>
-                <code>{daemon.baseUrl}</code>
-                <button
-                  type="button"
-                  class="wf-btn beat-btn"
-                  class:btn-primary={daemon.baseUrl === store.discovery.baseUrl}
-                  class:live={daemon.baseUrl === store.discovery.baseUrl && store.discovery.alive}
-                  onclick={() => store.connectDiscovered(daemon.baseUrl)}>Connect</button>
-              </li>
-            {/each}
-          </ul>
-          <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Pair a daemon we cannot see</a>
-        </div>
-      {/if}
-      {#if store.discovery.state === 'connected'}
-        <p class="connect-bar ok" role="status">Connected to Focusa at <code>{store.discovery.baseUrl}</code></p>
-      {/if}
-      {#if store.discovery.state === 'not_found' && !store.active}
-        <div class="connect-bar" role="status">
-          <p><strong>No Focusa daemon answered</strong> on loopback, this device's bridges or the tailnet.</p>
-          <div class="row">
-            <button type="button" class="wf-btn" onclick={() => store.discover()}>Look again</button>
-            <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Pair a remote daemon</a>
-          </div>
-        </div>
-      {/if}
 
       <!-- docs/17 §19 degraded geometry: one banner under the header, last-known retained -->
       {#if healthState !== 'ok' && store.active}
@@ -1176,7 +1143,8 @@
           {/if}
         </div>
       {/if}
-      </div>{/key}
+      </div>
+      {/key}
     </div>
 
     <!-- CONTEXT RAIL (docs/17 §6): Needs You · Verified · source posture · contextual only -->

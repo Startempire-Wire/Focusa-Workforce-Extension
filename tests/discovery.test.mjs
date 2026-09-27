@@ -106,3 +106,39 @@ test('a corrupt stored environment is treated as no known daemon, not a crash', 
   const chromeApi = chromeWith({}, { envs: [{ environment_id: 'local:http://127.0.0.1:8787' }] });
   assert.equal(await hasKnownDaemon(chromeApi), false);
 });
+
+test('a known host is probed on every plausible Focusa port, never swept', async () => {
+  const { hostCandidates, PORT_VARIANTS } = await import('../src/workforce/lib/discovery.js');
+  assert.deepEqual(PORT_VARIANTS, [8787, 8788, 8789, 18787], 'a small fixed set, not a range');
+  assert.equal(hostCandidates('100.64.1.9').length, PORT_VARIANTS.length);
+  // A tailnet literal speaks HTTP; anything else must be HTTPS.
+  assert.ok(hostCandidates('100.64.1.9').every((u) => u.startsWith('http://')));
+  assert.ok(hostCandidates('kh.tailnet.ts.net').every((u) => u.startsWith('https://')));
+});
+
+test('a seed accepts a name, an address, or a URL with its own port', async () => {
+  const { seedCandidates } = await import('../src/workforce/lib/discovery.js');
+  assert.deepEqual(seedCandidates('kh:9999'), ['https://kh:9999'], 'an explicit port is respected exactly');
+  assert.equal(seedCandidates('kh').length, 4, 'a bare name is tried on the known ports');
+  assert.deepEqual(seedCandidates('127.0.0.1'), ['http://127.0.0.1:8787'], 'loopback is one port');
+  assert.deepEqual(seedCandidates('https://kh.example:8443'), ['https://kh.example:8443']);
+  assert.deepEqual(seedCandidates(''), []);
+});
+
+test('every daemon that answered is learned for the next cold start', async () => {
+  const { rememberDaemon, discoveryCandidates } = await import('../src/workforce/lib/discovery.js');
+  const chromeApi = chromeWith();
+  await rememberDaemon(chromeApi, { baseUrl: 'http://100.64.7.7:8788', label: 'Tailnet' });
+  const candidates = await discoveryCandidates(chromeApi);
+  assert.ok(candidates.includes('http://100.64.7.7:8788'), 'the learned daemon is probed again');
+  // A learned host also expands to its other known Focusa ports.
+  assert.ok(candidates.includes('http://100.64.7.7:8787'));
+  assert.ok(candidates.includes('http://100.64.7.7:18787'));
+});
+
+test('an origin the device cannot reach is reported, never invented', async () => {
+  const { discoverDaemons } = await import('../src/workforce/lib/discovery.js');
+  const result = await discoverDaemons(chromeWith(), { fetchImpl: async () => { throw new Error('down'); } });
+  assert.deepEqual(result.found, []);
+  assert.ok(result.answers.every((a) => a.ok === false));
+});

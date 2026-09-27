@@ -29,6 +29,21 @@ export function isLocalDaemonHost(hostname) {
   return isTailnetHost(hostname);
 }
 
+/**
+ * The scheme a daemon on this host is expected to speak: HTTP on this machine
+ * and on the tailnet, HTTPS everywhere else. Names (MagicDNS or otherwise)
+ * resolve off-device, so they get HTTPS unless the host is a tailnet literal.
+ *
+ * @param {string} hostname
+ * @returns {'http:' | 'https:'}
+ */
+export function daemonSchemeForHost(hostname) {
+  if (isLocalDaemonHost(hostname)) return 'http:';
+  // A dotted quad on the tailnet is local; anything with letters is a name.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(String(hostname))) return 'https:';
+  return 'https:';
+}
+
 export function normalizeDaemonOrigin(value) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError('daemon URL is required');
   const parsed = new URL(value.trim());
