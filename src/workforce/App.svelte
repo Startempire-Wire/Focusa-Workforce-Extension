@@ -23,6 +23,7 @@
   import StateNote from './components/StateNote.svelte';
   import { groupRoster, personFacts, distinctStates } from './lib/roster-groups.js';
   import { needsBuckets } from './lib/needs-buckets.js';
+  import { evidenceBuckets, evidenceSources } from './lib/evidence-buckets.js';
   import {
     ROUTES,
     INTENTS,
@@ -152,6 +153,27 @@
       if (refState === 'ok' && ref) {
         const refId = ref.session_id ?? ref.id ?? ref.workpoint_id ?? String(ref);
         return store.needsYou.items.find((item) => item.label === refId || item.label === ref) ?? null;
+      }
+      return null;
+    })(),
+  );
+
+  /* ---- Evidence face state (docs/18 §Evidence, docs/17 §12) ---- */
+  let evidenceSourceFilter = $state('');
+  const evidenceSourceOptions = $derived(evidenceSources(store.evidenceTrail.entries));
+  const evidenceIndex = $derived(
+    evidenceBuckets(
+      evidenceSourceFilter
+        ? store.evidenceTrail.entries.filter((entry) => entry.source === evidenceSourceFilter)
+        : store.evidenceTrail.entries,
+    ),
+  );
+  const evidenceEntryForDetail = $derived(
+    (() => {
+      const { refState, ref } = routeCtx;
+      if (refState === 'ok' && ref) {
+        const refId = ref.evidence_id ?? ref.sha256 ?? ref.receipt_id ?? ref.id ?? null;
+        return store.evidenceTrail.entries.find((entry) => entry.ref === refId || entry.ref === ref || entry.ref === String(ref)) ?? null;
       }
       return null;
     })(),
@@ -1052,12 +1074,9 @@
           </section>
         {/if}
 
-      {:else if route === '#/evidence' || route === '#/evidence/detail'}
-        <!-- ============ EVIDENCE ============ -->
-        {#if route === '#/evidence/detail' && routeCtx.params.env}
-          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
-        {/if}
-        <section class="card" aria-labelledby="wf-evidence">
+      {:else if route === '#/evidence'}
+        <!-- ============ EVIDENCE INDEX (docs/18 §Evidence) ============ -->
+        <section class="card evidence-index" aria-labelledby="wf-evidence">
           <div class="card-head">
             <h2 id="wf-evidence">Evidence</h2>
             <span class="count-chip">{counts.evidence}</span>
@@ -1066,17 +1085,97 @@
           {#if store.evidenceTrail.entries.length === 0}
             <p class="empty">Focusa has not reported an evidence or receipt reference for this scope.</p>
           {:else}
-            <ul class="items compact">
-              {#each store.evidenceTrail.entries as entry (`${entry.kind}:${entry.ref}`)}
-                <li>
-                  <span class="kind {entry.kind}">{entry.kind}</span>
-                  <code>{entry.ref}</code>
-                  <span class="muted tiny">via {entry.source}</span>
-                </li>
-              {/each}
-            </ul>
+            <div class="row evidence-tools">
+              <label class="field evidence-filter">
+                <span>Source filter</span>
+                <select value={evidenceSourceFilter} onchange={(e) => (evidenceSourceFilter = e.currentTarget.value)}>
+                  <option value="">All sources</option>
+                  {#each evidenceSourceOptions as source (source)}
+                    <option value={source}>{source}</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+            {#if evidenceIndex.needs.length}
+              <h3 class="bucket">Needs verification</h3>
+              <ul class="items compact">
+                {#each evidenceIndex.needs as entry (`${entry.kind}:${entry.ref}`)}
+                  <li>
+                    <span class="kind {entry.kind}">{entry.kind}</span>
+                    <a class="item-link" href="#/evidence/detail" onclick={(e) => { e.preventDefault(); navigate(`#/evidence/detail?ref=${encodeURIComponent(entry.ref)}`); }}><code>{entry.ref}</code></a>
+                    <span class="muted tiny">via {entry.source}</span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            {#if evidenceIndex.settled.length}
+              <h3 class="bucket">Settled</h3>
+              <ul class="items compact">
+                {#each evidenceIndex.settled as entry (`${entry.kind}:${entry.ref}`)}
+                  <li>
+                    <span class="kind {entry.kind}">{entry.kind}</span>
+                    <a class="item-link" href="#/evidence/detail" onclick={(e) => { e.preventDefault(); navigate(`#/evidence/detail?ref=${encodeURIComponent(entry.ref)}`); }}><code>{entry.ref}</code></a>
+                    <span class="muted tiny">via {entry.source}</span>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            {#if evidenceIndex.stale.length}
+              <h3 class="bucket">Stale / corrected</h3>
+              <ul class="items compact">
+                {#each evidenceIndex.stale as entry (`${entry.kind}:${entry.ref}`)}
+                  <li><span class="kind {entry.kind}">{entry.kind}</span><code>{entry.ref}</code><span class="muted tiny">via {entry.source}</span></li>
+                {/each}
+              </ul>
+            {/if}
+            <p class="muted tiny">Recently verified appears when the owner reports a verification step; stale/corrected appears when the owner reports a correction. Neither is invented (docs/18 §Evidence).</p>
           {/if}
         </section>
+
+      {:else if route === '#/evidence/detail'}
+        <!-- ============ EVIDENCE DETAIL (docs/17 §12) ============ -->
+        {#if routeCtx.params.env}
+          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
+        {/if}
+        {#if evidenceEntryForDetail}
+          {@const entry = evidenceEntryForDetail}
+          <section class="card evidence-index" aria-labelledby="wf-evidence-detail">
+            <div class="card-head">
+              <h2 id="wf-evidence-detail">Evidence</h2>
+              <button type="button" class="wf-btn" onclick={() => navigate('#/evidence')}>All evidence</button>
+            </div>
+            <dl class="facts">
+              <dt>Claim / outcome</dt><dd><code>{entry.ref}</code></dd>
+              <dt>Proof state</dt><dd><span class="kind {entry.kind}">{entry.kind}</span></dd>
+              <dt>Source</dt><dd>{entry.source} · {store.evidenceTrail.disclosure}</dd>
+              <dt>Verification summary</dt><dd>owner reports only — see supporting refs and settlement below</dd>
+            </dl>
+            <h3 class="bucket">Supporting evidence</h3>
+            <p class="muted tiny">Artifacts/observations attach when the owner reports them (docs/17 §12); none is invented.</p>
+            <div class="wd-split">
+              <section class="card">
+                <h2 class="wf-section-label">Settlement / Receipt</h2>
+                {#if entry.kind === 'receipt' || entry.kind === 'projection'}
+                  <p class="source authoritative">This reference is a {entry.kind} — owner-reported as settled.</p>
+                {:else}
+                  <p class="empty">No owner-reported settlement or receipt for this reference yet.</p>
+                {/if}
+              </section>
+              <section class="card">
+                <h2 class="wf-section-label">Correction / Revocation</h2>
+                <p class="empty">Owner has not reported a correction or revocation for this reference.</p>
+              </section>
+            </div>
+            <h3 class="bucket">Accepted outcome link</h3>
+            <p class="muted tiny">Rendered when the owner reports one; the reference above is the closest owner-reported proof today.</p>
+          </section>
+        {:else}
+          <section class="card evidence-index" aria-labelledby="wf-evidence-none">
+            <h2 id="wf-evidence-none">Reference not found</h2>
+            <p class="gap">No owner-reported evidence reference matches this detail ref ({routeCtx.refReason ?? 'no reference'}). Workforce renders no invented claim.</p>
+            <button type="button" class="wf-btn" onclick={() => navigate('#/evidence')}>Back to Evidence</button>
+          </section>
+        {/if}
 
       {:else if route === '#/topology'}
         <!-- ============ TOPOLOGY (bodies) ============ -->
@@ -1588,6 +1687,9 @@
   .item-link { text-decoration: none; color: inherit; }
   .item-link strong { color: var(--accent); }
   .item-link:hover strong { text-decoration: underline; }
+  .evidence-index { max-width: 1000px; }
+  .evidence-tools { align-items: center; }
+  .evidence-filter { flex: 0 1 14rem; }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
