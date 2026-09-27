@@ -205,6 +205,14 @@
     }),
   );
 
+  /* docs/17 §15: after successful pairing, the store already selected the env,
+     refreshed the owner source and restored the Workstream; route to Overview. */
+  $effect(() => {
+    if (store.pairing?.state === 'paired' && route === '#/settings') {
+      navigate('#/overview');
+    }
+  });
+
   const freshLabel = $derived(
     store.foremanCard.freshness ?? (store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'),
   );
@@ -1365,67 +1373,117 @@
         </section>
 
       {:else if route === '#/settings'}
-        <!-- ============ SETTINGS ============ -->
-        <section class="card" aria-labelledby="wf-settings">
+        <!-- ============ SETTINGS / CONNECTIONS (docs/17 §15) ============ -->
+        {@const settingsSection = routeCtx.params.section ?? 'connections'}
+        <section class="settings" aria-labelledby="wf-settings" style:max-width="1040px">
           <div class="card-head">
-            <h2 id="wf-settings">Settings</h2>
+            <h2 id="wf-settings" class="settings-title">Settings</h2>
+            <nav class="settings-nav" aria-label="Settings sections">
+              <a href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }} class:active={settingsSection === 'connections'}>Connections</a>
+              <a href="#/settings?section=appearance" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=appearance'); }} class:active={settingsSection === 'appearance'}>Appearance</a>
+              <a href="#/settings?section=notifications" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=notifications'); }} class:active={settingsSection === 'notifications'}>Notifications</a>
+              <a href="#/settings?section=browser-permissions" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=browser-permissions'); }} class:active={settingsSection === 'browser-permissions'}>Browser permissions</a>
+              <a href="#/settings?section=public-demo" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=public-demo'); }} class:active={settingsSection === 'public-demo'}>Public demo</a>
+              <a href="#/settings?section=advanced" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=advanced'); }} class:active={settingsSection === 'advanced'}>Advanced</a>
+            </nav>
           </div>
 
-          <details class="capability">
-            <summary>Environment &amp; connections</summary>
-            {#if store.environments.length === 0}
-              <p class="empty">No paired Focusa environment.</p>
-            {:else}
-              <label class="field">
-                <span>Active</span>
-                <select value={store.activeId} onchange={(e) => store.setEnvironment(e.currentTarget.value)}>
-                  {#each store.environments as env (env.id)}
-                    <option value={env.id}>{env.label} — {env.baseUrl}</option>
-                  {/each}
-                </select>
-              </label>
-            {/if}
-            <div class="row">
-              <button type="button" class="wf-btn" onclick={connectLocal} disabled={store.environments.some((e) => e.kind === 'local')}>
-                {store.environments.some((e) => e.kind === 'local') ? 'Local daemon connected' : 'Use the daemon on this device'}
-              </button>
+          {#if settingsSection === 'connections'}
+            <div class="settings-split">
+              <section class="set-group" aria-labelledby="wf-envs">
+                <h3 id="wf-envs">Your environments</h3>
+                {#if store.environments.length === 0}
+                  <p class="empty">No paired Focusa environment yet — pair one on the right.</p>
+                {:else}
+                  <ul class="items compact">
+                    {#each store.environments as env (env.id)}
+                      <li class="env-row">
+                        <button type="button" class="env-select" class:env-active={env.id === store.activeId} onclick={() => store.setEnvironment(env.id)}>
+                          <strong>{env.label}</strong>
+                          <span class="state-sig">{env.id === store.activeId ? 'Active' : 'Standby'}</span>
+                        </button>
+                        <span class="muted tiny">{env.kind} · <code>{env.baseUrl}</code></span>
+                      </li>
+                    {/each}
+                  </ul>
+                  <div class="row">
+                    <button type="button" class="wf-btn" onclick={connectLocal} disabled={store.environments.some((e) => e.kind === 'local')}>
+                      {store.environments.some((e) => e.kind === 'local') ? 'Local daemon connected' : 'Use the daemon on this device'}
+                    </button>
+                  </div>
+                  {#if environmentError}<p class="gap">{environmentError}</p>{/if}
+                  <p class="muted tiny">Health/liveness per body renders when the owner reports it; “Fresh/Offline” is not invented.</p>
+                {/if}
+              </section>
+
+              <section class="set-group" aria-labelledby="wf-pair">
+                <h3 id="wf-pair">Pair Focusa</h3>
+                {#if !store.pairing}
+                  <form onsubmit={(event) => { event.preventDefault(); store.beginPairing({ baseUrl: pairUrl, label: pairLabel || 'Focusa daemon' }); }} class="stack">
+                    <label class="field">
+                      <span>Environment label</span>
+                      <input type="text" aria-label="Environment label" placeholder="label (optional)" bind:value={pairLabel} />
+                    </label>
+                    <label class="field">
+                      <span>Focusa address</span>
+                      <input type="text" aria-label="Daemon URL" placeholder="https://daemon.example:8787" bind:value={pairUrl} />
+                    </label>
+                    <button type="submit" class="wf-btn" disabled={store.pairingBusy || !pairUrl.trim()}>Start pairing</button>
+                  </form>
+                {:else if store.pairing.state === 'awaiting_approval'}
+                  <p class="muted tiny">PAIRING CODE</p>
+                  <p class="pair-code">{store.pairing.code}</p>
+                  <p class="muted tiny">Approve in Focusa on the daemon — or run: <code>{store.pairing.operator_command ?? ''}</code></p>
+                  <p class="muted tiny">expires {store.pairing.expires_at}</p>
+                  <div class="row">
+                    <button type="button" class="wf-btn" onclick={() => store.checkPairingNow()} disabled={store.pairingBusy}>Check again</button>
+                    <button type="button" class="wf-btn" onclick={() => store.cancelPairing()}>Cancel</button>
+                  </div>
+                {:else}
+                  <p class="gap">pairing {store.pairing.state}</p>
+                  <button type="button" class="wf-btn" onclick={() => store.cancelPairing()}>Reset</button>
+                {/if}
+                {#if store.pairingError}<p class="gap">{store.pairingError}</p>{/if}
+                <p class="muted tiny">On success Workforce selects the environment, refreshes the owner source, restores/requests the Workstream, and routes to Overview (docs/17 §15).</p>
+              </section>
             </div>
-            {#if environmentError}<p class="gap">{environmentError}</p>{/if}
-            <StateNote label="Health" result={store.resultOf('health')} />
-            <StateNote label="Entitlement" result={store.resultOf('license')} />
-          </details>
-
-          <details class="capability">
-            <summary>Pair a daemon</summary>
-            {#if !store.pairing}
-              <form onsubmit={(event) => { event.preventDefault(); store.beginPairing({ baseUrl: pairUrl, label: pairLabel || 'Focusa daemon' }); }}>
-                <label class="field">
-                  <span>Daemon URL</span>
-                  <input type="text" aria-label="Daemon URL" placeholder="https://daemon.example:8787" bind:value={pairUrl} />
-                </label>
-                <label class="field">
-                  <span>Label</span>
-                  <input type="text" aria-label="Environment label" placeholder="label (optional)" bind:value={pairLabel} />
-                </label>
-                <button type="submit" class="wf-btn" disabled={store.pairingBusy || !pairUrl.trim()}>Start pairing</button>
-              </form>
-            {:else if store.pairing.state === 'awaiting_approval'}
-              <p class="muted tiny">Approve on the daemon: <code>{store.pairing.operator_command ?? store.pairing.code}</code></p>
-              <p class="muted tiny">expires {store.pairing.expires_at}</p>
-              <button type="button" class="wf-btn" onclick={() => store.cancelPairing()}>Cancel</button>
-            {:else}
-              <p class="gap">pairing {store.pairing.state}</p>
-              <button type="button" class="wf-btn" onclick={() => store.cancelPairing()}>Reset</button>
-            {/if}
-            {#if store.pairingError}<p class="gap">{store.pairingError}</p>{/if}
-          </details>
-
-          <dl class="facts">
-            <dt>Loaded build</dt><dd>{buildStamp}</dd>
-            <dt>Route</dt><dd><code>{route}</code></dd>
-            <dt>Addressable routes</dt><dd>{ROUTES.length} · <code>#/needs-you</code> is a non-nav route</dd>
-            <dt>Intents</dt><dd>{INTENTS.join(', ')}</dd>
-          </dl>
+          {:else if settingsSection === 'appearance'}
+            <div class="set-group">
+              <h3>Appearance</h3>
+              <p class="muted tiny">The workforce shell follows the extension/OS theme tokens and respects reduced motion. Owner-provided appearance options render here when they exist — none are invented.</p>
+            </div>
+          {:else if settingsSection === 'notifications'}
+            <div class="set-group">
+              <h3>Notifications</h3>
+              <p class="muted tiny">{store.notifications.length} notification(s) stored; {store.unreadCount} unread.</p>
+              <div class="row">
+                <button type="button" class="wf-btn" onclick={() => store.markAllRead()} disabled={store.unreadCount === 0}>Mark all read</button>
+              </div>
+            </div>
+          {:else if settingsSection === 'browser-permissions'}
+            <div class="set-group">
+              <h3>Browser &amp; context permissions</h3>
+              <p class="muted tiny">Declared extension permissions are <code>storage</code>, <code>alarms</code>, <code>notifications</code> — scoped to this extension.</p>
+              <p class="muted tiny">Focusa sessions run in the platform browser Workforce does not drive directly; no invented site permission is claimed.</p>
+            </div>
+          {:else if settingsSection === 'public-demo'}
+            <div class="set-group">
+              <h3>Public demo / local behavior</h3>
+              <p class="muted tiny">The public <code>os.focusa.dev</code> profile is a read-only demo — Workforce never authenticates there.</p>
+              <p class="muted tiny">Local behavior: a loopback daemon on this device pairs without a token (principal: local-loopback).</p>
+            </div>
+          {:else}
+            <div class="set-group">
+              <h3>Advanced / debug</h3>
+              <dl class="facts">
+                <dt>Loaded build</dt><dd>{buildStamp}</dd>
+                <dt>Route</dt><dd><code>{route}</code></dd>
+                <dt>Addressable routes</dt><dd>{ROUTES.length} · <code>#/needs-you</code> is a non-nav route</dd>
+                <dt>Intents</dt><dd>{INTENTS.join(', ')}</dd>
+              </dl>
+              <p class="muted tiny">All Workforce data is local to this extension (no remote sync surface). A wipe/export action renders when the owner provides one.</p>
+            </div>
+          {/if}
         </section>
       {/if}
 
@@ -1798,6 +1856,20 @@
   .t-time { font-size: var(--text-micro); color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .t-body { display: flex; flex-wrap: wrap; gap: var(--space-tight); align-items: baseline; font-size: var(--text-small); }
   .t-tech { font-size: var(--text-micro); }
+  .settings-title { margin: 0; }
+  .settings { display: grid; gap: var(--space-standard); }
+  .settings-nav { display: flex; flex-wrap: wrap; gap: var(--space-tight); font-size: var(--text-small); }
+  .settings-nav a { color: var(--text-muted); text-decoration: none; border-bottom: 1px solid transparent; }
+  .settings-nav a.active, .settings-nav a:hover { color: var(--text-strong); border-bottom-color: var(--accent); }
+  .settings-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-standard); align-items: start; }
+  .set-group { background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-compact) var(--space-roomy); display: grid; gap: var(--space-tight); }
+  .set-group h3 { margin: 0; font-size: var(--text-small); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .env-row { display: grid; gap: var(--space-tight); }
+  .env-select { display: flex; justify-content: space-between; align-items: center; gap: var(--space-tight); width: 100%; background: transparent; border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: var(--space-tight) var(--space-compact); color: inherit; font: inherit; cursor: pointer; }
+  .env-select.env-active { border-color: var(--accent); }
+  .env-select:hover { border-color: var(--accent); }
+  .pair-code { font-size: 1.4rem; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+  .stack { display: grid; gap: var(--space-tight); }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
@@ -1866,6 +1938,11 @@
      columns carry the deep proof + posture panels. */
   @media (max-width: 1099px) {
     .wd-split { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* docs/17 §15: <900px stacks environments first, pairing second */
+  @media (max-width: 899px) {
+    .settings-split { grid-template-columns: minmax(0, 1fr); }
   }
 
 </style>

@@ -357,24 +357,31 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   function startPairingPoll() {
     stopPairingPoll();
-    pairingTimer = setInterval(async () => {
-      if (!pairing || pairing.state !== 'awaiting_approval') { stopPairingPoll(); return; }
-      try {
-        const next = await pollPairing(pairing, { chromeApi });
-        pairing = next;
-        if (next.state === 'paired') {
-          stopPairingPoll();
-          await refreshEnvironments();
-          activeId = next.connection.connection_id;
-          await refreshOwner();
-          await loadBoundTarget();
-          await startStream();
-        }
-      } catch (error) {
-        pairingError = error instanceof Error ? error.message : String(error);
+    pairingTimer = setInterval(pollPairingOnce, 3000);
+  }
+
+  /** One immediate poll cycle (docs/17 §15: “Check again” during pending). */
+  function checkPairingNow() {
+    pollPairingOnce();
+  }
+
+  async function pollPairingOnce() {
+    if (!pairing || pairing.state !== 'awaiting_approval') return;
+    try {
+      const next = await pollPairing(pairing, { chromeApi });
+      pairing = next;
+      if (next.state === 'paired') {
         stopPairingPoll();
+        await refreshEnvironments();
+        activeId = next.connection.connection_id;
+        await refreshOwner();
+        await loadBoundTarget();
+        await startStream();
       }
-    }, 3000);
+    } catch (error) {
+      pairingError = error instanceof Error ? error.message : String(error);
+      stopPairingPoll();
+    }
   }
 
   function stopPairingPoll() {
@@ -675,6 +682,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     clearBoundTarget,
     beginPairing,
     cancelPairing,
+    checkPairingNow,
     selectSession,
     loadOutput,
     refreshNotifications,

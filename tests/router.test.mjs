@@ -97,3 +97,13 @@ test('buildRoute never emits an unknown intent', () => {
 test('buildRoute drops unknown routes back to default', () => {
   assert.equal(buildRoute('#/bogus', {}), '#/overview');
 });
+
+test('settings section param round-trips and validates (docs/17 §15)', () => {
+  const built = buildRoute('#/settings', { section: 'connections' });
+  assert.equal(built, '#/settings?section=connections');
+  const parsed = parseRoute(built);
+  assert.equal(parsed.route, '#/settings');
+  assert.equal(parsed.params.section, 'connections');
+  // Unknown sections are ignored, same as unknown intents.
+  assert.equal(parseRoute('#/settings?section=nope').params.section, undefined);
+});

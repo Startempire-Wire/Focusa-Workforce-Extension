@@ -40,8 +40,12 @@ export const ROUTES = Object.freeze([
 /** Only these intents are recognised (docs/11 §3.1). */
 export const INTENTS = Object.freeze(['inspect', 'direct', 'review', 'watch', 'approve']);
 
-/** Recognised context parameters; anything else is ignored. */
-export const CONTEXT_PARAMS = Object.freeze(['env', 'ref', 'intent', 'return']);
+/** Recognised context parameters; anything else is ignored (docs/11 §3.1).
+ * `section` addresses settings groups (docs/17 §15: #/settings?section=connections). */
+export const CONTEXT_PARAMS = Object.freeze(['env', 'ref', 'intent', 'return', 'section']);
+
+/** Only these settings sections are recognised (docs/17 §15). */
+export const SETTINGS_SECTIONS = Object.freeze(['connections', 'appearance', 'notifications', 'browser-permissions', 'public-demo', 'advanced']);
 
 /** Supported typed-ref versions the presenter understands. */
 export const SUPPORTED_REF_VERSIONS = Object.freeze(['focusa.workforce.ref.v1']);
@@ -102,6 +106,7 @@ export function parseRoute(hash) {
     if (CONTEXT_PARAMS.includes(key)) params[key] = value;
   }
   if (params.intent && !INTENTS.includes(params.intent)) delete params.intent;
+  if (params.section && !SETTINGS_SECTIONS.includes(params.section)) delete params.section;
 
   const decoded = decodeTypedRef(params.ref ?? null);
   const refState = !params.ref ? 'absent' : (decoded.ok ? 'ok' : 'incompatible');
@@ -119,7 +124,7 @@ export function parseRoute(hash) {
  * Build a hash for navigation. Unknown intents are dropped rather than emitted.
  *
  * @param {string} route
- * @param {{env?: string, ref?: any, intent?: string, return?: string}} [context]
+ * @param {{env?: string, ref?: any, intent?: string, return?: string, section?: string}} [context]
  */
 export function buildRoute(route, context = {}) {
   const base = ROUTES.includes(route) ? route : DEFAULT_ROUTE;
@@ -134,6 +139,7 @@ export function buildRoute(route, context = {}) {
   }
   if (context.intent && INTENTS.includes(context.intent)) query.set('intent', context.intent);
   if (context.return) query.set('return', context.return);
+  if (context.section && SETTINGS_SECTIONS.includes(context.section)) query.set('section', context.section);
   const suffix = query.toString();
   return suffix ? `${base}?${suffix}` : base;
 }
