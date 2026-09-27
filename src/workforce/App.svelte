@@ -392,6 +392,27 @@
         <StateNote label="Extension" result={{ state: 'error', note: store.bootError }} />
       {/if}
 
+      <!-- docs/17 §19 Unavailable/Stale: one banner below the surface header,
+           last-known content retained, Refresh/Open source where useful. -->
+      {#if store.resultOf('health') && store.resultOf('health').state !== 'ok'}
+        <div class="banner {store.resultOf('health').state === 'degraded' ? 'degraded' : 'unavailable'}" role="status">
+          <strong>{
+            store.resultOf('health').state === 'network' || store.resultOf('health').state === 'invalid'
+              ? 'Owner unavailable — showing last-known state'
+              : store.resultOf('health').state === 'degraded'
+                ? 'Owner degraded — showing last-known state'
+                : `Owner ${store.resultOf('health').state.replace('_', ' ')}`
+          }</strong>
+          {#if store.resultOf('health').note}<span class="muted tiny">{store.resultOf('health').note}</span>{/if}
+          <div class="row">
+            <button type="button" class="wf-btn" onclick={() => store.refreshOwner()}>Refresh</button>
+            {#if store.active?.baseUrl}
+              <a class="wf-btn" href={store.active.baseUrl} target="_blank" rel="noreferrer">Open source</a>
+            {/if}
+          </div>
+        </div>
+      {/if}
+
       {#if store.scopeGuard.level !== 'ok'}
         <div class="guard {store.scopeGuard.level}" role="status">
           <strong>{store.scopeGuardLabel}</strong>
@@ -2008,6 +2029,10 @@
   .wall-col#wall-col-needs { grid-area: needs; }
   .wall-col#wall-col-verified { grid-area: verified; }
   .wall-exception { border: 1px solid var(--border-warning, #d99a2b); border-radius: var(--radius-md); padding: var(--space-compact); color: var(--text-warning, inherit); }
+  /* docs/17 §19: consistent degraded geometry — one banner, retained content */
+  .banner { border: 1px solid var(--border-default); border-left-width: 4px; border-radius: var(--radius-md); padding: var(--space-compact) var(--space-roomy); display: grid; gap: var(--space-tight); align-items: start; background: var(--bg-surface); }
+  .banner.unavailable { border-left-color: var(--border-warning, #d99a2b); }
+  .banner.degraded { border-left-color: var(--accent); }
   /* <900px: Current Focus → Needs You → Working Now → Verified, one column */
   @media (max-width: 899px) {
     .wall-grid { grid-template-areas: 'needs' 'working' 'verified'; grid-template-columns: minmax(0, 1fr); }
