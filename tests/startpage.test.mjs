@@ -40,8 +40,19 @@ test('start page implements the docs/17 §4 state replacements', () => {
     assert.match(html, new RegExp(`id="${id}"`), id);
   }
   assert.match(js, /Not connected/);
-  assert.match(html, /Your workforce is not connected on this device/);
-  assert.match(html, /Pair Focusa/);
+  // The not-connected state is a LIVING discovery surface, not a pairing wall.
+  assert.match(html, /Looking for your workforce/);
+  assert.match(html, /id="start-connect"/, 'it has a connection surface');
+  assert.match(html, /name or address/, 'it accepts a name or address directly');
+  assert.match(html, /Pair a daemon we cannot see/, 'pairing stays available but secondary');
+  assert.doesNotMatch(html, /Your workforce is not connected on this device/,
+    'the dead pairing copy must not come back');
+  // and it is driven by the shared discovery, with live previews
+  assert.match(js, /discoverDaemons/);
+  assert.match(js, /previewDaemon/);
+  assert.match(js, /watchLiveness/);
+  assert.match(js, /writes/);
+  assert.match(js, /Disconnect|disconnect/);
   // Unpaired replaces everything below the header (no empty sections below).
   assert.match(js, /el\.unpaired\.hidden = true;[\s\S]*el\.private\.hidden = false/);
 });

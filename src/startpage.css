@@ -89,6 +89,44 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
 
 :focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
+/* ── the living connection surface ── */
+.sp-connect { display: grid; gap: 14px; }
+.sp-places { list-style: none; display: flex; flex-wrap: wrap; gap: 18px; margin: 0; padding: 0; }
+.sp-places li { display: inline-flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--text-muted); }
+.sp-places .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
+.sp-places li.ok { color: var(--success); }
+.sp-places li.ok .dot { background: var(--success); }
+.sp-places em { font-style: normal; opacity: .75; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.sp-daemons { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.sp-daemon {
+  display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle); background: var(--surface, var(--bg-inset));
+}
+.sp-daemon.lead { border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.sp-daemon .sp-btn { justify-self: start; }
+.sp-daemon button { justify-self: start; }
+.sp-dhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sp-kind { font: var(--text-small-strong); }
+.sp-daemon code { color: var(--text-secondary); font: var(--text-micro); overflow-wrap: anywhere; }
+.sp-preview { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; font: var(--text-micro); color: var(--text-secondary); }
+.sp-preview b { color: var(--text-primary); }
+.sp-preview .warn, .sp-preview .warn b { color: var(--danger); }
+.sp-preview.pending { color: var(--text-muted); }
+.sp-names { margin: 0; font: var(--text-micro); color: var(--text-muted); overflow-wrap: anywhere; }
+.sp-empty-line { margin: 0; font: var(--text-body); color: var(--text-secondary); }
+.sp-seed { display: flex; gap: 8px; max-width: 520px; }
+.sp-seed input {
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default); background: var(--bg-inset); color: var(--text-primary); font: var(--text-small);
+}
+.sp-seed input::placeholder { color: var(--text-muted); }
+#start-freshness.live { color: var(--success); font-weight: 600; }
+
 /* 600–899px: keep 2 columns only while each can retain >=260px */
 @media (prefers-reduced-motion: no-preference) {
   #start-private > * { animation: sp-rise var(--motion-slow) var(--ease-out) both; }

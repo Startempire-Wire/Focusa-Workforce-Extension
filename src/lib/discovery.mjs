@@ -34,8 +34,8 @@ const HEALTH_PATH = '/v1/health';
  * to an address the operator already owns, never a sweep of a network.
  */
 export const PORT_VARIANTS = Object.freeze([8787, 8788, 8789, 18787]);
-import { listLocalEnvironments } from '../../lib/storage.mjs';
-import { daemonSchemeForHost } from '../../lib/validation.mjs';
+import { listLocalEnvironments } from './storage.mjs';
+import { daemonSchemeForHost } from './validation.mjs';
 
 const REMEMBERED_KEY = 'focusa.workforce.discovered.v1';
 
@@ -336,7 +336,7 @@ export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_
   const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs, extra, onAnswer });
   let paired = [];
   try {
-    const { listConnections } = await import('../../lib/storage.mjs');
+    const { listConnections } = await import('./storage.mjs');
     paired = await listConnections(chromeApi);
   } catch { paired = []; }
   const known = new Set(found.map((daemon) => daemon.baseUrl));

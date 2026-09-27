@@ -23,14 +23,19 @@ test('sidepanel preserves behavior hooks and accessible landmarks', () => {
   assert.match(html, /<script type="module" src="sidepanel\.mjs"><\/script>/);
 });
 
-test('sidepanel follows the docs/17 §3 region order', () => {
-  const order = ['app-header', 'sp-scope', 'orientation-heading', 'sp-needs-heading', 'sp-working-heading', 'sp-verified-heading', 'sp-footer'];
+test('sidepanel follows the docs/17 §3 region order', async () => {
+  const script = fs.readFileSync(path.join(root, 'sidepanel.mjs'), 'utf8');
+  const order = ['app-header', 'sp-scope', 'orientation-heading', 'sp-needs-heading', 'sp-working-heading', 'sp-verified-heading', 'pair-section', 'sp-footer'];
   let cursor = -1;
   for (const region of order) {
     const at = html.indexOf(region);
     assert.ok(at > cursor, region + ' appears in atlas order');
     cursor = at;
   }
+  // The panel's connection surface is alive: discovery, previews, heartbeat.
+  assert.match(html, /id="connect-body"/);
+  assert.match(script, /discoverDaemons|previewDaemon/);
+  assert.match(html, /name or address/);
 });
 
 test('sidepanel visual system supports responsive, light, and reduced-motion users', () => {

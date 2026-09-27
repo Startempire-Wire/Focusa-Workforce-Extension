@@ -7,7 +7,7 @@ import {
   hasKnownDaemon,
   probeDaemon,
   rememberDaemon,
-} from '../src/workforce/lib/discovery.js';
+} from '../src/lib/discovery.mjs';
 
 const TOKEN_KEY = 'focusa.workforce.discovered.v1';
 const ENV_KEY = 'focusa.workforce.local_environments.v1';
@@ -108,7 +108,7 @@ test('a corrupt stored environment is treated as no known daemon, not a crash', 
 });
 
 test('a known host is probed on every plausible Focusa port, never swept', async () => {
-  const { hostCandidates, PORT_VARIANTS } = await import('../src/workforce/lib/discovery.js');
+  const { hostCandidates, PORT_VARIANTS } = await import('../src/lib/discovery.mjs');
   assert.deepEqual(PORT_VARIANTS, [8787, 8788, 8789, 18787], 'a small fixed set, not a range');
   assert.equal(hostCandidates('100.64.1.9').length, PORT_VARIANTS.length);
   // A tailnet literal speaks HTTP; anything else must be HTTPS.
@@ -117,7 +117,7 @@ test('a known host is probed on every plausible Focusa port, never swept', async
 });
 
 test('a seed accepts a name, an address, or a URL with its own port', async () => {
-  const { seedCandidates } = await import('../src/workforce/lib/discovery.js');
+  const { seedCandidates } = await import('../src/lib/discovery.mjs');
   assert.deepEqual(seedCandidates('kh:9999'), ['https://kh:9999'], 'an explicit port is respected exactly');
   assert.equal(seedCandidates('kh').length, 4, 'a bare name is tried on the known ports');
   assert.deepEqual(seedCandidates('127.0.0.1'), ['http://127.0.0.1:8787'], 'loopback is one port');
@@ -126,7 +126,7 @@ test('a seed accepts a name, an address, or a URL with its own port', async () =
 });
 
 test('every daemon that answered is learned for the next cold start', async () => {
-  const { rememberDaemon, discoveryCandidates } = await import('../src/workforce/lib/discovery.js');
+  const { rememberDaemon, discoveryCandidates } = await import('../src/lib/discovery.mjs');
   const chromeApi = chromeWith();
   await rememberDaemon(chromeApi, { baseUrl: 'http://100.64.7.7:8788', label: 'Tailnet' });
   const candidates = await discoveryCandidates(chromeApi);
@@ -137,14 +137,14 @@ test('every daemon that answered is learned for the next cold start', async () =
 });
 
 test('an origin the device cannot reach is reported, never invented', async () => {
-  const { discoverDaemons } = await import('../src/workforce/lib/discovery.js');
+  const { discoverDaemons } = await import('../src/lib/discovery.mjs');
   const result = await discoverDaemons(chromeWith(), { fetchImpl: async () => { throw new Error('down'); } });
   assert.deepEqual(result.found, []);
   assert.ok(result.answers.every((a) => a.ok === false));
 });
 
 test('discovery only probes origins this extension is actually granted', async () => {
-  const { reachableOriginFilter, discoverDaemon } = await import('../src/workforce/lib/discovery.js');
+  const { reachableOriginFilter, discoverDaemon } = await import('../src/lib/discovery.mjs');
   // This device's manifest grants these three (plus the UIAI bridge).
   const chromeApi = {
     permissions: { getAll: async () => ({ origins: ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*'] }) },
@@ -167,14 +167,14 @@ test('discovery only probes origins this extension is actually granted', async (
 });
 
 test('with no permissions API nothing is filtered', async () => {
-  const { reachableOriginFilter } = await import('../src/workforce/lib/discovery.js');
+  const { reachableOriginFilter } = await import('../src/lib/discovery.mjs');
   const reachable = await reachableOriginFilter({ storage: { local: { get: async () => ({}) } } });
   assert.equal(await reachable('http://[::1]:8787'), true);
 });
 
 test('a seed the device cannot reach is refused before any request', async () => {
-  const { seedCandidates } = await import('../src/workforce/lib/discovery.js');
-  const { reachableOriginFilter } = await import('../src/workforce/lib/discovery.js');
+  const { seedCandidates } = await import('../src/lib/discovery.mjs');
+  const { reachableOriginFilter } = await import('../src/lib/discovery.mjs');
   const chromeApi = { permissions: { getAll: async () => ({ origins: ['http://127.0.0.1/*'] }) } };
   const reachable = await reachableOriginFilter(chromeApi);
   const results = [];
@@ -183,7 +183,7 @@ test('a seed the device cannot reach is refused before any request', async () =>
 });
 
 test('a daemon previews what it actually holds, before connecting', async () => {
-  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const { previewDaemon } = await import('../src/lib/discovery.mjs');
   const preview = await previewDaemon({
     baseUrl: 'http://127.0.0.1:8787',
     fetchImpl: async (url) => {
@@ -204,7 +204,7 @@ test('a daemon previews what it actually holds, before connecting', async () => 
 });
 
 test('a preview degrades honestly when only health answers', async () => {
-  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const { previewDaemon } = await import('../src/lib/discovery.mjs');
   const preview = await previewDaemon({
     baseUrl: 'http://100.64.1.9:8787',
     fetchImpl: async (url) => (new URL(String(url)).pathname === '/v1/health'
@@ -218,7 +218,7 @@ test('a preview degrades honestly when only health answers', async () => {
 });
 
 test('an unreachable daemon previews as not alive rather than throwing', async () => {
-  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const { previewDaemon } = await import('../src/lib/discovery.mjs');
   const preview = await previewDaemon({ baseUrl: 'http://127.0.0.1:8787', fetchImpl: async () => { throw new Error('down'); } });
   assert.equal(preview.alive, false);
   assert.equal(preview.batches, null);

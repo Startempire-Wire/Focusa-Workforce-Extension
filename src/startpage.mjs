@@ -11,6 +11,11 @@ import { projectWorkLoop } from './lib/projections.mjs';
 import { runReliableEventStream } from './lib/reconnect.mjs';
 import { listConnections, listLocalEnvironments } from './lib/storage.mjs';
 import { listNotifications, notificationFromEvent, saveNotification } from './lib/notifications.mjs';
+import {
+  discoverDaemons, previewDaemon, rememberDaemon, reachableOriginFilter, seedCandidates, watchLiveness,
+} from './lib/discovery.mjs';
+import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaemonOrigin } from './lib/validation.mjs';
+import { saveLocalEnvironment } from './lib/storage.mjs';
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -38,6 +43,12 @@ const el = {
   working: $('#start-working'),
   verified: $('#start-verified'),
   pair: $('#pair-focusa'),
+  unpairedHeading: $('#start-unpaired-heading'),
+  connect: $('#start-connect'),
+  seedForm: $('#start-seed'),
+  seedInput: $('#start-seed-input'),
+  seedNote: $('#start-seed-note'),
+  telemetry: $('#start-telemetry'),
   publicDate: $('#public-date'),
   publicMission: $('#public-mission'),
   publicWorkforce: $('#public-workforce'),
@@ -72,6 +83,151 @@ function setFreshness(state, text) {
   el.freshness.className = state;
 }
 
+/* ── the living connection surface ──────────────────────────────────────────
+   The Start Page is the calmest face, but it is not inert: it discovers
+   automatically, previews each daemon with that daemon's own reported
+   liveness, and keeps a heartbeat running so freshness is a live fact. */
+let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [] };
+let previews = {};
+let stopHeartbeat = null;
+
+const PLACES = [
+  { label: 'This browser', hosts: ['127.0.0.1', 'localhost', '[::1]'] },
+  { label: 'This device', hosts: ['100.115.92.26', '100.127.113.90'] },
+  { label: 'Tailnet', hosts: null },
+];
+const isTailnet = (host) => {
+  const parts = String(host).split('.');
+  return /^[\d.]+$/.test(host) && parts[0] === '100' && Number(parts[1]) >= 64 && Number(parts[1]) <= 127;
+};
+
+function renderDiscovery() {
+  if (!el.connect) return;
+  el.unpaired.hidden = false;
+  el.private.hidden = true;
+  if (discoveryState.state === 'found') {
+    el.unpairedHeading && (el.unpairedHeading.textContent = 'Your workforce is here');
+    el.connect.innerHTML = `
+      <ul class="sp-daemons">
+        ${discoveryState.daemons.map((daemon) => {
+          const preview = previews[daemon.baseUrl];
+          const lead = daemon.baseUrl === discoveryState.baseUrl;
+          const stats = preview
+            ? `<p class="sp-preview"><span><b>${preview.batches ?? '—'}</b> writes</span><span class="${(preview.failures ?? 0) > 0 ? 'warn' : ''}"><b>${preview.failures ?? '—'}</b> failures</span><span><b>${preview.projectCount ?? '—'}</b> projects</span></p>
+               ${preview.projects?.length ? `<p class="sp-names">${preview.projects.join(' · ')}</p>` : ''}`
+            : '<p class="sp-preview pending">reading what this daemon holds…</p>';
+          return `<li class="sp-daemon${lead ? ' lead' : ''}">
+            <div class="sp-dhead"><span class="sp-kind">${daemon.kindLabel}</span><code>${daemon.baseUrl}</code></div>
+            ${stats}
+            <button type="button" class="sp-btn ${lead ? 'sp-btn-primary' : ''}" data-connect="${daemon.baseUrl}">Connect</button>
+          </li>`;
+        }).join('')}
+      </ul>`;
+    el.connect.querySelectorAll('[data-connect]').forEach((button) => {
+      button.addEventListener('click', () => connect(button.dataset.connect));
+    });
+    return;
+  }
+  if (discoveryState.state === 'none') {
+    el.connect.innerHTML = `<p class="sp-empty-line">No Focusa daemon answered on loopback, this device's bridges or the tailnet.</p>`;
+    return;
+  }
+  const answered = new Set((discoveryState.answers ?? []).filter((a) => a.ok).map((a) => new URL(a.baseUrl).hostname));
+  el.connect.innerHTML = `<ul class="sp-places">${PLACES.map((place) => {
+    const ok = place.hosts ? place.hosts.some((host) => answered.has(host)) : [...answered].some(isTailnet);
+    return `<li class="${ok ? 'ok' : ''}"><span class="dot"></span>${place.label}<em>${ok ? 'found' : 'checking'}</em></li>`;
+  }).join('')}</ul>`;
+}
+
+function loadPreview(baseUrl) {
+  return previewDaemon({ baseUrl })
+    .then((preview) => { previews = { ...previews, [baseUrl]: preview }; renderDiscovery(); renderTelemetry(); })
+    .catch(() => {});
+}
+
+function renderTelemetry() {
+  if (!el.telemetry) return;
+  const baseUrl = liveConnection?.base_url;
+  const preview = baseUrl ? previews[baseUrl] : null;
+  if (!preview) { el.telemetry.hidden = true; return; }
+  el.telemetry.hidden = false;
+  el.telemetry.textContent = `${preview.batches ?? '—'} writes persisted · ${preview.failures ?? '—'} failures · ${preview.projectCount ?? '—'} projects in this daemon`;
+}
+
+async function discover({ extra = [] } = {}) {
+  discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [] };
+  previews = {};
+  renderDiscovery();
+  const { found, answers } = await discoverDaemons(chrome, {
+    extra,
+    onAnswer: (answer) => { discoveryState.answers = [...discoveryState.answers, answer]; renderDiscovery(); },
+  });
+  if (!found.length) { discoveryState = { state: 'none', daemons: [], answers }; renderDiscovery(); return; }
+  discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
+  renderDiscovery();
+  for (const daemon of found) loadPreview(daemon.baseUrl);
+}
+
+async function connect(baseUrl) {
+  const origin = normalizeDaemonOrigin(baseUrl);
+  const already = await hasDaemonOriginPermission(origin).catch(() => false);
+  if (!already) {
+    const granted = await requestDaemonOriginPermission(origin, chrome).catch(() => false);
+    if (!granted) return;
+  }
+  await saveLocalEnvironment({
+    schema: 'focusa.workforce_local_environment.v1',
+    environment_id: `local:${origin}`,
+    label: `Focusa daemon (${origin})`,
+    base_url: origin,
+    created_at: new Date().toISOString(),
+  }, chrome);
+  await rememberDaemon(chrome, { baseUrl: origin, label: 'Focusa daemon' });
+  liveConnection = { connection_id: `local:${origin}`, label: `Focusa daemon (${origin})`, base_url: origin, token: null };
+  await chrome.storage.local.set({ [CONNECTION_KEY]: liveConnection.connection_id });
+  el.connect.hidden = true;
+  el.unpaired.hidden = true;
+  el.private.hidden = false;
+  el.envLabel.textContent = liveConnection.label;
+  await refresh();
+  startStream();
+  stopHeartbeat?.();
+  stopHeartbeat = watchLiveness(origin, (beat) => {
+    discoveryState = { ...discoveryState, alive: beat.ok };
+    if (beat.ok) { el.freshness.className = 'live'; el.freshness.textContent = 'Live'; loadPreview(origin); }
+  });
+}
+
+async function disconnect() {
+  stopHeartbeat?.();
+  stopHeartbeat = null;
+  const { forgetLocalEnvironment } = await import('./lib/storage.mjs');
+  if (liveConnection?.connection_id?.startsWith('local:')) {
+    await forgetLocalEnvironment(liveConnection.connection_id, chrome).catch(() => {});
+  }
+  await chrome.storage.local.remove(CONNECTION_KEY);
+  streamAbort?.abort();
+  liveConnection = null;
+  await discover({});
+}
+
+el.connect?.addEventListener('click', (event) => {
+  if (event.target?.id === 'start-disconnect') disconnect();
+});
+el.seedForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const value = el.seedInput.value.trim();
+  if (!value) return;
+  const reachable = await reachableOriginFilter(chrome);
+  const extra = [];
+  for (const origin of seedCandidates(value)) if (await reachable(origin)) extra.push(origin);
+  if (!extra.length) { el.seedNote.textContent = 'This device is not permitted to reach that address yet.'; return; }
+  el.seedNote.textContent = `Looking for ${value}…`;
+  await discover({ extra });
+  el.seedNote.textContent = discoveryState.state === 'none' ? `No Focusa daemon answered on ${value}.` : '';
+  el.seedInput.value = '';
+});
+
 async function loadSelectedConnection() {
   const [paired, local] = await Promise.all([listConnections(), listLocalEnvironments().catch(() => [])]);
   const records = [...local, ...paired];
@@ -82,6 +238,9 @@ async function loadSelectedConnection() {
     el.envLabel.textContent = liveConnection?.label ?? liveConnection?.environment_id ?? '';
     el.unpaired.hidden = true;
     el.private.hidden = false;
+    el.freshness.insertAdjacentHTML('afterend',
+      '<button type="button" class="sp-link-btn" id="start-disconnect">Disconnect</button>');
+    el.freshness.nextElementSibling?.addEventListener('click', disconnect);
     return true;
   }
   el.envLabel.textContent = 'Not connected';
@@ -117,6 +276,7 @@ async function refresh() {
       : [emptyRow('Nothing needs you right now.')]));
     el.needsCount.textContent = `${needs.length}`;
 
+    renderTelemetry();
     const settled = notifications.filter((n) => n.severity === 'success');
     el.verified.replaceChildren(...(settled.length
       ? settled.slice(0, 3).map((n) => row(n.title, n.timestamp ?? null))
@@ -169,9 +329,18 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
   await import('./startpage-public.mjs');
 } else {
   notifications = await listNotifications().catch(() => []);
+  // Discovery runs first so the face is alive immediately, then any stored
+  // connection is adopted.
+  await discover({});
   const connected = await loadSelectedConnection();
   if (connected) {
     await refresh();
     startStream();
+    if (liveConnection?.base_url) loadPreview(liveConnection.base_url);
+    stopHeartbeat?.();
+    stopHeartbeat = watchLiveness(liveConnection.base_url, (beat) => {
+      if (beat.ok) { el.freshness.className = 'live'; el.freshness.textContent = 'Live'; loadPreview(liveConnection.base_url); }
+      else { el.freshness.className = ''; el.freshness.textContent = 'Reachable but not answering'; }
+    });
   }
 }

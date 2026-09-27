@@ -7,7 +7,7 @@
  */
 import { captureActiveTab, createOrientationPacket, renderOrientationMission } from './lib/orientation.mjs';
 import { startPairing, pollPairing } from './lib/pairing.mjs';
-import { listConnections, listLocalEnvironments, saveLocalEnvironment } from './lib/storage.mjs';
+import { listConnections, listLocalEnvironments, saveLocalEnvironment, forgetLocalEnvironment } from './lib/storage.mjs';
 import { fetchHealth, fetchWorkLoop, fetchRoster } from './lib/api-client.mjs';
 import { projectHealth, projectRoster, projectWorkLoop } from './lib/projections.mjs';
 import { runReliableEventStream } from './lib/reconnect.mjs';
@@ -15,6 +15,10 @@ import { buildSafeSessionConfig, createPreflightedSession, preflightSafeSession 
 import { orchestrateAction } from './lib/orchestration.mjs';
 import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from './lib/notifications.mjs';
 import { auditRecordFromEvent, clearAuditRecords, listAuditRecords, saveAuditRecord } from './lib/audit-log.mjs';
+import {
+  discoverDaemons, previewDaemon, rememberDaemon, reachableOriginFilter, seedCandidates, watchLiveness,
+} from './lib/discovery.mjs';
+import { hasDaemonOriginPermission, requestDaemonOriginPermission } from './lib/validation.mjs';
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -51,6 +55,8 @@ const el = {
   audit: $('#audit'),
   auditCount: $('#audit-count'),
   auditFilter: $('#audit-filter'),
+  connectBody: $('#connect-body'),
+  seed: $('#pair-base-url'),
   auditState: $('#audit-state'),
   clearAudit: $('#clear-audit'),
   notifCount: $('#notification-count'),
@@ -230,6 +236,206 @@ async function controlSession(action, target) {
   }
 }
 
+/* ── the panel's living connection surface ──
+   The same discovery the full page uses: automatic, silent, and honest. Each
+   daemon previews its own liveness and inventory before anything is attached,
+   and the numbers keep moving once a heartbeat is running. */
+let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false };
+let previews = {};
+let stopHeartbeat = null;
+
+const PLACES = [
+  { label: 'This browser', hosts: ['127.0.0.1', 'localhost', '[::1]'] },
+  { label: 'This device', hosts: ['100.115.92.26', '100.127.113.90'] },
+  { label: 'Tailnet', hosts: null },
+];
+
+function isTailnetHost(host) {
+  const parts = String(host).split('.');
+  return /^[\d.]+$/.test(host) && parts[0] === '100' && Number(parts[1]) >= 64 && Number(parts[1]) <= 127;
+}
+
+function placeRows() {
+  const answered = new Set((discoveryState.answers ?? []).filter((a) => a.ok).map((a) => new URL(a.baseUrl).hostname));
+  return PLACES.map((place) => ({
+    label: place.label,
+    ok: place.hosts
+      ? place.hosts.some((host) => answered.has(host))
+      : [...answered].some(isTailnetHost),
+  }));
+}
+
+function previewLine(baseUrl) {
+  const preview = previews[baseUrl];
+  if (!preview) return '<p class="sp-preview pending">reading what this daemon holds…</p>';
+  const parts = [
+    `<span><b>${preview.batches ?? '—'}</b> writes</span>`,
+    `<span class="${(preview.failures ?? 0) > 0 ? 'warn' : ''}"><b>${preview.failures ?? '—'}</b> failures</span>`,
+    `<span><b>${preview.projectCount ?? '—'}</b> projects</span>`,
+  ];
+  const names = (preview.projects ?? []).join(' · ');
+  return `<p class="sp-preview">${parts.join('')}</p>${names ? `<p class="sp-names">${names}</p>` : ''}`;
+}
+
+function node(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function previewNodes(baseUrl) {
+  const preview = previews[baseUrl];
+  if (!preview) return [node('p', 'sp-preview pending', 'reading what this daemon holds…')];
+  const stats = node('p', 'sp-preview');
+  const add = (label, value, warn) => {
+    const span = node('span', warn ? 'warn' : null);
+    span.append(node('b', null, String(value)), document.createTextNode(` ${label}`));
+    stats.append(span);
+  };
+  add('writes', preview.batches ?? '—');
+  add('failures', preview.failures ?? '—', (preview.failures ?? 0) > 0);
+  add('projects', preview.projectCount ?? '—');
+  const nodes = [stats];
+  if (preview.projects?.length) nodes.push(node('p', 'sp-names', preview.projects.join(' · ')));
+  return nodes;
+}
+
+function renderConnection() {
+  el.pairSection.hidden = false;
+  const body = el.connectBody;
+  body.replaceChildren();
+
+  if (discoveryState.state === 'connected') {
+    const live = node('p', 'sp-live');
+    live.append(node('span', `sp-beat${discoveryState.alive ? ' live' : ''}`), node('strong', null, 'Focusa is live'));
+    body.append(live, node('code', 'sp-origin', discoveryState.baseUrl));
+    const preview = previews[discoveryState.baseUrl];
+    if (preview) {
+      const line = node('p', 'sp-telemetry');
+      const b = (v) => node('b', null, String(v));
+      line.append(b(preview.batches ?? '—'), document.createTextNode(' writes · '), b(preview.failures ?? '—'),
+        document.createTextNode(' failures · '), b(preview.projectCount ?? '—'), document.createTextNode(' projects'));
+      body.append(line);
+    }
+    const disconnect = node('button', 'btn btn-quiet', 'Disconnect');
+    disconnect.type = 'button';
+    disconnect.addEventListener('click', disconnectDaemon);
+    body.append(disconnect);
+    return;
+  }
+
+  if (discoveryState.state === 'found') {
+    const head = node('p', 'sp-live');
+    head.append(node('span', 'sp-beat live'), node('strong', null, `${discoveryState.daemons.length} Focusa daemon${discoveryState.daemons.length > 1 ? 's' : ''}`));
+    const list = node('ul', 'sp-daemons');
+    for (const daemon of discoveryState.daemons) {
+      const item = node('li', `sp-daemon${daemon.baseUrl === discoveryState.baseUrl ? ' lead' : ''}`);
+      const head2 = node('div', 'sp-dhead');
+      head2.append(node('span', 'sp-kind', daemon.kindLabel), node('code', null, daemon.baseUrl));
+      const button = node('button', `btn${daemon.baseUrl === discoveryState.baseUrl ? ' btn-primary' : ''}`, 'Connect');
+      button.type = 'button';
+      button.addEventListener('click', () => connectDaemon(daemon.baseUrl));
+      item.append(head2, ...previewNodes(daemon.baseUrl), button);
+      list.append(item);
+    }
+    body.append(head, list);
+    return;
+  }
+
+  if (discoveryState.state === 'discovering') {
+    const head = node('p', 'sp-live');
+    head.append(node('span', 'sp-pulse'), node('strong', null, 'Looking for Focusa'));
+    const places = node('ul', 'sp-places');
+    for (const place of placeRows()) {
+      const item = node('li', place.ok ? 'ok' : null);
+      item.append(node('span', 'dot'), document.createTextNode(place.label), node('em', null, place.ok ? 'found' : 'checking'));
+      places.append(item);
+    }
+    body.append(head, places);
+    return;
+  }
+
+  body.append(
+    node('p', 'sp-live', 'No Focusa daemon answered'),
+    node('p', 'sp-meta', 'loopback, this device\'s bridges and the tailnet were checked. Name one above to look again.'),
+  );
+  const again = node('button', 'btn', 'Look again');
+  again.type = 'button';
+  again.addEventListener('click', () => discover({}));
+  body.append(again);
+}
+
+function loadPreview(baseUrl) {
+  return previewDaemon({ baseUrl })
+    .then((preview) => { previews = { ...previews, [baseUrl]: preview }; renderConnection(); })
+    .catch(() => {});
+}
+
+async function discover({ extra = [] } = {}) {
+  discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [] };
+  previews = {};
+  renderConnection();
+  const { found, answers } = await discoverDaemons(chrome, {
+    extra,
+    onAnswer: (answer) => { discoveryState.answers = [...discoveryState.answers, answer]; renderConnection(); },
+  });
+  if (!found.length) { discoveryState = { state: 'none', daemons: [], answers }; renderConnection(); return; }
+  discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
+  renderConnection();
+  for (const daemon of found) loadPreview(daemon.baseUrl);
+}
+
+async function connectDaemon(baseUrl) {
+  const already = await hasDaemonOriginPermission(baseUrl).catch(() => false);
+  if (!already) {
+    const granted = await requestDaemonOriginPermission(baseUrl, chrome).catch(() => false);
+    if (!granted) return;
+  }
+  await saveLocalEnvironment({
+    schema: 'focusa.workforce_local_environment.v1',
+    environment_id: `local:${baseUrl}`,
+    label: `Focusa daemon (${baseUrl})`,
+    base_url: baseUrl,
+    created_at: new Date().toISOString(),
+  }, chrome);
+  await rememberDaemon(chrome, { baseUrl, label: 'Focusa daemon' });
+  await loadConnectionOptions(`local:${baseUrl}`);
+  discoveryState = { ...discoveryState, state: 'connected', baseUrl, alive: true };
+  stopHeartbeat?.();
+  stopHeartbeat = watchLiveness(baseUrl, (beat) => {
+    discoveryState = { ...discoveryState, alive: beat.ok };
+    renderConnection();
+    if (beat.ok) loadPreview(baseUrl);
+  });
+  renderConnection();
+}
+
+async function disconnectFromDaemon() {
+  stopHeartbeat?.();
+  stopHeartbeat = null;
+  if (connection) await forgetLocalEnvironment(connection.connection_id ?? connection.environment_id, chrome).catch(() => {});
+  streamAbort?.abort();
+  connection = null;
+  discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [] };
+  await loadConnectionOptions();
+  await discover({});
+}
+
+el.pairForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const value = el.seed.value.trim();
+  if (!value) return;
+  const reachable = await reachableOriginFilter(chrome);
+  const extra = [];
+  for (const origin of seedCandidates(value)) if (await reachable(origin)) extra.push(origin);
+  if (!extra.length) { el.pairResult.textContent = 'This device is not permitted to reach that address yet.'; return; }
+  el.pairResult.textContent = `Looking for ${value}…`;
+  await discover({ extra });
+  el.pairResult.textContent = discoveryState.state === 'none' ? `No Focusa daemon answered on ${value}.` : '';
+  el.seed.value = '';
+});
+
 /* ── connection lifecycle ── */
 async function loadConnectionOptions(preferred = null) {
   const [paired, local] = await Promise.all([listConnections(), listLocalEnvironments().catch(() => [])]);
@@ -354,4 +560,14 @@ Promise.all([listNotifications(), listAuditRecords()])
   .then(([items, audits]) => { notifications = items; auditRecords = audits; renderVerified(); renderAudit(); })
   .catch(() => { renderVerified(); renderAudit(); });
 
-loadConnectionOptions().catch((error) => setStatus(el.status, 'degraded', safeError(error)));
+// The panel discovers first, then adopts any stored connection, so the surface
+// is alive from the moment it opens.
+(async () => {
+  await discover({});
+  await loadConnectionOptions().catch((error) => setStatus(el.status, 'degraded', safeError(error)));
+  if (connection) {
+    discoveryState = { ...discoveryState, state: 'connected', baseUrl: connection.base_url, alive: true };
+    renderConnection();
+    loadPreview(connection.base_url);
+  }
+})();

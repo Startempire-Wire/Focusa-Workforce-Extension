@@ -102,13 +102,17 @@
     </section>
 
     <!-- PAIRING (unpaired replacement; collapsed when connected) -->
-    <section class="sp-section" id="pair-section" aria-labelledby="sp-pair-heading" hidden>
-      <h2 id="sp-pair-heading" class="sp-label">Connect Focusa</h2>
-      <p class="sp-meta">Pair an environment to operate your workforce here.</p>
+    <!-- CONNECTION (docs/17 §3): the panel's own living connection surface.
+         Replaces the pairing wall: discovery is automatic and silent, each
+         daemon previews what it really holds, attaching is one click, and
+         Disconnect lives right here. -->
+    <section class="sp-section sp-connect" id="pair-section" aria-labelledby="sp-connect-heading" hidden>
+      <h2 id="sp-connect-heading" class="sp-label">Focusa</h2>
+      <div id="connect-body" class="sp-connect-body" role="status" aria-live="polite"></div>
       <form id="pair-form" class="sp-pair-form">
         <label class="sr-only" for="pair-base-url">Focusa address</label>
-        <input id="pair-base-url" name="base_url" placeholder="https://daemon.example:8787" required>
-        <button id="pair-start" type="submit" class="btn btn-primary">Open pairing</button>
+        <input id="pair-base-url" name="base_url" placeholder="name or address, e.g. kh or 100.64.1.9:8788">
+        <button id="pair-start" type="submit" class="btn">Find</button>
       </form>
       <p id="pair-result" class="sp-meta" aria-live="polite"></p>
       <p id="pair-code" class="sp-pair-code" hidden></p>
