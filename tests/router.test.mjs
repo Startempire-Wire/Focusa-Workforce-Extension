@@ -13,7 +13,7 @@ import {
 
 test('ROUTES is frozen and exact (docs/11 §3 + docs/18 §4)', () => {
   assert.ok(Object.isFrozen(ROUTES));
-  // Overview → Work → People → Needs You → Evidence → Topology → Audit → Settings
+  // Overview → Work → People → Needs You → Evidence → Topology → Audit → Settings → Wall
   assert.deepEqual(ROUTES, [
     '#/overview',
     '#/work',
@@ -27,6 +27,7 @@ test('ROUTES is frozen and exact (docs/11 §3 + docs/18 §4)', () => {
     '#/topology',
     '#/audit',
     '#/settings',
+    '#/wall',
   ]);
 });
 

@@ -213,6 +213,10 @@
     }
   });
 
+  /* Wall face state (docs/17 §16: ambient read-only board) */
+  const wallWorking = $derived(store.roster.filter((entry) => /working|active/.test(String(entry.state ?? ''))));
+  const wallVerified = $derived(store.evidenceTrail.entries.filter((entry) => entry.kind === 'receipt' || entry.kind === 'projection'));
+
   const freshLabel = $derived(
     store.foremanCard.freshness ?? (store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'),
   );
@@ -230,12 +234,13 @@
       : route === '#/topology' ? 'Topology'
       : route === '#/audit' ? 'Audit'
       : route === '#/settings' ? 'Settings'
+      : route === '#/wall' ? 'Wall'
       : 'Workforce',
   );
 
   const activeNav = $derived(navItemForRoute(route));
 
-  /* ---- primary nav from docs/18 §4 (Needs You deliberately absent) ---- */
+  /* ---- primary nav from docs/18 §4 (Needs You intentionally absent; Wall is an ambient addressable target, not primary nav) ---- */
   const NAV = $derived([
     { route: '#/overview', label: 'Overview' },
     { route: '#/work', label: 'Work' },
@@ -355,12 +360,17 @@
         {/each}
       </ul>
       <div class="nav-spacer" aria-hidden="true"></div>
-      <!-- Needs You: addressable non-nav route (context rail + deep link) -->
+      <!-- Needs You + Wall: addressable non-nav routes (docs/18 §4; ambient/contextual) -->
       <ul class="nav-list nav-nonmain">
         <li>
           <a class="nav-item needs-you {activeNav === 'Needs You' ? 'active' : ''}" href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}>
             Needs You
             <span class="nav-count" aria-label={`${counts.needsYou} items`}>{counts.needsYou}</span>
+          </a>
+        </li>
+        <li>
+          <a class="nav-item {activeNav === 'Wall' ? 'active' : ''}" href="#/wall" onclick={(e) => { e.preventDefault(); navigate('#/wall'); }}>
+            Wall
           </a>
         </li>
       </ul>
@@ -1372,6 +1382,78 @@
           {/if}
         </section>
 
+      {:else if route === '#/wall'}
+        <!-- ============ WALL (docs/17 §16: ambient, read-only, distance board) ============ -->
+        <section class="wall" aria-labelledby="wf-wall">
+          <header class="wall-bar">
+            <h2 id="wf-wall" class="wall-bar-title">Focusa Workforce</h2>
+            <span class="wall-fresh">
+              {#if store.resultOf('health')?.state === 'ok'}● Fresh{:else}● {store.resultOf('health')?.state ?? 'no environment'}{/if}
+              {store.active ? ` · ${store.active.label}` : ''}
+            </span>
+          </header>
+
+          <div class="wall-focus">
+            <h3 class="wall-section-label">Current focus</h3>
+            {#if store.foremanCard.objective}
+              <p class="wall-focus-title">{store.foremanCard.objective}</p>
+              {#if store.foremanCard.frontier}<p class="wall-focus-sub">{store.foremanCard.frontier}</p>{/if}
+              <p class="muted tiny">frontier via {store.foremanCard.source}{#if store.foremanCard.revision} · rev {store.foremanCard.revision}{/if}</p>
+            {:else}
+              <p class="wall-focus-title empty">No current focus reported.</p>
+            {/if}
+          </div>
+
+          <div class="wall-grid">
+            <section class="wall-col" aria-labelledby="wf-wall-working">
+              <h3 id="wf-wall-working" class="wall-section-label">Working now <span class="count-chip">{wallWorking.length}</span></h3>
+              {#if wallWorking.length === 0}
+                <p class="muted tiny">No working members reported.</p>
+              {:else}
+                <ul class="items compact">
+                  {#each wallWorking.slice(0, 3) as row (row.id)}
+                    <li><strong>{row.label}</strong><span class="muted tiny">{row.state}{#if row.role} · {row.role}{/if}</span></li>
+                  {/each}
+                </ul>
+              {/if}
+            </section>
+
+            <section class="wall-col" aria-labelledby="wf-wall-needs">
+              <h3 id="wf-wall-needs" class="wall-section-label">Needs you <span class="count-chip">{counts.needsYou}</span></h3>
+              {#if store.needsYou.items.length === 0}
+                <p class="muted tiny">Nothing needs a human decision right now.</p>
+              {:else}
+                <ul class="items compact">
+                  {#each store.needsYou.items.slice(0, 3) as item (`${item.kind}:${item.label}`)}
+                    <li><strong>{item.label}</strong><span class="muted tiny">{item.kind.replace('_', ' ')}</span></li>
+                  {/each}
+                </ul>
+                {#if store.needsYou.items.length > 3}<p class="muted tiny">…and {store.needsYou.items.length - 3} more on <a href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}>Needs You</a>.</p>{/if}
+              {/if}
+            </section>
+
+            <section class="wall-col" aria-labelledby="wf-wall-verified">
+              <h3 id="wf-wall-verified" class="wall-section-label">Verified recently <span class="count-chip">{wallVerified.length}</span></h3>
+              {#if wallVerified.length === 0}
+                <p class="muted tiny">No settled owner references yet.</p>
+              {:else}
+                <ul class="items compact">
+                  {#each wallVerified.slice(0, 3) as entry (`${entry.kind}:${entry.ref}`)}
+                    <li><span class="kind">{entry.kind}</span><code>{entry.ref}</code></li>
+                  {/each}
+                </ul>
+                {#if wallVerified.length > 3}<p class="muted tiny">…and {wallVerified.length - 3} more on <a href="#/evidence" onclick={(e) => { e.preventDefault(); navigate('#/evidence'); }}>Evidence</a>.</p>{/if}
+              {/if}
+            </section>
+          </div>
+
+          {#if store.anyBlocked || environmentError || store.pairingError}
+            <p class="wall-exception">Exception (material only): {store.anyBlocked ? 'entitlement policy is denying canonical operations' : ''}{environmentError ? ` ${environmentError}` : ''}{store.pairingError ? ` ${store.pairingError}` : ''} — <a href="#/topology" onclick={(e) => { e.preventDefault(); navigate('#/topology'); }}>Topology</a></p>
+          {/if}
+
+          <p class="muted tiny">Ambient read-only view; when content overflows, the board summarizes and hands off to the <a href="#/work" onclick={(e) => { e.preventDefault(); navigate('#/work'); }}>Full Workforce</a> (docs/17 §16). No scrolling log.</p>
+        </section>
+
       {:else if route === '#/settings'}
         <!-- ============ SETTINGS / CONNECTIONS (docs/17 §15) ============ -->
         {@const settingsSection = routeCtx.params.section ?? 'connections'}
@@ -1870,6 +1952,25 @@
   .env-select:hover { border-color: var(--accent); }
   .pair-code { font-size: 1.4rem; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
   .stack { display: grid; gap: var(--space-tight); }
+  /* Wall (docs/17 §16): larger type, 32–40px gutters, max 1600px, read-only */
+  .wall { max-width: 1600px; display: grid; gap: 32px; }
+  .wall-bar { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-standard); border-bottom: 1px solid var(--border-default); padding-bottom: var(--space-tight); }
+  .wall-bar-title { margin: 0; font-size: 1.15rem; }
+  .wall-fresh { color: var(--text-muted); font-size: var(--text-small); }
+  .wall-focus { display: grid; gap: var(--space-tight); max-width: 46rem; }
+  .wall-section-label { margin: 0; font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .wall-focus-title { margin: 0; font-size: clamp(1.75rem, 2.5vw, 2rem); font-weight: 650; line-height: 1.15; }
+  .wall-focus-sub { margin: 0; font-size: 1.05rem; color: var(--text-muted); }
+  .wall-grid { display: grid; grid-template-areas: 'working needs verified'; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 40px; }
+  .wall-col { display: grid; gap: var(--space-tight); align-content: start; }
+  .wall-col#wall-col-working { grid-area: working; }
+  .wall-col#wall-col-needs { grid-area: needs; }
+  .wall-col#wall-col-verified { grid-area: verified; }
+  .wall-exception { border: 1px solid var(--border-warning, #d99a2b); border-radius: var(--radius-md); padding: var(--space-compact); color: var(--text-warning, inherit); }
+  /* <900px: Current Focus → Needs You → Working Now → Verified, one column */
+  @media (max-width: 899px) {
+    .wall-grid { grid-template-areas: 'needs' 'working' 'verified'; grid-template-columns: minmax(0, 1fr); }
+  }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is

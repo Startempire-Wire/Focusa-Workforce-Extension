@@ -35,6 +35,7 @@ export const ROUTES = Object.freeze([
   '#/topology',
   '#/audit',
   '#/settings',
+  '#/wall',
 ]);
 
 /** Only these intents are recognised (docs/11 §3.1). */
@@ -153,5 +154,6 @@ export function navItemForRoute(route) {
   if (route.startsWith('#/topology')) return 'Topology';
   if (route.startsWith('#/audit')) return 'Audit';
   if (route.startsWith('#/settings')) return 'Settings';
+  if (route.startsWith('#/wall')) return 'Wall';
   return 'Overview';
 }
