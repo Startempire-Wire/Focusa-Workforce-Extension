@@ -192,6 +192,19 @@
     })(),
   );
 
+  /* ---- Audit face state (docs/17 §14: causal timeline) ---- */
+  let auditClassFilter = $state('all');
+  let auditActorFilter = $state('');
+  const auditActors = $derived([...new Set(store.activity.map((e) => e.origin).filter(Boolean))]);
+  const auditTimeline = $derived(
+    store.activity.filter((event) => {
+      if (auditClassFilter === 'observation' && !event.observation) return false;
+      if (auditClassFilter === 'decision' && event.observation) return false;
+      if (auditActorFilter && event.origin !== auditActorFilter) return false;
+      return true;
+    }),
+  );
+
   const freshLabel = $derived(
     store.foremanCard.freshness ?? (store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'),
   );
@@ -1286,15 +1299,43 @@
           {#if store.activity.length === 0}
             <p class="empty">Focusa has not reported recent activity for this scope.</p>
           {:else}
-            <ul class="items compact">
-              {#each store.activity.slice(0, 10) as event (event.id ?? `${event.type}-${event.timestamp}`)}
-                <li>
-                  <strong>{event.type ?? 'event'}</strong>
-                  {#if event.observation}<span class="kind">observation</span>{/if}
-                  <span class="muted tiny">{event.timestamp ?? ''}{#if event.origin} · {event.origin}{/if}</span>
+            <div class="row audit-tools">
+              <label class="field audit-filter">
+                <span>Event class</span>
+                <select value={auditClassFilter} onchange={(e) => (auditClassFilter = e.currentTarget.value)}>
+                  <option value="all">All events</option>
+                  <option value="decision">Decisions</option>
+                  <option value="observation">Observations</option>
+                </select>
+              </label>
+              <label class="field audit-filter">
+                <span>Actor</span>
+                <select value={auditActorFilter} onchange={(e) => (auditActorFilter = e.currentTarget.value)}>
+                  <option value="">All actors</option>
+                  {#each auditActors as actor (actor)}
+                    <option value={actor}>{actor}</option>
+                  {/each}
+                </select>
+              </label>
+            </div>
+            <ol class="timeline">
+              {#each auditTimeline.slice(0, 12) as event (event.id ?? `${event.type}-${event.timestamp}`)}
+                <li class:observation={event.observation}>
+                  <time class="t-time">{event.timestamp ?? '—'}</time>
+                  <span class="t-body">
+                    <strong>{event.type ?? 'event'}</strong>
+                    {#if event.observation}<span class="kind">observation</span>{/if}
+                    {#if event.origin}<span class="muted tiny">actor {event.origin}</span>{/if}
+                    {#if event.sessionId}<span class="muted tiny">workstream/session {event.sessionId}</span>{/if}
+                  </span>
+                  <details class="capability t-tech">
+                    <summary>raw</summary>
+                    <pre class="output">{JSON.stringify(event, null, 1)}</pre>
+                  </details>
                 </li>
               {/each}
-            </ul>
+            </ol>
+            <p class="muted tiny">Single vertical causal timeline (docs/17 §14); technical raw events are a per-row verbosity toggle, never a parallel default table. Result/proof cues render when the owner reports them.</p>
           {/if}
           <StateNote label="Events" result={store.resultOf('events')} />
         </section>
@@ -1746,6 +1787,17 @@
   }
   .body-card.active { border-color: var(--accent); }
   .body-head { display: flex; align-items: center; gap: var(--space-tight); justify-content: space-between; }
+  .audit-tools { align-items: center; }
+  .audit-filter { flex: 0 1 13rem; }
+  .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-left: 1px solid var(--border-default); }
+  .timeline li {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: var(--space-tight);
+    align-items: baseline; padding: var(--space-tight) var(--space-compact); border-bottom: 1px solid var(--border-default);
+  }
+  .timeline li.observation { background: var(--bg-subtle); }
+  .t-time { font-size: var(--text-micro); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .t-body { display: flex; flex-wrap: wrap; gap: var(--space-tight); align-items: baseline; font-size: var(--text-small); }
+  .t-tech { font-size: var(--text-micro); }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
