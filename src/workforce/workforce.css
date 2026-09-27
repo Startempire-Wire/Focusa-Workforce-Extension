@@ -75,6 +75,10 @@ body {
 .fresh.stale { background: var(--warning-weak); border-color: transparent; color: var(--warning); }
 .fresh.unavailable { background: var(--danger-weak); border-color: transparent; color: var(--danger); }
 .fresh.idle { background: var(--bg-subtle); color: var(--text-muted); }
+.live-chip.streaming { background: var(--success-weak); color: var(--success); }
+@media (prefers-reduced-motion: no-preference) {
+  .live-chip.streaming { animation: wfx-heart 3.2s ease-in-out infinite; }
+}
 .topbar .rail-open-btn { display: none; }
 
 .body { display: grid; grid-template-columns: 216px minmax(0, 1fr) 304px; flex: 1; min-height: 0; }
@@ -88,7 +92,7 @@ body {
 .nav-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .nav-spacer { flex: 1; }
 .nav-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   padding: 9px 12px; border-radius: var(--radius-sm);
   color: var(--text-secondary); text-decoration: none; font: var(--text-body-strong);
 }
@@ -116,7 +120,7 @@ body {
 .rail-head { display: none; }
 .rail-title { margin: 0; font: var(--text-title); }
 .rail-block { display: grid; gap: 8px; align-content: start; }
-.rail-block h3 { margin: 0; font: var(--text-kicker); letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
+.rail-block h3 { display: flex; align-items: center; gap: 6px; margin: 0; font: var(--text-kicker); letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
 .rail-close { display: none; }
 .count-big { font: var(--text-display-2); color: var(--text-primary); margin: 0; }
 .rail-facts { font: var(--text-small); }
@@ -128,6 +132,8 @@ body {
   display: flex; flex-direction: column; gap: 10px; min-width: 0;
 }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card-head h2, .wd-split h2, .settings h2, .wall-cols h2, .main > h2 { display: flex; align-items: center; gap: 8px; }
+.btn .icon, .wf-btn .icon { opacity: .9; }
 h2, h3, h4 { margin: 0; font: var(--text-title); }
 .wf-section-label { font: var(--text-kicker); }
 h3.sub { font: var(--text-body-strong); color: var(--text-primary); }
@@ -160,6 +166,8 @@ h3.sub { font: var(--text-body-strong); color: var(--text-primary); }
 .btn-primary, .wf-btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover, .wf-btn-primary:hover { background: var(--accent-hover); }
 .btn-quiet { border-color: transparent; background: transparent; color: var(--text-secondary); }
+.btn.danger { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); background: var(--danger-weak); }
+.btn.danger:hover { background: color-mix(in srgb, var(--danger) 16%, transparent); }
 .btn-quiet:hover { background: var(--bg-subtle); }
 .row { display: flex; flex-wrap: wrap; gap: var(--space-unit); align-items: center; }
 .inline-link { font: var(--text-small-strong); color: var(--accent); }
@@ -191,9 +199,53 @@ h3.sub { font: var(--text-body-strong); color: var(--text-primary); }
 .connect-bar p { margin: 0; font: var(--text-body); }
 .connect-bar code { overflow-wrap: anywhere; }
 .connect-bar.found { border-color: var(--accent-edge); background: var(--bg-surface); box-shadow: var(--elevation-1); }
+/* Every daemon discovery can see, each one click away. */
+.daemons { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.daemon {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); background: var(--bg-inset);
+  font: var(--text-small);
+}
+.daemon.primary { border-color: var(--success); background: var(--success-weak); }
+.daemon-name { font-weight: 600; }
+.daemon code { overflow-wrap: anywhere; }
+.daemon .wf-btn { margin-left: auto; }
+
 .connect-bar.ok { border-color: transparent; background: var(--success-weak); color: var(--success); }
 .connect-bar.searching { justify-content: space-between; }
 .connect-lead { font: var(--text-body-strong); }
+
+/* A living daemon, shown honestly: the breath runs only while a health probe is
+   actually answering, and every animation is disabled when the OS asks for less
+   motion (docs/17 §21.7, reduced motion). */
+.beat {
+  display: inline-block; width: 8px; height: 8px; margin-right: 8px;
+  border-radius: 50%; background: var(--border-strong); vertical-align: middle;
+}
+.beat.live { background: var(--success); }
+.beat-btn { position: relative; }
+.connect-bar.found p { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+
+@keyframes wfx-heart { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.32); opacity: .72; } }
+@keyframes wfx-halo {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 12px color-mix(in srgb, var(--success) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 0%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .beat.live { animation: wfx-heart 2.4s ease-in-out infinite; }
+  .beat-btn.live { animation: wfx-halo 2.4s ease-out infinite; }
+}
+
+/* Face transition: each region settles in as it becomes the current face. */
+.face { display: contents; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes wfx-face-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+  .main > .face > * { animation: wfx-face-in 220ms cubic-bezier(.2, .7, .3, 1) both; }
+  .main > .face > *:nth-child(2) { animation-delay: 26ms; }
+  .main > .face > *:nth-child(3) { animation-delay: 46ms; }
+}
 .places { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 0; }
 .place { display: inline-flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--text-muted); }
 .place .dot {
@@ -312,6 +364,12 @@ textarea { min-height: 76px; resize: vertical; }
 .body-card.active { border-color: var(--accent-edge); background: var(--accent-weak); }
 .body-card h4 { font: var(--text-body-strong); }
 details.tech { border-top: 1px dashed var(--border-subtle); padding-top: 6px; }
+.cap-head { margin-top: 10px; font: var(--text-small-strong); }
+.cap-families { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 3px; }
+.cap-families li { display: flex; justify-content: space-between; gap: 8px; font: var(--text-micro); color: var(--text-secondary); }
+.cap-ops { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.cap-ops li { display: grid; gap: 1px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--bg-subtle); }
+.cap-ops code { overflow-wrap: anywhere; }
 details.tech summary { cursor: pointer; font: var(--text-micro); color: var(--text-secondary); }
 
 /* ────────────────────────── §14 AUDIT ────────────────────────── */

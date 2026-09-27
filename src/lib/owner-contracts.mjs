@@ -46,6 +46,7 @@ const op = (id, method, path, scopes, family, docs, mutating = false) =>
 /** Real owning operations Workforce binds to. */
 export const OPERATIONS = Object.freeze({
   health: op('focusa.health.check', 'GET', '/v1/health', [], 'base_focusa', 'docs/05'),
+  operations: op('focusa.agent.operations', 'GET', '/v1/agent/operations', [], 'base_focusa', 'docs/05'),
 
   // Project (owner of the project boundary)
   projectIdentity: op('focusa.project.identity', 'GET', '/v1/project/identity', ['project_root'], 'base_focusa', 'docs/135a'),

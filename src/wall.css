@@ -48,6 +48,8 @@ body {
   background: var(--bg-subtle); border: 1px solid var(--line);
   font: var(--text-small-strong); color: var(--muted);
 }
+.ic { width: 18px; height: 18px; flex: none; }
+.wall-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .wall-fresh.ok { background: var(--success-weak); color: var(--success); border-color: transparent; }
 .wall-fresh.stale { background: var(--warning-weak); color: var(--warning); border-color: transparent; }
 .wall-fresh.unavailable { background: var(--danger-weak); color: var(--danger); border-color: transparent; }
@@ -70,7 +72,7 @@ body {
   display: flex; flex-direction: column; gap: 12px; min-width: 0;
 }
 .wall-col-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.wall-col-head h2 { margin: 0; font: 600 clamp(16px, 1.4vw, 18px)/1.3 var(--font-sans); }
+.wall-col-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 clamp(16px, 1.4vw, 18px)/1.3 var(--font-sans); }
 .wall-count { font: var(--text-body-strong); color: var(--muted); }
 
 .wall-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -102,6 +104,11 @@ body {
   .wall-col:nth-of-type(3) { order: 3; }  /* Verified Recently */
   .wall-readonly { display: none; }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .wall-fresh.ok .wall-dot { animation: wall-breathe 3s ease-in-out infinite; }
+}
+@keyframes wall-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: .7; } }
 
 @media (prefers-color-scheme: light) { :root { color-scheme: light; } }
 @media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }

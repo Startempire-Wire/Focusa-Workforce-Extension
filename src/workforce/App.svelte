@@ -13,6 +13,7 @@
    */
   import { onMount } from 'svelte';
   import StateNote from './components/StateNote.svelte';
+  import Icon from './components/Icon.svelte';
   import { buildRoute, navItemForRoute, parseRoute, ROUTES, INTENTS } from './lib/router.js';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
   import { localDaemonCandidates } from './lib/local-daemon.js';
@@ -181,7 +182,7 @@
   <!-- HEADER (docs/17 §6): Operator · Environment / Project / Workstream · Fresh -->
   <header class="topbar">
     <div class="brand">
-      <span class="mark" aria-hidden="true">F</span>
+      <span class="mark" aria-hidden="true"><Icon name="layers" size={17} /></span>
       <div class="brand-text">
         <p class="wf-section-label">Focusa Workforce</p>
         <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -200,8 +201,14 @@
     <div class="topbar-right">
       <button type="button" class="wf-btn rail-open-btn" aria-expanded={railOpen} onclick={() => (railOpen = !railOpen)}>Context</button>
       <span class="posture-chip">{store.entitlementState ?? 'unknown'}</span>
-      <span class="fresh {freshClass}">{freshLabel}</span>
-      <button type="button" class="wf-btn" onclick={() => store.refreshOwner()} disabled={!store.active}>Refresh</button>
+      {#if store.active}
+        <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
+          {store.streamState?.phase === 'open' ? 'Live' : freshLabel}
+        </span>
+      {:else}
+        <span class="fresh {freshClass}">{freshLabel}</span>
+      {/if}
+      <button type="button" class="wf-btn" onclick={() => store.refreshOwner()} disabled={!store.active}><Icon name="refresh" size={16} /> Refresh</button>
     </div>
   </header>
 
@@ -209,20 +216,24 @@
     <!-- NAV (docs/17 §6: Needs You is NOT a primary nav item) -->
     <nav class="nav" aria-label="Workforce">
       <ul class="nav-list">
-        {#each [['#/overview', 'Overview'], ['#/work', 'Work'], ['#/people', 'People'], ['#/evidence', 'Evidence'], ['#/topology', 'Topology'], ['#/audit', 'Audit'], ['#/settings', 'Settings']] as [href, label] (href)}
+        {#each [['#/overview', 'Overview', 'overview'], ['#/work', 'Work', 'work'], ['#/people', 'People', 'people'], ['#/evidence', 'Evidence', 'evidence'], ['#/topology', 'Topology', 'topology'], ['#/audit', 'Audit', 'audit'], ['#/settings', 'Settings', 'settings']] as [href, label, icon] (href)}
           <li>
-            <a class="nav-item" class:active={navLabel === label} {href} onclick={(e) => { e.preventDefault(); navigate(href); }}>{label}</a>
+            <a class="nav-item" class:active={navLabel === label} {href} onclick={(e) => { e.preventDefault(); navigate(href); }}>
+              <Icon name={icon} size={17} />
+              <span>{label}</span>
+            </a>
           </li>
         {/each}
       </ul>
       <div class="nav-spacer" aria-hidden="true"></div>
       <ul class="nav-list nav-nonmain">
-        <li><a class="nav-item" class:active={navLabel === 'Needs You'} href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}>Needs You <span class="nav-count" aria-label={`${needsItems.length} items`}>{needsItems.length}</span></a></li>
-        <li><a class="nav-item" class:active={navLabel === 'Wall'} href="#/wall" onclick={(e) => { e.preventDefault(); navigate('#/wall'); }}>Wall</a></li>
+        <li><a class="nav-item" class:active={navLabel === 'Needs You'} href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}><Icon name="attention" size={17} /><span>Needs You</span> <span class="nav-count" aria-label={`${needsItems.length} items`}>{needsItems.length}</span></a></li>
+        <li><a class="nav-item" class:active={navLabel === 'Wall'} href="#/wall" onclick={(e) => { e.preventDefault(); navigate('#/wall'); }}><Icon name="wall" size={17} /><span>Wall</span></a></li>
       </ul>
     </nav>
 
     <div class="main" id="wf-main" tabindex="-1">
+      {#key route}<div class="face">
       {#if store.bootError}<StateNote label="Extension" result={{ state: 'error', note: store.bootError }} />{/if}
 
       <!-- Discovery: silent and read-only. Attaching is one deliberate click, so
@@ -239,11 +250,26 @@
       {/if}
       {#if store.discovery.state === 'found' && !store.active}
         <div class="connect-bar found" role="status">
-          <p><strong>Focusa found</strong> at <code>{store.discovery.baseUrl}</code></p>
-          <div class="row">
-            <button type="button" class="wf-btn btn-primary" onclick={() => store.connectDiscovered()}>Connect</button>
-            <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Connect another daemon</a>
-          </div>
+          <p>
+            <span class="beat" class:live={store.discovery.alive} aria-hidden="true"></span>
+            <strong>{store.discovery.daemons?.length > 1 ? `${store.discovery.daemons.length} Focusa daemons available` : 'Focusa is live'}</strong>
+          </p>
+          <ul class="daemons">
+            {#each store.discovery.daemons ?? [] as daemon (daemon.baseUrl)}
+              <li class="daemon" class:primary={daemon.baseUrl === store.discovery.baseUrl}>
+                <Icon name={daemon.kind === 'remote' ? 'globe' : daemon.kind === 'tailnet' ? 'link' : 'monitor'} size={16} />
+                <span class="daemon-name">{daemon.kindLabel}{daemon.paired ? '' : ' · answering'}</span>
+                <code>{daemon.baseUrl}</code>
+                <button
+                  type="button"
+                  class="wf-btn beat-btn"
+                  class:btn-primary={daemon.baseUrl === store.discovery.baseUrl}
+                  class:live={daemon.baseUrl === store.discovery.baseUrl && store.discovery.alive}
+                  onclick={() => store.connectDiscovered(daemon.baseUrl)}>Connect</button>
+              </li>
+            {/each}
+          </ul>
+          <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Pair a daemon we cannot see</a>
         </div>
       {/if}
       {#if store.discovery.state === 'connected'}
@@ -325,7 +351,7 @@
 
           <!-- NEEDS YOU (top 3) -->
           <section class="card ov-needs" aria-labelledby="wf-overview-needs">
-            <div class="card-head"><h2 id="wf-overview-needs">Needs You</h2><span class="count-chip">{needsItems.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-needs"><Icon name="attention" size={16} /> Needs You</h2><span class="count-chip">{needsItems.length}</span></div>
             {#if needsItems.length === 0}
               <p class="empty">Nothing needs a human decision right now.</p>
             {:else}
@@ -344,7 +370,7 @@
 
           <!-- WORKING NOW -->
           <section class="card ov-working" aria-labelledby="wf-overview-working">
-            <div class="card-head"><h2 id="wf-overview-working">Working Now</h2><span class="count-chip">{workingNow.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-working"><Icon name="activity" size={16} /> Working Now</h2><span class="count-chip">{workingNow.length}</span></div>
             {#if workingNow.length === 0}
               <p class="empty">No active work reported by the owner.</p>
             {:else}
@@ -362,7 +388,7 @@
 
           <!-- VERIFIED RECENTLY -->
           <section class="card ov-verified" aria-labelledby="wf-overview-verified">
-            <div class="card-head"><h2 id="wf-overview-verified">Verified Recently</h2><span class="count-chip">{verifiedEntries.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-verified"><Icon name="shield" size={16} /> Verified Recently</h2><span class="count-chip">{verifiedEntries.length}</span></div>
             {#if verifiedEntries.length === 0}
               <p class="empty">No settled proof reported yet.</p>
             {:else}
@@ -374,6 +400,36 @@
             {/if}
           </section>
         </div>
+
+        <!-- PROJECTS: everything this daemon is connected to (owner-reported) -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Projects</h2>
+            <span class="count-chip">{store.projects?.projects?.length ?? 0}</span>
+          </div>
+          {#if store.projects?.projects?.length}
+            <p class="muted tiny">{store.projects.projects.length} project(s) connected to this daemon. Choosing one scopes the whole workforce.</p>
+            <ul class="items">
+              {#each store.projects.projects as project (project.id ?? project.root)}
+                <li>
+                  <strong>{project.name}</strong>
+                  <code>{project.root ?? '—'}</code>
+                  {#if project.stack}<span class="detail">{project.stack}</span>{/if}
+                  {#if store.selection.projectRoot === project.root}
+                    <span class="state-sig active">active</span>
+                  {:else}
+                    <button type="button" class="wf-btn" onclick={() => store.useProject(project.root)} disabled={store.projectBusy || !project.root}>Use</button>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="empty">This daemon reports no projects yet.</p>
+          {/if}
+          {#if store.capabilities}
+            <p class="muted tiny">{store.capabilities.total} governed operations · {store.capabilities.families.length} families · <a class="inline-link" href="#/topology" onclick={(e) => { e.preventDefault(); navigate('#/topology'); }}>What this daemon can do →</a></p>
+          {/if}
+        </section>
 
         <!-- WORKSTREAMS grouped by Project -->
         <section class="card">
@@ -499,7 +555,13 @@
             </div>
             <div class="chips">
               <span class="state-sig">{store.trajectoryView.ladder.currentWorkpoint ?? 'idle'}</span>
-              <span class="fresh {freshClass}">{freshLabel}</span>
+              {#if store.active}
+        <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
+          {store.streamState?.phase === 'open' ? 'Live' : freshLabel}
+        </span>
+      {:else}
+        <span class="fresh {freshClass}">{freshLabel}</span>
+      {/if}
               {#each ['full', 'medium', 'short'] as g (g)}
                 <button type="button" class="chip" class:on={granularity === g} onclick={() => (granularity = g)}>{g}</button>
               {/each}
@@ -512,7 +574,7 @@
 
         <div class="wd-split wide">
           <section class="card">
-            <div class="card-head"><h2>Foreman</h2><span class="count-chip">{store.foremanProfiles.length}</span></div>
+            <div class="card-head"><h2><Icon name="foreman" size={16} /> Foreman</h2><span class="count-chip">{store.foremanProfiles.length}</span></div>
             <dl class="facts">
               <dt>Role</dt><dd>{store.foremanProfiles[0]?.role ?? 'accountable role — owner not reported'}</dd>
               <dt>Objective</dt><dd>{store.foremanCard.objective ?? '—'}</dd>
@@ -536,7 +598,7 @@
         </div>
 
         <section class="card">
-          <div class="card-head"><h2>Direct → Workstream / Foreman</h2></div>
+          <div class="card-head"><h2><Icon name="direction" size={16} /> Direct → Workstream / Foreman</h2></div>
           {#if !store.workstream}
             <p class="empty">Select a Workstream to address Direction.</p>
           {:else if !steerTarget}
@@ -569,7 +631,7 @@
         </section>
 
         <section class="card">
-          <div class="card-head"><h2>Trajectory</h2><StateNote label="Source" result={store.resultOf('trajectory')} /></div>
+          <div class="card-head"><h2><Icon name="trajectory" size={16} /> Trajectory</h2><StateNote label="Source" result={store.resultOf('trajectory')} /></div>
           <p class="source {store.trajectoryView.authoritative ? 'authoritative' : 'stopgap'}">{store.trajectoryView.disclosure}</p>
           <ol class="trajectory">
             <li><span class="t-kind">desired outcome</span><span class="t-value">{store.foremanCard.objective ?? '— not reported'}</span></li>
@@ -582,7 +644,7 @@
         </section>
 
         <section class="card">
-          <div class="card-head"><h2>Working Now</h2><span class="count-chip">{workingNow.length}</span></div>
+          <div class="card-head"><h2><Icon name="activity" size={16} /> Working Now</h2><span class="count-chip">{workingNow.length}</span></div>
           {#if workingNow.length === 0}
             <p class="empty">No member reports active responsibility.</p>
           {:else}
@@ -613,7 +675,7 @@
             <a class="inline-link" href="#/evidence" onclick={(e) => { e.preventDefault(); navigate('#/evidence'); }}>Open Evidence →</a>
           </section>
           <section class="card">
-            <div class="card-head"><h2>Execution Posture</h2><span class="count-chip">{store.environments.length}</span></div>
+            <div class="card-head"><h2><Icon name="monitor" size={16} /> Execution Posture</h2><span class="count-chip">{store.environments.length}</span></div>
             <ul class="items">
               {#each store.environments as env (env.id)}
                 <li>
@@ -820,7 +882,7 @@
 
       <!-- ══════════ §13 TOPOLOGY ══════════ -->
       {#if route === '#/topology'}
-        <h2>Topology</h2>
+        <h2><Icon name="topology" size={18} /> Topology</h2>
         {#if store.environments.length === 0}
           <section class="card"><p class="empty">No environment placed. Connect Focusa on the Connections face.</p></section>
         {:else}
@@ -832,9 +894,32 @@
                   <h4>{env.label}</h4>
                   <span class="muted tiny">Paired Focusa environment</span>
                   <StateNote label="Health" result={env.id === store.activeId ? store.resultOf('health') : null} />
+                  {#if env.id === store.activeId && store.capabilities}
+                    <p class="muted tiny">
+                      {store.capabilities.total} governed operations · {store.capabilities.families.length} families
+                    </p>
+                  {/if}
                   <details class="tech">
                     <summary>Technical detail</summary>
                     <dl class="facts"><dt>Base URL</dt><dd>{env.baseUrl}</dd><dt>Scopes</dt><dd>{env.scopes?.join(' · ') ?? '—'}</dd><dt>Token</dt><dd>{env.token ? 'stored' : 'none (local principal)'}</dd></dl>
+                    {#if env.id === store.activeId && store.capabilities}
+                      <h4 class="cap-head">Daemon capabilities</h4>
+                      <p class="muted tiny">{store.capabilities.disclosure}</p>
+                      <ul class="cap-families">
+                        {#each store.capabilities.families as family (family.name)}
+                          <li><span>{family.name}</span><span class="muted tiny">{family.count}</span></li>
+                        {/each}
+                      </ul>
+                      <ul class="cap-ops">
+                        {#each store.capabilities.operations as op (op.id)}
+                          <li>
+                            <code>{op.method}</code> <code>{op.path}</code>
+                            <span class="muted tiny">{op.permissions.join(' · ') || 'no scope'}{op.reversible === false ? ' · not reversible' : ''}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                      {#if store.capabilities.truncated}<p class="muted tiny">Showing the first {store.capabilities.operations.length} of {store.capabilities.total}.</p>{/if}
+                    {/if}
                   </details>
                 </article>
               {/each}
@@ -983,7 +1068,13 @@
                     <button type="button" class="wf-btn" onclick={connectLocal} disabled={store.environments.some((e) => e.kind === 'local')}>
                       {store.environments.some((e) => e.kind === 'local') ? 'Local daemon connected' : 'Use the daemon on this device'}
                     </button>
+                    {#if store.active}
+                      <button type="button" class="wf-btn danger" onclick={() => store.disconnect()}>Disconnect from {store.active.label}</button>
+                    {/if}
                   </div>
+                  {#if store.active}
+                    <p class="muted tiny">Disconnect detaches this browser only. Focusa keeps running; reconnecting is one click.</p>
+                  {/if}
                   {#if envError}<p class="gap">{envError}</p>{/if}
                 {/if}
               </section>
@@ -1085,6 +1176,7 @@
           {/if}
         </div>
       {/if}
+      </div>{/key}
     </div>
 
     <!-- CONTEXT RAIL (docs/17 §6): Needs You · Verified · source posture · contextual only -->
@@ -1095,7 +1187,7 @@
       </div>
 
       <section class="rail-block">
-        <h3>Needs You</h3>
+        <h3><Icon name="attention" size={13} /> Needs You</h3>
         {#if needsItems.length === 0}
           <p class="empty">Nothing needs a human decision right now.</p>
         {:else}
@@ -1110,7 +1202,7 @@
       </section>
 
       <section class="rail-block">
-        <h3>Verified</h3>
+        <h3><Icon name="shield" size={13} /> Verified</h3>
         <p class="count-big">{verifiedEntries.length}</p>
         <a class="inline-link" href="#/evidence" onclick={(e) => { e.preventDefault(); navigate('#/evidence'); }}>Open Evidence</a>
       </section>
@@ -1124,7 +1216,7 @@
       {/if}
 
       <section class="rail-block">
-        <h3>Source posture</h3>
+        <h3><Icon name="layers" size={13} /> Source posture</h3>
         <dl class="facts rail-facts">
           <dt>Entitlement</dt><dd>{store.entitlementState ?? 'unknown'}</dd>
           <dt>Trajectory</dt><dd>{store.trajectoryView.authoritative ? 'canonical' : 'stopgap projection'}</dd>

@@ -23,7 +23,7 @@
         </div>
       </div>
       <p class="wall-readonly">READ ONLY · no mutation authority</p>
-      <span id="freshness" class="wall-fresh">Unavailable</span>
+      <span id="freshness" class="wall-fresh"><span class="wall-dot" aria-hidden="true"></span>Unavailable</span>
     </header>
 
     <!-- CURRENT FOCUS (28–32px title) -->
@@ -36,17 +36,17 @@
 
     <div class="wall-cols">
       <section class="wall-col" aria-labelledby="wall-working-heading">
-        <div class="wall-col-head"><h2 id="wall-working-heading">Working Now</h2><span id="working-count" class="wall-count">0</span></div>
+        <div class="wall-col-head"><h2 id="wall-working-heading"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Working Now</h2><span id="working-count" class="wall-count">0</span></div>
         <ul id="signals" class="wall-list"><li class="wall-empty">No active work reported.</li></ul>
       </section>
 
       <section class="wall-col" aria-labelledby="wall-needs-heading">
-        <div class="wall-col-head"><h2 id="wall-needs-heading">Needs You</h2><span id="needs-count" class="wall-count">0</span></div>
+        <div class="wall-col-head"><h2 id="wall-needs-heading"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/></svg> Needs You</h2><span id="needs-count" class="wall-count">0</span></div>
         <ul id="wall-needs" class="wall-list"><li class="wall-empty">Nothing needs you right now.</li></ul>
       </section>
 
       <section class="wall-col" aria-labelledby="wall-verified-heading">
-        <div class="wall-col-head"><h2 id="wall-verified-heading">Verified Recently</h2><span id="verified-count" class="wall-count">0</span></div>
+        <div class="wall-col-head"><h2 id="wall-verified-heading"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 12l2 2 4-4M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg> Verified Recently</h2><span id="verified-count" class="wall-count">0</span></div>
         <ul id="wall-verified" class="wall-list"><li class="wall-empty">No settled proof yet.</li></ul>
       </section>
     </div>

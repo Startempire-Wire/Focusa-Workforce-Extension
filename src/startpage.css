@@ -56,6 +56,11 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
 }
 
 .sp-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ic { width: 16px; height: 16px; }
+.sp-btn { display: inline-flex; align-items: center; gap: 7px; }
+.sp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.sp-dot.live { background: var(--success); }
+.sp-env { display: inline-flex; align-items: center; gap: 6px; }
 .sp-btn {
   min-height: 40px; padding: 9px 18px; border-radius: var(--radius-sm);
   border: 1px solid var(--line); background: var(--panel); color: var(--text);
@@ -96,7 +101,12 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
 @media (max-width: 599px) {
   .sp-header { flex-direction: column; gap: 4px; }
   .sp-actions { flex-direction: column; align-items: stretch; }
-  .sp-btn { width: 100%; min-height: 44px; }
+  .ic { width: 16px; height: 16px; }
+.sp-btn { display: inline-flex; align-items: center; gap: 7px; }
+.sp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.sp-dot.live { background: var(--success); }
+.sp-env { display: inline-flex; align-items: center; gap: 6px; }
+.sp-btn { width: 100%; min-height: 44px; }
 }
 
 @media (prefers-color-scheme: light) { :root { color-scheme: light; } }

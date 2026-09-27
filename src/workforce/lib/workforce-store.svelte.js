@@ -11,9 +11,9 @@
  *
  * @module workforce/lib/workforce-store
  */
-import { listConnections, listLocalEnvironments, saveLocalEnvironment } from '../../lib/storage.mjs';
+import { listConnections, listLocalEnvironments, forgetLocalEnvironment, saveLocalEnvironment } from '../../lib/storage.mjs';
 import { startPairing, pollPairing } from '../../lib/pairing.mjs';
-import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner } from '../../lib/workforce-client.mjs';
+import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner, capabilitiesFromOwner } from '../../lib/workforce-client.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { parseExactTarget, resolveDirectionTarget, describeTarget, targetFromCreatedSession } from '../../lib/direction-target.mjs';
@@ -24,7 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
-import { discoverDaemon, rememberDaemon, hasKnownDaemon } from './discovery.js';
+import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness } from './discovery.js';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -94,7 +94,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let bootError = $state(/** @type {string|null} */ (null));
   // Silent read-only discovery; attaching is always one explicit click.
   // state: idle | discovering | found | connected | not_found
-  let discovery = $state(/** @type {{state: string, baseUrl: string|null, answers: any[], returning?: boolean, permitted?: boolean}} */ ({ state: 'idle', baseUrl: null, answers: [] }));
+  let discovery = $state(/** @type {{state: string, baseUrl: string|null, answers: any[], daemons?: any[], returning?: boolean, permitted?: boolean, alive?: boolean, lastSeenAt?: string|null}} */ ({ state: 'idle', baseUrl: null, answers: [], daemons: [] }));
+  let stopLiveness = null;
   let discovered = $state(/** @type {any[]} */ ([]));
   let projectBusy = $state(false);
   // Live freshness: owner-sourced event stream state (never synthesized).
@@ -154,6 +155,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // The cutover is automatic — see lib/trajectory-source.mjs (focusa#621).
   const evidenceTrail = $derived(buildEvidenceTrail(reads));
   const activity = $derived(reads.events?.state === ResultState.OK ? eventsFromOwner(reads.events.data) : []);
+  // Everything this daemon knows: its projects, and the operations it governs.
+  const projects = $derived(reads.projects?.state === ResultState.OK ? projectsFromOwner(reads.projects.data) : null);
+  const capabilities = $derived(reads.capabilities?.state === ResultState.OK ? capabilitiesFromOwner(reads.capabilities.data) : null);
   const needsYou = $derived(buildNeedsYou({ roster, trajectoryView, activity, reads }));
   const unreadCount = $derived(unreadNotificationCount(notifications));
   const scopeGuard = $derived(evaluateScopeGuard({
@@ -262,28 +266,63 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function discover() {
     discovery = { state: 'discovering', baseUrl: null, answers: [] };
     const returning = await hasKnownDaemon(chromeApi);
-    const { connected, answers } = await discoverDaemon(chromeApi);
-    if (!connected) {
-      discovery = { state: 'not_found', baseUrl: null, answers };
+    const { found, answers } = await discoverDaemons(chromeApi);
+    if (!found.length) {
+      discovery = { state: 'not_found', baseUrl: null, answers, daemons: [] };
       return null;
     }
+    const connected = found[0];
     const permitted = await hasDaemonOriginPermission(connected.baseUrl).catch(() => false);
-    discovery = { state: 'found', baseUrl: connected.baseUrl, answers, returning, permitted };
+    discovery = { state: 'found', baseUrl: connected.baseUrl, answers, daemons: found, returning, permitted, alive: true, lastSeenAt: new Date().toISOString() };
+    // While the operator decides, keep proving the daemon is alive so the
+    // connect affordance can breathe on fact rather than on hope.
+    stopLiveness?.();
+    stopLiveness = watchLiveness(connected.baseUrl, (beat) => {
+      discovery = { ...discovery, alive: beat.ok, lastSeenAt: beat.at };
+    });
     return null;
   }
 
-  /** One click: connect to the daemon discovery found. */
-  async function connectDiscovered() {
-    if (!discovery.baseUrl) return null;
-    const origin = discovery.baseUrl;
+  /** One click: connect to a specific daemon discovery found. */
+  async function connectDiscovered(target) {
+    const origin = typeof target === 'string' ? target : (target?.baseUrl ?? discovery.baseUrl);
+    if (!origin) return null;
     // Local/tailnet origins are already permitted, so this is a single click
     // with no permission prompt at all. A peer origin outside those asks Chrome
     // for that one origin and nothing else.
     const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
     if (!granted) return null;
-    await attachDaemon(origin, 'Focusa daemon');
-    discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers };
+    stopLiveness?.();
+    stopLiveness = null;
+    // A daemon this browser is already paired with keeps its stored token; a
+    // discovered local/tailnet one is tokenless (local-loopback principal).
+    const paired = (await listConnections(chromeApi)).find((c) => c.base_url === origin);
+    if (paired) {
+      await refreshEnvironments();
+      activeId = paired.connection_id;
+      await refreshOwner();
+      await startStream();
+    } else {
+      await attachDaemon(origin, 'Focusa daemon');
+    }
+    discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString() };
     return origin;
+  }
+
+  /**
+   * Detach this browser from the daemon. Presentation-only: the owner keeps
+   * running; Workforce stops reading and stops streaming. The daemon stays
+   * remembered so reconnecting is one click again.
+   */
+  async function disconnect() {
+    stopLiveness?.();
+    stopLiveness = null;
+    const current = active;
+    stopStream();
+    if (current) await forgetLocalEnvironment(current.id, chromeApi).catch(() => {});
+    discovery = { state: 'idle', baseUrl: null, answers: [], daemons: [] };
+    await refreshEnvironments();
+    return true;
   }
 
   async function attachDaemon(baseUrl, label) {
@@ -350,6 +389,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     record('health', await c.health());
     record('license', await c.licenseStatus());
     record('projects', await c.projectList());
+    record('capabilities', await c.operations());
     if (selection.projectRoot) {
       record('project', await c.projectIdentity(selection.projectRoot));
       record('projectStatus', await c.projectStatus(selection.projectRoot));
@@ -835,6 +875,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get trajectoryView() { return trajectoryView; },
     get evidenceTrail() { return evidenceTrail; },
     get activity() { return activity; },
+    get projects() { return projects; },
+    get capabilities() { return capabilities; },
     get needsYou() { return needsYou; },
     get notifications() { return notifications; },
     get unreadCount() { return unreadCount; },
@@ -877,6 +919,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get discovery() { return discovery; },
     discover,
     connectDiscovered,
+    disconnect,
     refreshEnvironments,
     refreshOwner,
     setEnvironment,

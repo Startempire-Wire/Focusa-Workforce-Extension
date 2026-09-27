@@ -192,6 +192,8 @@ export function createWorkforceClient(config) {
     projectStatus: (projectRoot) => call('projectStatus', { scope: { projectRoot } }),
     /** Owner project dashboard (selected project + registered projects). */
     projectList: () => call('projectList'),
+    /** The daemon's governed operation catalog: what this owner can actually do. */
+    operations: () => call('operations'),
     /**
      * Owner project discovery. Scans for project roots; results are owner summaries.
      * @param {{from?: string, maxDepth?: number, maxResults?: number, includeGitOnly?: boolean}} [input]
@@ -284,6 +286,49 @@ export function eventsFromOwner(ownerData) {
     sessionId: row.session_id ?? null,
     observation: row.is_observation === true,
   })));
+}
+
+/**
+ * Project the daemon's governed operation catalog into what a face can show.
+ * Only real, owner-reported operations are listed; the summary is derived, not
+ * invented, and the list is bounded for a drawer.
+ *
+ * @param {any} ownerData payload from GET /v1/agent/operations
+ * @param {{limit?: number}} [options]
+ */
+export function capabilitiesFromOwner(ownerData, { limit = 60 } = {}) {
+  const body = ownerData?.data ?? ownerData ?? {};
+  const list = Array.isArray(body.operations) ? body.operations : [];
+  const families = new Map();
+  const effects = new Map();
+  for (const op of list) {
+    const family = op?.family ?? 'unclassified';
+    families.set(family, (families.get(family) ?? 0) + 1);
+    const effect = op?.side_effect_class ?? 'unknown';
+    effects.set(effect, (effects.get(effect) ?? 0) + 1);
+  }
+  return Object.freeze({
+    total: list.length,
+    families: Object.freeze([...families.entries()]
+      .map(([name, count]) => Object.freeze({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))),
+    sideEffects: Object.freeze([...effects.entries()]
+      .map(([name, count]) => Object.freeze({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))),
+    operations: Object.freeze(list.slice(0, limit).map((op) => Object.freeze({
+      id: op?.operation_id ?? null,
+      label: op?.label ?? op?.operation_id ?? 'operation',
+      method: op?.method ?? null,
+      path: op?.path ?? null,
+      family: op?.family ?? null,
+      effect: op?.side_effect_class ?? null,
+      permissions: Object.freeze([...(op?.permissions_required ?? [])]),
+      reversible: op?.control?.reversible ?? null,
+      idempotent: op?.control?.idempotency_required ?? null,
+    }))),
+    truncated: list.length > limit,
+    disclosure: `source: Focusa governed operation catalog (${list.length} operations)`,
+  });
 }
 
 /**

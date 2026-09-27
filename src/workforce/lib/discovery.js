@@ -42,6 +42,30 @@ export const DEVICE_CANDIDATES = Object.freeze([
 
 export const PROBE_TIMEOUT_MS = 2500;
 
+/** What kind of place an origin is, so the UI can say it plainly. */
+export function classifyBaseUrl(baseUrl) {
+  let host;
+  try { host = new URL(baseUrl).hostname; } catch { return 'unknown'; }
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return 'loopback';
+  if (host === '100.115.92.26') return 'device';
+  if (host === '100.127.113.90') return 'device';
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    const [a, b] = host.split('.').map(Number);
+    if (a === 100 && b >= 64 && b <= 127) return 'tailnet';
+  }
+  return 'remote';
+}
+
+const KIND_LABEL = Object.freeze({
+  loopback: 'This browser',
+  device: 'This device',
+  tailnet: 'Tailnet',
+  remote: 'Remote',
+  unknown: 'Unknown',
+});
+
+export function kindLabel(kind) { return KIND_LABEL[kind] ?? 'Unknown'; }
+
 /** @param {any} chromeApi */
 async function readRemembered(chromeApi) {
   try {
@@ -75,6 +99,26 @@ export async function discoveryCandidates(chromeApi) {
   const remembered = await readRemembered(chromeApi);
   const ordered = [...remembered.map((item) => item.baseUrl), ...DEVICE_CANDIDATES];
   return Object.freeze([...new Set(ordered)]);
+}
+
+/**
+ * A quiet liveness heartbeat. Re-probes one origin so the UI can say the daemon
+ * is alive only while it actually answers; it never mutates anything and stops
+ * on demand.
+ *
+ * @returns {() => void} stop function
+ */
+export function watchLiveness(baseUrl, onBeat, { intervalMs = 12000, fetchImpl, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+  if (!baseUrl) return () => {};
+  let stopped = false;
+  let timer = null;
+  const beat = async () => {
+    if (stopped) return;
+    const answer = await probeDaemon(baseUrl, { fetchImpl, timeoutMs });
+    if (!stopped) onBeat({ ...answer, at: new Date().toISOString() });
+  };
+  timer = setInterval(beat, intervalMs);
+  return () => { stopped = true; if (timer) clearInterval(timer); };
 }
 
 /**
@@ -113,8 +157,52 @@ export async function probeDaemon(baseUrl, { fetchImpl = globalThis.fetch, timeo
  *
  * @returns {Promise<{connected: any|null, answers: any[]}>}
  */
+/** Loopback aliases are the same daemon; show it once, at the address that answered. */
+const LOOPBACK_ALIASES = Object.freeze(['http://127.0.0.1:8787', 'http://localhost:8787', 'http://[::1]:8787']);
+
+function collapseAliases(found) {
+  const loopback = found.filter((daemon) => daemon.kind === 'loopback');
+  const rest = found.filter((daemon) => daemon.kind !== 'loopback');
+  if (!loopback.length) return rest;
+  const preferred = LOOPBACK_ALIASES
+    .map((alias) => loopback.find((daemon) => daemon.baseUrl === alias))
+    .find(Boolean) ?? loopback[0];
+  return [preferred, ...rest];
+}
+
 export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
   const candidates = await discoveryCandidates(chromeApi);
   const answers = await Promise.all(candidates.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs })));
-  return { connected: answers.find((answer) => answer.ok) ?? null, answers };
+  const found = collapseAliases(answers
+    .filter((answer) => answer.ok)
+    .map((answer) => {
+      const kind = classifyBaseUrl(answer.baseUrl);
+      return { ...answer, kind, kindLabel: kindLabel(kind), aliases: kind === 'loopback' ? LOOPBACK_ALIASES : [] };
+    }));
+  return { connected: found[0] ?? null, found, answers };
+}
+
+/**
+ * Every daemon this browser can see: the ones that answered a health probe, plus
+ * remote daemons this browser is already paired with (they need their stored
+ * token rather than an anonymous probe, so they are reported as paired).
+ *
+ * @param {any} chromeApi
+ * @param {{fetchImpl?: function, timeoutMs?: number}} [options]
+ */
+export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS } = {}) {
+  const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs });
+  let paired = [];
+  try {
+    const { listConnections } = await import('../../lib/storage.mjs');
+    paired = await listConnections(chromeApi);
+  } catch { paired = []; }
+  const known = new Set(found.map((daemon) => daemon.baseUrl));
+  const remote = paired
+    .filter((connection) => !known.has(connection.base_url))
+    .map((connection) => ({
+      baseUrl: connection.base_url, ok: null, kind: 'remote', kindLabel: 'Paired',
+      label: connection.label ?? connection.base_url, paired: true,
+    }));
+  return { found: [...found, ...remote], answers };
 }
