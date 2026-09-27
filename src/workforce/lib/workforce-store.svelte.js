@@ -25,6 +25,7 @@ import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
 import { promptBodyFor } from '../../lib/page-context.mjs';
+import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
 
 const SELECTION_KEY = 'focusa.workforce.selection.v1';
@@ -112,6 +113,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let pageCaptures = $state(/** @type {any[]} */ ([]));
   let pageWorkBusy = $state(false);
   let pageWorkOutcomes = $state(/** @type {Record<string, any>} */ ({}));
+  // UIAI engine integration (MLG-6.1/6.3.5)
+  let uiaiToken = $state('');
+  let uiaiHealth = $state(null);
+  let uiaiSessions = $state(/** @type {Record<string, any>} */ ({}));
+  let uiaiBusy = $state(false);
   let notifications = $state(/** @type {any[]} */ ([]));
   let outputCursor = $state(/** @type {string|null} */ (null));
   let outputLines = $state(/** @type {string[]} */ ([]));
@@ -193,6 +199,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   async function refreshEnvironments() {
     await loadPageCaptures();
+    await loadUiaiToken();
     try {
       const paired = (await listConnections(chromeApi)).map((c) => ({
         id: c.connection_id, kind: 'paired', label: c.label, baseUrl: c.base_url, token: c.token, scopes: c.granted_scopes,
@@ -627,6 +634,54 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     }
   }
 
+  async function loadUiaiToken() {
+    uiaiToken = await getUiaiToken(chromeApi);
+  }
+
+  async function setUiaiToken(token) {
+    uiaiToken = token.trim();
+    await setUiaiToken(chromeApi, uiaiToken);
+  }
+
+  async function checkUiai() {
+    uiaiBusy = true;
+    try {
+      uiaiHealth = await checkUiaiHealth();
+    } catch (error) {
+      uiaiHealth = { ok: false, reachable: false, healthy: false, error: String(error) };
+    } finally {
+      uiaiBusy = false;
+    }
+  }
+
+  async function createUiai({ profile = 'detect', model, provider }) {
+    if (!uiaiToken) throw new Error('UIAI token not configured');
+    uiaiBusy = true;
+    try {
+      const session = await createUiaiSession({ chromeApi, profile, model, provider });
+      uiaiSessions = { ...uiaiSessions, [session.session_id]: { ...session, createdAt: new Date().toISOString() } };
+      return session;
+    } finally {
+      uiaiBusy = false;
+    }
+  }
+
+  async function closeUiai(sessionId) {
+    uiaiBusy = true;
+    try {
+      await closeUiaiSession({ chromeApi, sessionId });
+      const { [sessionId]: _, ...rest } = uiaiSessions;
+      uiaiSessions = rest;
+    } finally {
+      uiaiBusy = false;
+    }
+  }
+
+  async function shareUiai(sessionId, minutes = 60) {
+    if (!uiaiToken) throw new Error('UIAI token not configured');
+    return shareUiaiSession({ chromeApi, sessionId, minutes });
+  }
+
   async function setSelection({ projectRoot, continuityId }) {
     selection = {
       projectRoot: projectRoot ?? selection.projectRoot,
@@ -744,6 +799,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     stagePageCapture,
     removePageCapture,
     submitPageWork,
+    get uiaiToken() { return uiaiToken; },
+    get uiaiHealth() { return uiaiHealth; },
+    get uiaiSessions() { return uiaiSessions; },
+    get uiaiBusy() { return uiaiBusy; },
     get bootError() { return bootError; },
     refreshEnvironments,
     refreshOwner,
@@ -768,5 +827,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     controlSession,
     direct,
     resultOf: (name) => reads[name] ?? null,
+    loadUiaiToken,
+    setUiaiToken,
+    checkUiai,
+    createUiai,
+    closeUiai,
+    shareUiai,
   };
 }

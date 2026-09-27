@@ -18,7 +18,7 @@ if ('content_scripts' in manifest) throw new Error('content scripts are forbidde
 // requirement 2026-09-27 — discovery must be automatic with no manual
 // entries). Least-privilege preserved: no wildcards, no remote hosts —
 // remote pairing still uses the optional host-permission flow.
-const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*'];
+const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*'];
 if (JSON.stringify([...(manifest.host_permissions ?? [])].sort()) !== JSON.stringify([...localOrigins].sort())) {
   throw new Error(`host permissions must be exactly ${localOrigins.join(', ')} (local daemon origins only)`);
 }

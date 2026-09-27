@@ -57,6 +57,7 @@ test('manifest is least-privilege MV3 with no content script', async () => {
   // keeps the optional host-permission flow.
   assert.deepEqual([...manifest.host_permissions].sort(), [
     'http://100.115.92.26/*',
+    'http://100.115.92.26:7456/*',
     'http://127.0.0.1/*',
     'http://localhost/*',
   ]);

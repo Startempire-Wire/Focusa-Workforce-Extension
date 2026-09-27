@@ -104,6 +104,11 @@
   let bindResult = $state('');
   let pairUrl = $state('');
   let pairLabel = $state('');
+  // UIAI settings form state
+  let uiaiTokenInput = $state('');
+  let uiaiProfile = $state('detect');
+  let uiaiModel = $state('');
+  let uiaiProvider = $state('');
   let sessionName = $state('');
   let sessionPreparation = $state(null);
   let sessionCreation = $state(null);
@@ -338,6 +343,37 @@
   function useCaptureAsDirection(capture) {
     instruction = (capture.instruction ?? capture.message ?? capture.note ?? `Page: ${capture.title ?? capture.source ?? ''}`).trim();
     document.querySelector('[data-direction]')?.focus();
+  }
+
+  async function openUiaiSession(sessionId) {
+    const session = store.uiaiSessions?.[sessionId];
+    if (session?.url) {
+      window.open(session.url, '_blank', 'noopener,noreferrer');
+    } else {
+      try {
+        const result = await store.shareUiai(sessionId);
+        if (result?.share_url) window.open(result.share_url, '_blank', 'noopener,noreferrer');
+      } catch (error) { console.error('Could not open UIAI session', error); }
+    }
+  }
+
+  async function saveUiaiToken() {
+    await store.setUiaiToken(uiaiTokenInput);
+    uiaiTokenInput = '';
+  }
+
+  async function watchUiaiSession(target, sessionId) {
+    if (!target) return;
+    try {
+      const result = await store.shareUiai(sessionId);
+      if (result?.share_url) {
+        // Deep link with return so the operator can come back to this work detail
+        const returnUrl = encodeURIComponent(location.href);
+        location.hash = `#/work/detail?env=${store.activeId}&return=${returnUrl}&watch=${sessionId}`;
+      } else {
+        console.error('No share URL from UIAI');
+      }
+    } catch (error) { console.error('Watch UIAI failed', error); }
   }
 
   async function connectLocal() {
@@ -935,6 +971,12 @@
                 {#each ['start', 'pause', 'resume', 'cancel'] as action (action)}
                   <button type="button" class="wf-btn" disabled={store.directing} onclick={() => store.controlSession({ action, target: steerTarget })}>{action}</button>
                 {/each}
+                {#if store.uiaiSessions && Object.keys(store.uiaiSessions).length > 0}
+                  {#each Object.values(store.uiaiSessions) as uis (uis.session_id)}
+                    <button type="button" class="wf-btn" onclick={() => openUiaiSession(uis.session_id)} disabled={store.uiaiBusy}>Open in UIAI</button>
+                    <button type="button" class="wf-btn" onclick={() => watchUiaiSession(steerTarget, uis.session_id)} disabled={store.uiaiBusy}>Watch</button>
+                  {/each}
+                {/if}
               </div>
             </form>
           {/if}
@@ -1629,6 +1671,7 @@
               <a href="#/settings?section=notifications" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=notifications'); }} class:active={settingsSection === 'notifications'}>Notifications</a>
               <a href="#/settings?section=browser-permissions" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=browser-permissions'); }} class:active={settingsSection === 'browser-permissions'}>Browser permissions</a>
               <a href="#/settings?section=public-demo" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=public-demo'); }} class:active={settingsSection === 'public-demo'}>Public demo</a>
+              <a href="#/settings?section=uiai" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=uiai'); }} class:active={settingsSection === 'uiai'}>UIAI Engine</a>
               <a href="#/settings?section=advanced" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=advanced'); }} class:active={settingsSection === 'advanced'}>Advanced</a>
             </nav>
           </div>
@@ -1716,6 +1759,60 @@
               <h3>Public demo / local behavior</h3>
               <p class="muted tiny">The public <code>os.focusa.dev</code> profile is a read-only demo — Workforce never authenticates there.</p>
               <p class="muted tiny">Local behavior: a loopback daemon on this device pairs without a token (principal: local-loopback).</p>
+            </div>
+          {:else if settingsSection === 'uiai'}
+            <div class="set-group" style="max-width: 720px;">
+              <h3>UIAI Engine</h3>
+              <p class="muted tiny">The UIAI engine runs at <code>http://100.115.92.26:7456</code> (bridged from loopback 7456). Configure the extension token and launch browser sessions for live execution.</p>
+              {#if store.uiaiHealth}
+                <div class="row">
+                  <span class:ok={store.uiaiHealth.healthy} class:warn={!store.uiaiHealth.healthy && store.uiaiHealth.reachable} class:err={!store.uiaiHealth.reachable}>
+                    {store.uiaiHealth.healthy ? 'Engine healthy' : (store.uiaiHealth.reachable ? 'Engine reachable but degraded' : 'Engine unreachable')}
+                  </span>
+                  <button type="button" class="wf-btn" onclick={() => store.checkUiai()} disabled={store.uiaiBusy}>Refresh</button>
+                </div>
+              {:else}
+                <button type="button" class="wf-btn" onclick={() => store.checkUiai()} disabled={store.uiaiBusy}>Check engine</button>
+              {/if}
+              <hr style="margin: 12px 0;">
+              <label class="field">
+                <span>Extension token (X-Extension-Token)</span>
+                <input type="password" aria-label="UIAI extension token" placeholder="set once; never printed" bind:value={uiaiTokenInput} />
+                <button type="button" class="wf-btn" onclick={saveUiaiToken} disabled={store.uiaiBusy || !uiaiTokenInput.trim()}>Save</button>
+              </label>
+              {#if store.uiaiToken}
+                <p class="muted tiny ok">Token configured (hidden).</p>
+              {:else}
+                <p class="muted tiny gap">No token — session create will fail.</p>
+              {/if}
+              <hr style="margin: 12px 0;">
+              <div class="row">
+                <select bind:value={uiaiProfile}>
+                  <option value="detect">detect</option>
+                  <option value="no_detect">no_detect</option>
+                  <option value="research">research</option>
+                  <option value="operator">operator</option>
+                </select>
+                <input type="text" placeholder="model (optional)" bind:value={uiaiModel} style="width: 180px;" />
+                <input type="text" placeholder="provider (optional)" bind:value={uiaiProvider} style="width: 180px;" />
+                <button type="button" class="wf-btn wf-btn-primary" onclick={() => store.createUiai({ profile: uiaiProfile, model: uiaiModel || undefined, provider: uiaiProvider || undefined })} disabled={store.uiaiBusy || !store.uiaiToken}>Create session</button>
+              </div>
+              {#if Object.keys(store.uiaiSessions).length}
+                <ul class="items">
+                  {#each Object.values(store.uiaiSessions) as session (session.session_id)}
+                    <li>
+                      <span><strong>{session.session_id}</strong> · {session.status}</span>
+                      {#if session.url}<a href={session.url} target="_blank" rel="noreferrer" class="muted tiny">open</a>{/if}
+                      <div class="row">
+                        <button type="button" class="wf-btn" onclick={() => store.shareUiai(session.session_id).then((r) => navigator.clipboard.writeText(r.share_url)).catch(() => {})} disabled={store.uiaiBusy}>Copy share link</button>
+                        <button type="button" class="wf-btn" onclick={() => store.closeUiai(session.session_id)} disabled={store.uiaiBusy}>Close</button>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              {:else}
+                <p class="muted tiny">No active UIAI sessions.</p>
+              {/if}
             </div>
           {:else}
             <div class="set-group">
