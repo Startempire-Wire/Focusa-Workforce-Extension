@@ -36,6 +36,7 @@ const HEALTH_PATH = '/v1/health';
 export const PORT_VARIANTS = Object.freeze([8787, 8788, 8789, 18787]);
 import { listLocalEnvironments } from './storage.mjs';
 import { daemonSchemeForHost } from './validation.mjs';
+import { hostBookCandidates, originsForHost, readHostBook } from './host-book.mjs';
 
 const REMEMBERED_KEY = 'focusa.workforce.discovered.v1';
 
@@ -162,8 +163,11 @@ export async function discoveryCandidates(chromeApi) {
   for (const record of remembered) {
     try { learned.add(new URL(record.baseUrl).hostname); } catch { /* skip junk */ }
   }
+  // Remote discovery is over the tailnet, and it comes first: the authoritative
+  // daemon is a tailnet host, not this machine.
+  const fromBook = (await hostBookCandidates(chromeApi)).map((item) => item.origin);
   const fromLearned = [...learned].flatMap((host) => hostCandidates(host));
-  const ordered = [...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
+  const ordered = [...fromBook, ...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
   return Object.freeze([...new Set(ordered)]);
 }
 
@@ -176,16 +180,21 @@ export async function discoveryCandidates(chromeApi) {
  * @param {string} input
  * @returns {string[]} candidate origins
  */
-export function seedCandidates(input) {
+export function seedCandidates(input, { allowInsecure = true } = {}) {
   const raw = String(input ?? '').trim();
   if (!raw) return [];
-  const withScheme = /^[a-z]+:\/\//i.test(raw)
-    ? raw
-    : `${daemonSchemeForHost(raw.split(':')[0])}//${raw}`;
+  // An explicit scheme the operator typed is respected exactly - never silently
+  // downgraded. A bare name/address follows the host-book rule instead.
+  const typedScheme = /^([a-z]+):\/\//i.exec(raw)?.[1]?.toLowerCase() ?? null;
+  const withScheme = typedScheme ? raw : `https://${raw}`;
   let parsed;
   try { parsed = new URL(withScheme); } catch { return []; }
-  if (parsed.port) return [`${parsed.protocol}//${parsed.host}`];
-  return hostCandidates(parsed.hostname);
+  if (typedScheme) {
+    if (parsed.port) return [`${parsed.protocol}//${parsed.host}`];
+    return [parsed.origin];
+  }
+  // parsed.host keeps an explicit port; hostname would silently drop it.
+  return originsForHost({ host: parsed.host, allowInsecure });
 }
 
 /**
@@ -262,7 +271,8 @@ export async function previewDaemon({ baseUrl, fetchImpl = globalThis.fetch, tim
     } catch { return null; } finally { clearTimeout(timer); }
   };
 
-  const [health, projects] = await Promise.all([read(HEALTH_PATH), read('/v1/project/list')]);
+  const [health, projects, sessions] = await Promise.all([read(HEALTH_PATH), read('/v1/project/list'), read('/v1/silent-sessions')]);
+  const sessionRows = Array.isArray(sessions?.sessions ?? sessions?.data?.sessions) ? (sessions.sessions ?? sessions.data.sessions) : null;
   const daemon = health?.daemon ?? null;
   const persistence = health?.persistence ?? null;
   const list = Array.isArray(projects?.projects) ? projects.projects : null;
@@ -280,6 +290,12 @@ export async function previewDaemon({ baseUrl, fetchImpl = globalThis.fetch, tim
     activeProject: effective?.canonical_name ?? effective?.project_root ?? null,
     projectSelectionRequired: projects?.failure_class === 'project_root_selection_required' || (!list?.length && !effective),
     projectListKnown: list !== null,
+    sessions: sessionRows ? sessionRows.length : null,
+    liveSessions: Object.freeze((sessionRows ?? []).slice(0, 5).map((row) => ({
+      id: row?.session_id ?? row?.id ?? null,
+      label: row?.title ?? row?.name ?? row?.session_id ?? null,
+      state: row?.state ?? row?.status ?? null,
+    }))),
     // Diagnostics, deliberately secondary: these are not what an operator is
     // choosing between, so they never lead the card.
     batches: persistence?.batches_total ?? null,
@@ -363,7 +379,23 @@ export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_
       existing.baseUrl = daemon.baseUrl;
     }
   }
-  const unique = [...byIdentity.values()].map((daemon) => ({ ...daemon, kindLabel: daemon.preview?.activeProject ? `${daemon.kindLabel} · ${daemon.preview.activeProject}` : daemon.kindLabel }));
+  const book = await readHostBook(chromeApi).catch(() => []);
+  const bookLabels = new Map(book.map((entry) => [entry.host, entry.label]));
+  const unique = [...byIdentity.values()].map((daemon) => {
+    let host = '';
+    try { host = new URL(daemon.baseUrl).hostname; } catch { /* keep unknown */ }
+    const label = bookLabels.get(host) ?? null;
+    const held = (daemon.preview?.projects?.length ?? 0) + (daemon.preview?.sessions ?? 0);
+    return {
+      ...daemon,
+      label,
+      held,
+      // The authoritative parent is the daemon actually holding work, which is
+      // the one everything else is deployed from.
+      authoritative: held > 0,
+      kindLabel: daemon.preview?.activeProject ? `${daemon.kindLabel} · ${daemon.preview.activeProject}` : daemon.kindLabel,
+    };
+  }).sort((a, b) => (Number(b.authoritative) - Number(a.authoritative)) || (b.held - a.held));
   found.length = 0;
   found.push(...unique);
   let paired = [];

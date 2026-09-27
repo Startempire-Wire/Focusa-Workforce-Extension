@@ -17,12 +17,16 @@
   let { store, reduce = false, ondiscover = () => store.discover() } = $props();
   let seed = $state('');
 
-  async function findSeed(event) {
+  /** Adding a host is one action; it is then looked for on every launch. */
+  async function addHostToBook(event) {
     event.preventDefault();
     if (!seed.trim()) return;
-    await store.addSeed(seed);
+    await store.addTailnetHost({ host: seed.trim() });
     seed = '';
+    await store.discover();
   }
+
+  const book = $derived(store.hostBook ?? []);
 
   const d = $derived(store.discovery);
   const daemons = $derived(d.daemons ?? []);
@@ -91,11 +95,12 @@
         <strong>{daemons.length > 1 ? `${daemons.length} Focusa daemons` : 'Focusa is live'}</strong>
         <ul class="daemons">
           {#each daemons as daemon (daemon.baseUrl)}
-            {@const preview = store.previews?.[daemon.baseUrl] ?? null}
-            <li class="daemon" class:lead={daemon.baseUrl === d.baseUrl}>
+            {@const preview = daemon.preview ?? store.previews?.[daemon.baseUrl] ?? null}
+            <li class="daemon" class:lead={daemon.baseUrl === d.baseUrl} class:parent={daemon.authoritative}>
               <div class="dhead">
                 <Icon name={daemon.kind === 'remote' ? 'globe' : daemon.kind === 'tailnet' ? 'link' : 'monitor'} size={15} />
-                <span class="dn">{daemon.kindLabel}</span>
+                <span class="dn">{daemon.label ?? daemon.kindLabel}</span>
+                {#if daemon.authoritative}<span class="parent-tag">authoritative · holds your work</span>{/if}
                 <code>{daemon.baseUrl}</code>
                 <button
                   type="button"
@@ -106,13 +111,17 @@
               </div>
               {#if preview}
                 <p class="preview">
-                  <span class="pv-item"><b>{preview.batches ?? '—'}</b> writes persisted</span>
-                  <span class="pv-item" class:warn={(preview.failures ?? 0) > 0}><b>{preview.failures ?? '—'}</b> failures</span>
-                  <span class="pv-item"><b>{preview.projectCount ?? '—'}</b> projects</span>
-                  <span class="pv-item"><b>{preview.pid ?? '—'}</b> pid</span>
+                  {#if preview.version}<span class="pv-item"><b>{preview.version}</b> version</span>{/if}
+                  {#if preview.uptimeMs != null}<span class="pv-item"><b>{Math.max(1, Math.round(preview.uptimeMs / 60000))}m</b> up</span>{/if}
+                  {#if preview.sessions != null}<span class="pv-item"><b>{preview.sessions}</b> live sessions</span>{/if}
                 </p>
                 {#if preview.projects?.length}
                   <p class="pprojects">{preview.projects.join(' · ')}</p>
+                {:else if preview.projectSelectionRequired}
+                  <p class="pprojects">No project chosen yet on this daemon.</p>
+                {/if}
+                {#if (daemon.addresses?.length ?? 0) > 1}
+                  <p class="pprojects">Reachable at {daemon.addresses.length} addresses</p>
                 {/if}
               {:else}
                 <p class="preview pending">reading what this daemon holds…</p>
@@ -120,11 +129,22 @@
             </li>
           {/each}
         </ul>
-        <a class="quiet" href="#/settings?section=connections">Pair a daemon we cannot see</a>
-        <form class="seed" onsubmit={findSeed}>
-          <input bind:value={seed} placeholder="name or address, e.g. kh or 100.64.1.9:8788" aria-label="Find a Focusa daemon by name or address" />
-          <button type="submit" class="connect">Find</button>
+        <form class="seed" onsubmit={addHostToBook}>
+          <input bind:value={seed} placeholder="tailnet host, e.g. kh, kh.tailnet.ts.net or 100.64.1.9" aria-label="Add a tailnet host to look for" />
+          <button type="submit" class="connect">Add host</button>
+          <button type="button" class="connect" onclick={() => store.discover()}>Look again</button>
         </form>
+        {#if book?.length}
+          <p class="bookline">
+            Looking for:
+            {#each book as entry (entry.host)}
+              <span class="bookentry">
+                {entry.label}
+                {#if !entry.default}<button type="button" class="bookx" title="Stop looking for this host" onclick={() => store.removeTailnetHost(entry.host)}>&times;</button>{/if}
+              </span>
+            {/each}
+          </p>
+        {/if}
         {#if store.discovery.seedError}<span class="dim">{store.discovery.seedError}</span>{/if}
       </div>
 
@@ -199,6 +219,15 @@
   .preview b { color: var(--text-primary); font-weight: 700; }
   .preview .warn, .preview .warn b { color: var(--danger); }
   .preview.pending { color: var(--text-muted); }
+  .parent-tag {
+    padding: 2px 8px; border-radius: var(--radius-pill);
+    background: var(--accent-weak); color: var(--accent); font: var(--text-micro);
+  }
+  .daemon.parent { border-color: var(--accent-edge); }
+  .bookline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; font: var(--text-micro); color: var(--text-muted); }
+  .bookentry { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg-subtle); color: var(--text-secondary); }
+  .bookx { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; padding: 0 2px; font: inherit; }
+  .bookx:hover { color: var(--danger); }
   .pprojects { margin: 2px 0 0; font: var(--text-micro); color: var(--text-muted); overflow-wrap: anywhere; }
   .telemetry { font: var(--text-micro); color: var(--text-secondary); }
   .telemetry b { color: var(--text-primary); }

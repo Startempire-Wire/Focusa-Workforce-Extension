@@ -44,15 +44,26 @@ export function daemonSchemeForHost(hostname) {
   return 'https:';
 }
 
-export function normalizeDaemonOrigin(value) {
+/**
+ * @param {string} value
+ * @param {{trustedHosts?: Set<string>|string[]}} [options]
+ *   `trustedHosts` are hosts the operator has explicitly put in the tailnet host
+ *   book. A trusted tailnet host may speak plain HTTP - the tailnet is end-to-end
+ *   encrypted and the book is a deliberate operator decision. Everything else off
+ *   this machine still must be HTTPS.
+ */
+export function normalizeDaemonOrigin(value, { trustedHosts = null } = {}) {
   if (typeof value !== 'string' || !value.trim()) throw new TypeError('daemon URL is required');
   const parsed = new URL(value.trim());
   if (parsed.username || parsed.password) throw new TypeError('daemon URL must not contain credentials');
   if (parsed.search || parsed.hash) throw new TypeError('daemon URL must not contain query or fragment');
   if (parsed.pathname !== '/' && parsed.pathname !== '') throw new TypeError('daemon URL must be an origin without a path');
-  const local = isLocalDaemonHost(parsed.hostname);
+  const trusted = trustedHosts instanceof Set
+    ? trustedHosts.has(parsed.hostname)
+    : Array.isArray(trustedHosts) && trustedHosts.includes(parsed.hostname);
+  const local = isLocalDaemonHost(parsed.hostname) || trusted;
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) {
-    throw new TypeError('daemon URL off this machine and off the tailnet must use HTTPS');
+    throw new TypeError('daemon URL off this machine, off the tailnet and outside the host book must use HTTPS');
   }
   return parsed.origin;
 }

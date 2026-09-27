@@ -24,6 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
+import { trustedHosts, readHostBook, addHost, removeHost } from '../../lib/host-book.mjs';
 import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter, previewDaemon } from '../../lib/discovery.mjs';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
@@ -210,6 +211,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   }
 
   async function refreshEnvironments() {
+    await loadHostBook();
     await loadPageCaptures();
     await loadUiaiToken();
     try {
@@ -387,7 +389,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   }
 
   async function attachDaemon(baseUrl, label) {
-    const origin = normalizeDaemonOrigin(baseUrl);
+    // A host in the operator's tailnet book may speak plain HTTP.
+    const origin = normalizeDaemonOrigin(baseUrl, { trustedHosts: await trustedHosts(chromeApi) });
     const record = await saveLocalEnvironment({
       schema: 'focusa.workforce_local_environment.v1',
       environment_id: `local:${origin}`,
@@ -735,6 +738,27 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   function pageWorkOutcomeFor(id) { return pageWorkOutcomes[id] ?? null; }
 
+  // The tailnet host book: which remote hosts to look for on every launch.
+  let hostBook = $state(/** @type {any[]} */ ([]));
+
+  async function loadHostBook() {
+    hostBook = [...(await readHostBook(chromeApi))];
+    return hostBook;
+  }
+
+  /** One action, no wizard: the host joins every future discovery. */
+  async function addTailnetHost(input) {
+    const entry = await addHost(chromeApi, input);
+    await loadHostBook();
+    return entry;
+  }
+
+  async function removeTailnetHost(host) {
+    const removed = await removeHost(chromeApi, host);
+    await loadHostBook();
+    return removed;
+  }
+
   async function loadPageCaptures() {
     try {
       const raw = (await chromeApi?.storage?.local?.get(PAGE_CAPTURES_KEY))?.[PAGE_CAPTURES_KEY] ?? [];
@@ -941,6 +965,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get projects() { return projects; },
     get capabilities() { return capabilities; },
     get previews() { return previews; },
+    get hostBook() { return hostBook; },
+    addTailnetHost,
+    removeTailnetHost,
     get needsYou() { return needsYou; },
     get notifications() { return notifications; },
     get unreadCount() { return unreadCount; },
