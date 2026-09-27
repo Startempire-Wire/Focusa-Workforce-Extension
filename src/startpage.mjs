@@ -1,190 +1,177 @@
-import { mountPublicWork } from './lib/public-work.mjs';
+/**
+ * Start Page (docs/17 §4–§5) — rapid orientation and return.
+ *
+ * Calmest face: no chat box, no raw endpoint, no dense nav. Everything shown is
+ * an owner projection; the page never invents freshness or proof. Public mode
+ * (?public-work=1) renders only the curated snapshot and never falls through to
+ * the private surface.
+ */
 import { fetchBrowserFleet, fetchWorkLoop, ProjectionRequestError } from './lib/api-client.mjs';
-import { loadNotifPrefs, saveNotifPrefs } from './lib/notifications.mjs';
-import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from './lib/notifications.mjs';
-import { listConnections } from './lib/storage.mjs';
+import { projectWorkLoop } from './lib/projections.mjs';
 import { runReliableEventStream } from './lib/reconnect.mjs';
+import { listConnections, listLocalEnvironments } from './lib/storage.mjs';
+import { listNotifications, notificationFromEvent, saveNotification } from './lib/notifications.mjs';
 
-const WIDGETS=[['focus','Today’s focus'],['workforce','Agents'],['controls','Quick controls'],['activity','Activity'],['notifications','Notifications'],['fleet','Browser Fleet'],['brief','Workspace brief']];
-const defaults=Object.fromEntries(WIDGETS.map(([id])=>[id,true]));
-const storage=globalThis.chrome?.storage?.local;
-const read=async()=>storage?.get('focusa_startpage_widgets')||{};
-const write=(value)=>storage?.set({focusa_startpage_widgets:value});
-const openPanel=()=>chrome.tabs.create({url:chrome.runtime.getURL('sidepanel.html')});
-const openWall=()=>chrome.tabs.create({url:chrome.runtime.getURL('wall.html')});
+const $ = (selector) => {
+  const node = document.querySelector(selector);
+  if (!node) throw new Error(`required start page element missing: ${selector}`);
+  return node;
+};
 
-function renderWidgets(state){for(const [id] of WIDGETS){const node=document.querySelector(`[data-widget="${id}"]`);if(node)node.hidden=state[id]===false;}const toggles=document.querySelector('#widget-toggles');toggles.replaceChildren(...WIDGETS.map(([id,label])=>{const button=document.createElement('button');button.className=`toggle${state[id]?' on':''}`;button.type='button';button.setAttribute('aria-pressed',String(Boolean(state[id])));button.textContent=label;button.addEventListener('click',()=>{state[id]=!state[id];write(state);renderWidgets(state);});return button;}));}
-function clock(){const node=document.querySelector('#clock');if(node)node.textContent=new Intl.DateTimeFormat(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date());}
-function bind(){document.querySelector('#customize').addEventListener('click',()=>{const drawer=document.querySelector('#widget-drawer');drawer.hidden=!drawer.hidden;});document.querySelector('#open-wall')?.addEventListener('click',openWall);for(const id of ['open-panel','manage-agents','orient-now','new-work','review-activity','pair-daemon'])document.querySelector(`#${id}`)?.addEventListener('click',openPanel);document.querySelector('#pause-work')?.addEventListener('click',()=>{document.querySelector('#runtime-label').textContent='Pause requested in command panel';openPanel();});}
-function setWidgetText(selector,text){const node=document.querySelector(selector);if(node)node.textContent=text;}
-let notifications=[];
-function renderStartNotifications(){const node=document.querySelector('#start-notifications');if(!node)return;node.replaceChildren();if(!notifications.length){node.append(Object.assign(document.createElement('p'),{className:'muted',textContent:'No important signals yet.'}));}else for(const item of notifications.slice(0,5)){const row=document.createElement('div');row.className=`start-notification ${item.read?'':'unread'}`;const dot=document.createElement('span');dot.className=`notification-dot ${item.severity}`;const copy=document.createElement('div');copy.className='start-notification-copy';const title=document.createElement('strong');title.textContent=item.title;const body=document.createElement('small');body.textContent=`${item.body} · ${item.timestamp}`;copy.append(title,body);row.append(dot,copy);node.append(row);}setWidgetText('#start-notification-count',`${unreadNotificationCount(notifications)} unread`);}
+const el = {
+  envLabel: $('#daemon-select-label'),
+  freshness: $('#start-freshness'),
+  private: $('#start-private'),
+  unpaired: $('#start-unpaired'),
+  public: $('#start-public'),
+  focusTitle: $('#start-focus-heading'),
+  objective: $('#start-objective'),
+  meta: $('#start-meta'),
+  stale: $('#start-stale'),
+  refresh: $('#start-refresh'),
+  continue: $('#orient-now'),
+  openNeeds: $('#open-needs'),
+  openNeeds2: $('#open-needs-2'),
+  openWorkforce: $('#open-workforce'),
+  needs: $('#start-needs'),
+  needsCount: $('#start-needs-count'),
+  working: $('#start-working'),
+  verified: $('#start-verified'),
+  pair: $('#pair-focusa'),
+  publicDate: $('#public-date'),
+  publicMission: $('#public-mission'),
+  publicWorkforce: $('#public-workforce'),
+  publicCurrent: $('#public-current'),
+  publicProof: $('#public-proof'),
+  publicFailure: $('#public-failure'),
+};
 
-let refreshPromise=null;
-let streamAbort=null;
-let streamCursor=null;
-let selectedConnectionId=null;
-let liveConnection=null;
+const CONNECTION_KEY = 'focusa_startpage_connection.v1';
 
-async function loadSelectedConnection(){
-  const connections=await listConnections();
-  const select=document.querySelector('#daemon-select');
-  renderOnboarding(connections.length);
-  if(select){select.replaceChildren(...connections.map((item)=>new Option(item.label,item.connection_id)));if(!connections.length)select.append(new Option('No daemon connected',''));selectedConnectionId=selectedConnectionId&&connections.some((item)=>item.connection_id===selectedConnectionId)?selectedConnectionId:(connections[0]?.connection_id||'');select.value=selectedConnectionId;}
-  return connections.find((item)=>item.connection_id===selectedConnectionId)||null;
+let liveConnection = null;
+let streamAbort = null;
+let notifications = [];
+
+function openWorkforce(hash = '') {
+  chrome.tabs.create({ url: chrome.runtime.getURL('workforce.html') + hash });
 }
 
-function renderLiveWorkLoop(projection){
-  const state=projection.status ?? 'unknown';
-  const enabled=projection.enabled === true;
-  const task=projection.current_task?.title || projection.current_task?.id || 'No current task';
-  setRuntimeState(`Work Loop ${state}`, state === 'healthy' || state === 'active' ? 'ready' : 'degraded');
-  setWidgetText('#focus-copy',enabled ? `Active task: ${task}. The daemon reports ${projection.status || 'an available'} Work Loop.` : 'Work Loop is idle. Open the command panel to choose the next governed action.');
-  setWidgetText('#agent-count',enabled ? '1' : '0');
-  setWidgetText('#agent-list',enabled ? `Work Loop · ${projection.status || 'active'}` : 'No active Work Loop.');
+function row(title, meta) {
+  const li = document.createElement('li');
+  li.append(Object.assign(document.createElement('span'), { className: 'sp-row-title', textContent: title }));
+  if (meta) li.append(Object.assign(document.createElement('span'), { className: 'sp-row-meta', textContent: meta }));
+  return li;
 }
 
-async function loadLiveWorkLoop(){
-  try{
-    const connection=await loadSelectedConnection();
-    liveConnection=connection;
-    if(!connection){setRuntimeState('Connect a daemon','degraded');return null;}
-    const projection=await fetchWorkLoop({baseUrl:connection.base_url,token:connection.token});
-    renderLiveWorkLoop(projection);
-    setRuntimeState(`Work Loop live · ${connection.label}`,'ready');
-    return connection;
-  }catch(error){
-    const label=error instanceof ProjectionRequestError ? `Runtime ${error.kind}` : 'Runtime unavailable';
-    setRuntimeState(label,'degraded');
-    return null;
+function emptyRow(message) {
+  return Object.assign(document.createElement('li'), { className: 'sp-empty', textContent: message });
+}
+
+function setFreshness(state, text) {
+  el.freshness.textContent = text;
+  el.freshness.className = state;
+}
+
+async function loadSelectedConnection() {
+  const [paired, local] = await Promise.all([listConnections(), listLocalEnvironments().catch(() => [])]);
+  const records = [...local, ...paired];
+  const stored = (await chrome.storage.local.get(CONNECTION_KEY))[CONNECTION_KEY];
+  const preferred = records.find((r) => (r.connection_id ?? r.environment_id) === stored);
+  liveConnection = preferred ?? records[0] ?? null;
+  if (liveConnection) {
+    el.envLabel.textContent = liveConnection?.label ?? liveConnection?.environment_id ?? '';
+    el.unpaired.hidden = true;
+    el.private.hidden = false;
+    return true;
+  }
+  el.envLabel.textContent = 'Not connected';
+  el.unpaired.hidden = false;
+  el.private.hidden = true;
+  return false;
+}
+
+async function refresh() {
+  if (!liveConnection) return;
+  const requestOptions = { base_url: liveConnection.base_url, token: liveConnection.token };
+  try {
+    const [loopBody, fleetBody] = await Promise.all([
+      fetchWorkLoop(requestOptions),
+      fetchBrowserFleet(requestOptions).catch(() => null),
+    ]);
+    const loop = projectWorkLoop(loopBody);
+    const task = loop?.current_task ?? null;
+    setFreshness('ok', 'Fresh');
+    el.focusTitle.textContent = task?.title ?? task?.description ?? 'Workstream active';
+    el.objective.textContent = task?.detail ?? task?.objective ?? '—';
+    el.meta.textContent = [loop?.state, loop?.status, task?.id].filter(Boolean).join(' · ');
+    el.stale.hidden = true;
+
+    const working = fleetBody?.data?.bodies ?? [];
+    el.working.replaceChildren(...(working.length
+      ? working.slice(0, 4).map((b) => row(b.label ?? b.id, b.state ?? null))
+      : [emptyRow('No active work reported.')]));
+
+    const needs = notifications.filter((n) => n.severity === 'warning' || n.severity === 'danger');
+    el.needs.replaceChildren(...(needs.length
+      ? needs.slice(0, 2).map((n) => row(n.title, n.body ?? null))
+      : [emptyRow('Nothing needs you right now.')]));
+    el.needsCount.textContent = `${needs.length}`;
+
+    const settled = notifications.filter((n) => n.severity === 'success');
+    el.verified.replaceChildren(...(settled.length
+      ? settled.slice(0, 3).map((n) => row(n.title, n.timestamp ?? null))
+      : [emptyRow('No settled proof yet.')]));
+  } catch (error) {
+    // docs/17 §4 Unavailable: keep last-known orientation, label source unavailable.
+    // docs/17 §4 Unavailable: keep last-known orientation and label it; with no
+    // last-known content there is nothing to retain, so the band stays hidden.
+    setFreshness('unavailable', 'Runtime unavailable');
+    if (el.meta.textContent.trim() && el.meta.textContent.trim() !== '—') {
+      el.stale.hidden = false;
+      el.stale.firstChild.textContent = 'Last confirmed state may have changed. ';
+    }
   }
 }
 
-async function refreshLiveWorkLoop(){
-  if(!refreshPromise)refreshPromise=loadLiveWorkLoop().finally(()=>{refreshPromise=null;});
-  return refreshPromise;
-}
-
-async function startLiveUpdates(){
-  const connection=await refreshLiveWorkLoop();
-  if(!connection)return;
+function startStream() {
+  if (!liveConnection) return;
   streamAbort?.abort();
-  streamAbort=new AbortController();
-  try{
-    await runReliableEventStream({
-      baseUrl:connection.base_url,
-      token:connection.token,
-      initialCursor:streamCursor,
-      signal:streamAbort.signal,
-      onEvent:async(event)=>{await refreshLiveWorkLoop();const notification=notificationFromEvent(event);if(notification){notifications=await saveNotification(notification);renderStartNotifications();}},
-      commitCursor:async(cursor)=>{streamCursor=cursor;},
-      onState:(state)=>{
-        const source=liveConnection?.label||'daemon';
-        if(state.phase==='reconnecting')setRuntimeState(`Events reconnecting · ${source}`,'degraded');
-        else if(state.phase==='unauthorized')setRuntimeState(`Events unauthorized · ${source}`,'degraded');
-        else if(state.phase==='live')setRuntimeState(`Work Loop live · ${source}`,'ready');
-      },
-    });
-  }catch(error){
-    if(!streamAbort.signal.aborted)setRuntimeState(error?.name==='StreamAuthError'?'Events unauthorized':'Events unavailable','degraded');
-  }
+  streamAbort = new AbortController();
+  runReliableEventStream({
+    base_url: liveConnection.base_url,
+    token: liveConnection.token,
+    initialCursor: liveConnection.last_cursor,
+    signal: streamAbort.signal,
+    onState: (state) => { el.freshness.textContent = `live ${state.phase}`; },
+    onEvent: async (event) => {
+      const notification = notificationFromEvent(event);
+      if (notification) { notifications = await saveNotification(notification); }
+      refresh();
+    },
+    commitCursor: async (cursor) => {
+      liveConnection = { ...liveConnection, last_cursor: cursor };
+      await chrome.storage.local.set({ [CONNECTION_KEY]: liveConnection.connection_id ?? liveConnection.environment_id });
+    },
+  }).catch(() => { el.freshness.textContent = 'stream unavailable'; });
 }
 
-function setRuntimeState(label, tone='ready'){const node=document.querySelector('#runtime-label');if(node)node.textContent=label;const health=document.querySelector('.health');if(health)health.dataset.tone=tone;}
+el.continue.addEventListener('click', () => openWorkforce('#/work/detail'));
+el.openNeeds.addEventListener('click', () => openWorkforce('#/needs-you'));
+el.openNeeds2.addEventListener('click', () => openWorkforce('#/needs-you'));
+el.openWorkforce.addEventListener('click', () => openWorkforce('#/overview'));
+el.pair.addEventListener('click', () => openWorkforce('#/settings?section=connections'));
+el.refresh.addEventListener('click', refresh);
+window.addEventListener('pagehide', () => streamAbort?.abort());
 
-// ── Onboarding (F-speedrun) ──────────────────────────────────────────────
-function renderOnboarding(connectionCount){
-  const el=document.querySelector('#onboarding');
-  if(!el)return;
-  el.hidden=connectionCount!==0;
-}
-
-// ── Browser Fleet (F1 client) ────────────────────────────────────────────
-function renderFleet(fleet){
-  const body=document.querySelector('#fleet-body'); if(!body) return;
-  const pools=Array.isArray(fleet?.pools)?fleet.pools:[];
-  setWidgetText('#fleet-pools',String(pools.length));
-  body.replaceChildren();
-  if(!pools.length){body.append(Object.assign(document.createElement('p'),{className:'muted',textContent:'No pools reported.'}));return;}
-  for(const p of pools){
-    const row=document.createElement('div'); row.className='fleet-row';
-    const label=document.createElement('strong');
-    label.textContent=`pool ${p.max_pages ?? '?'}p · ${p.browser_state ?? '?'}`;
-    const meta=document.createElement('small'); meta.className='muted';
-    meta.textContent=`active ${p.active_pages ?? 0} · fails ${p.fail_count ?? 0}`;
-    row.append(label,meta); body.append(row);
-  }
-}
-async function loadFleet(){
-  try{ const c=liveConnection||await loadSelectedConnection(); if(!c){setWidgetText('#fleet-body','Connect a daemon first.');return;}
-    renderFleet(await fetchBrowserFleet({baseUrl:c.base_url,token:c.token}));
-  }catch(e){ const b=document.querySelector('#fleet-body'); if(b) b.replaceChildren(Object.assign(document.createElement('p'),{className:'muted',textContent:`Fleet unavailable: ${e?.kind||'error'}`})); }
-}
-
-// ── Notification severity prefs (speedrun) ───────────────────────────────
-async function renderNotifPrefToggles(){
-  const drawer=document.querySelector('#widget-drawer');
-  if(!drawer||drawer.dataset.prefs==='1')return;
-  drawer.dataset.prefs='1';
-  const prefs=await loadNotifPrefs();
-  const wrap=document.createElement('div');
-  wrap.className='notif-prefs';
-  wrap.append(Object.assign(document.createElement('strong'),{textContent:'Notify severities'}));
-  for(const sev of ['info','success','warning','danger']){
-    const label=document.createElement('label');
-    label.className='toggle';
-    label.style.cursor='pointer';
-    const box=document.createElement('input');
-    box.type='checkbox'; box.checked=prefs[sev]!==false; box.style.marginRight='6px';
-    box.addEventListener('change',async()=>{
-      const next={...(await loadNotifPrefs())}; next[sev]=box.checked;
-      await saveNotifPrefs(next);
-    });
-    label.append(box, document.createTextNode(sev));
-    wrap.append(label);
-  }
-  drawer.append(wrap);
-}
-
-// F2 client: ingest engine events through the daemon bridge (spec 181).
-async function startFleetEventStream(){
-  const connection=await loadSelectedConnection();
-  if(!connection)return;
-  fleetAbort?.abort();
-  fleetAbort=new AbortController();
-  try{
-    await runReliableEventStream({
-      baseUrl:connection.base_url,
-      token:connection.token,
-      path:'/v1/browser-fleet/stream',
-      initialCursor:fleetCursor,
-      signal:fleetAbort.signal,
-      onEvent:async(event)=>{
-        const notification=notificationFromEvent(event);
-        if(notification){notifications=await saveNotification(notification);renderStartNotifications();}
-        if((event.invalidate||[]).includes('browser_fleet'))loadFleet();
-      },
-      commitCursor:async(v)=>{fleetCursor=v;},
-      onState:(st)=>{ if(st.phase==='unauthorized')setWidgetText('#fleet-body','Fleet stream unauthorized.'); },
-    });
-  }catch(e){
-    setWidgetText('#fleet-body',`Fleet stream unavailable: ${e?.name||'error'}`);
-  }
-}
-let fleetAbort=null;
-let fleetCursor=null;
-
-document.querySelector('#onboard-open-panel')?.addEventListener('click',openPanel);
-document.querySelector('#mark-start-notifications-read')?.addEventListener('click',async()=>{notifications=await markNotificationsRead();renderStartNotifications();});
-document.querySelector('#daemon-select')?.addEventListener('change',async(event)=>{selectedConnectionId=event.target.value;await storage?.set({'focusa_startpage_connection.v1':selectedConnectionId});streamAbort?.abort();await startLiveUpdates();startFleetEventStream();});
-document.querySelector('#fleet-refresh')?.addEventListener('click',async()=>{await loadSelectedConnection();loadFleet();startFleetEventStream();});
-
+// docs/17 §5: public mode loads a dedicated module that cannot read private
+// storage or private projections. The private path is never executed.
 if (new URL(window.location.href).searchParams.get('public-work') === '1') {
-  await mountPublicWork(document, chrome.runtime.getURL('public-work.json'));
-  clock(); setInterval(clock,30000);
+  await import('./startpage-public.mjs');
 } else {
-  notifications=await listNotifications().catch(()=>[]);renderStartNotifications();
-  const savedSelection=await storage?.get('focusa_startpage_connection.v1');selectedConnectionId=savedSelection?.['focusa_startpage_connection.v1']||null;
-  const state={...defaults,...(await read()).focusa_startpage_widgets};renderWidgets(state);renderNotifPrefToggles();bind();clock();setInterval(clock,30000);startLiveUpdates();startFleetEventStream();
+  notifications = await listNotifications().catch(() => []);
+  const connected = await loadSelectedConnection();
+  if (connected) {
+    await refresh();
+    startStream();
+  }
 }
-window.addEventListener('pagehide',()=>streamAbort?.abort());

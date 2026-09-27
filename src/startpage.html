@@ -1,26 +1,98 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light">
-  <title>Focusa Workforce · Start</title><link rel="stylesheet" href="startpage.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Focusa Workforce</title>
+  <link rel="stylesheet" href="startpage.css">
 </head>
+<!--
+  docs/17 §4 Private Start Page — "orient me". The calmest face: opening the
+  door to a functioning organization, not a monitoring dashboard.
+  Region order fixed by the atlas: brand + freshness → CURRENT WORKSTREAM hero
+  (title / objective / Foreman / last verified) → Continue + Needs You N +
+  Open Workforce → NEEDS YOU | WORKING NOW (2-col) → VERIFIED RECENTLY.
+  docs/17 §5: ?public-work=1 replaces the whole body with a curated public
+  snapshot; it never falls through to private mode.
+-->
 <body>
-  <header class="topbar"><div class="brand"><span class="mark">F</span><div><span class="eyebrow">FOCUSA WORKFORCE</span><strong>Start page</strong></div></div><div class="top-actions"><label class="daemon-picker" for="daemon-select">Runtime<select id="daemon-select"><option value="">No daemon connected</option></select></label><span id="clock" class="muted"></span><button id="customize" class="ghost" type="button">Customize</button><button id="open-wall" class="ghost" type="button">Open wall</button><button id="open-panel" type="button">Open command panel</button></div></header>
-  <main>
-    <section class="welcome"><div><p class="eyebrow">GOOD TO SEE YOU</p><h1>Make the next move count.</h1><p class="lead">A calm, high-level view of your work, your agents, and the controls that matter now.</p></div><div class="health"><span class="pulse"></span><span id="runtime-label">Runtime ready</span></div></section>
-    <section id="widget-drawer" class="drawer" hidden><div><strong>Choose your view</strong><span class="muted">Turn areas on or off. Your layout stays local to this browser.</span></div><div id="widget-toggles" class="toggles"></div></section>
-    <div id="dashboard" class="dashboard">
-      <section id="onboarding" class="widget onboarding" hidden><div class="widget-head"><div><p class="eyebrow">GET STARTED</p><h2>Three steps to your workforce</h2></div></div><ol class="steps"><li><strong>Pair a daemon</strong><small>Open the command panel → Connection → request pairing.</small></li><li><strong>Approve the code</strong><small>Confirm in Focusa within the expiry window.</small></li><li><strong>Orient your first mission</strong><small>Capture this tab and set the objective.</small></li></ol><button id="onboard-open-panel" type="button">Open command panel</button></section>
-      <section class="widget hero-widget" data-widget="focus"><div class="widget-head"><div><p class="eyebrow">HIGH-LEVEL VIEW</p><h2>Today’s focus</h2></div><span class="badge">Uncommitted</span></div><p id="focus-copy" class="focus-copy">Connect your daemon and orient the current tab to see the active mission here.</p><div class="quick-actions"><button id="orient-now" type="button">Orient current tab</button><button id="new-work" class="secondary" type="button">Start a new work item</button></div></section>
-      <section class="widget" data-widget="workforce"><div class="widget-head"><div><p class="eyebrow">LIVE WORKFORCE</p><h2>Agents at a glance</h2></div><span id="agent-count" class="metric">0</span></div><div id="agent-list" class="agent-list"><p class="muted">No active agents yet.</p></div><button id="manage-agents" class="link-button" type="button">Manage workforce →</button></section>
-      <section class="widget" data-widget="controls"><div class="widget-head"><div><p class="eyebrow">QUICK CONTROLS</p><h2>Keep work governed</h2></div><span class="badge safe">Safe defaults</span></div><div class="control-grid"><button id="pause-work" class="control-card" type="button"><span class="control-icon">Ⅱ</span><strong>Pause work</strong><small>Hold active workers</small></button><button id="review-activity" class="control-card" type="button"><span class="control-icon">≡</span><strong>Review activity</strong><small>Open recent receipts</small></button><button id="pair-daemon" class="control-card" type="button"><span class="control-icon">⌁</span><strong>Connect daemon</strong><small>Pair another runtime</small></button></div></section>
-      <section class="widget" data-widget="activity"><div class="widget-head"><div><p class="eyebrow">RECENT ACTIVITY</p><h2>What changed</h2></div><span class="muted">Local view</span></div><ul id="activity-list" class="activity-list"><li><span class="activity-dot"></span><div><strong>Start page ready</strong><small>Widgets are customizable and off by default only when you hide them.</small></div></li></ul></section>
-      <section class="widget notification-widget" data-widget="notifications"><div class="widget-head"><div><p class="eyebrow">FOCUSA SIGNALS</p><h2>Notifications</h2></div><span id="start-notification-count" class="badge">0 unread</span></div><div id="start-notifications" class="start-notifications"><p class="muted">No important signals yet.</p></div><button id="mark-start-notifications-read" class="link-button" type="button">Mark all read</button></section>
-      <section class="widget fleet-widget" data-widget="fleet"><div class="widget-head"><div><p class="eyebrow">BROWSER FLEET</p><h2>Engine pools</h2></div><span id="fleet-pools" class="metric">–</span></div><div id="fleet-body" class="fleet-body"><p class="muted">Connect a daemon to see engine pools.</p></div><div class="quick-actions"><button id="fleet-refresh" class="secondary" type="button">Refresh fleet</button></div></section>
-      <section class="widget" data-widget="brief"><div class="widget-head"><div><p class="eyebrow">WORKSPACE BRIEF</p><h2>Before you begin</h2></div></div><div class="brief-list"><div><span>01</span><p><strong>Orient the page</strong><small>Capture what you are looking at.</small></p></div><div><span>02</span><p><strong>Set the boundary</strong><small>Define the outcome and approvals.</small></p></div><div><span>03</span><p><strong>Start deliberately</strong><small>Run only the worker you intend.</small></p></div></div></section>
-    </div>
+  <header class="sp-header">
+    <p class="sp-brand">Focusa Workforce</p>
+    <p class="sp-env"><span id="daemon-select-label">Not connected</span> · <span id="start-freshness">Unavailable</span></p>
+  </header>
+
+  <main class="sp-container">
+    <!-- PRIVATE -->
+    <section id="start-private" aria-labelledby="start-focus-heading">
+      <p class="sp-label">Current Workstream</p>
+      <h1 id="start-focus-heading" class="sp-hero-title">— no Workstream selected</h1>
+      <p id="start-objective" class="sp-hero-objective">Choose the work you want this browser to return to.</p>
+      <p id="start-meta" class="sp-hero-meta">—</p>
+      <p id="start-stale" class="sp-stale" hidden>Last confirmed —. Current work may have changed. <button id="start-refresh" type="button" class="sp-link-btn">Refresh</button></p>
+      <div class="sp-actions">
+        <button id="orient-now" type="button" class="sp-btn sp-btn-primary">Continue</button>
+        <button id="open-needs" type="button" class="sp-btn">Needs You <span id="start-needs-count">0</span></button>
+        <button id="open-workforce" type="button" class="sp-btn sp-btn-quiet">Open Workforce</button>
+      </div>
+
+      <div class="sp-summary">
+        <section class="sp-summary-col" aria-labelledby="start-needs-heading">
+          <h2 id="start-needs-heading" class="sp-label">Needs You</h2>
+          <ul id="start-needs" class="sp-list"><li class="sp-empty">Nothing needs you right now.</li></ul>
+          <button id="open-needs-2" type="button" class="sp-link-btn">Open Needs You →</button>
+        </section>
+        <section class="sp-summary-col" aria-labelledby="start-working-heading">
+          <h2 id="start-working-heading" class="sp-label">Working Now</h2>
+          <ul id="start-working" class="sp-list"><li class="sp-empty">No active work reported.</li></ul>
+        </section>
+      </div>
+
+      <section aria-labelledby="start-verified-heading">
+        <h2 id="start-verified-heading" class="sp-label">Verified Recently</h2>
+        <ul id="start-verified" class="sp-list"><li class="sp-empty">No settled proof yet.</li></ul>
+      </section>
+    </section>
+
+    <!-- UNPAIRED replacement (docs/17 §4): replaces everything below the header -->
+    <section id="start-unpaired" hidden aria-labelledby="start-unpaired-heading">
+      <h1 id="start-unpaired-heading" class="sp-hero-title">Your workforce is not connected on this device.</h1>
+      <p class="sp-hero-objective">Pair a Focusa environment to make this new tab your operating return point.</p>
+      <div class="sp-actions">
+        <button id="pair-focusa" type="button" class="sp-btn sp-btn-primary">Pair Focusa</button>
+      </div>
+    </section>
+
+    <!-- PUBLIC (docs/17 §5) -->
+    <section id="start-public" hidden aria-labelledby="public-heading">
+      <p class="sp-label">Public snapshot · <span id="public-date"></span></p>
+      <h1 id="public-heading" class="sp-hero-title">Focusa Workforce</h1>
+      <p id="public-mission" class="sp-hero-objective">—</p>
+      <div class="sp-summary">
+        <section class="sp-summary-col" aria-labelledby="public-workforce-heading">
+          <h2 id="public-workforce-heading" class="sp-label">Workforce</h2>
+          <p id="public-workforce" class="sp-body">—</p>
+        </section>
+        <section class="sp-summary-col" aria-labelledby="public-current-heading">
+          <h2 id="public-current-heading" class="sp-label">Current Work</h2>
+          <p id="public-current" class="sp-body">—</p>
+        </section>
+      </div>
+      <section id="public-proof-section" aria-labelledby="public-proof-heading">
+        <h2 id="public-proof-heading" class="sp-label">Proof</h2>
+        <ul id="public-proof" class="sp-list"></ul>
+      </section>
+      <p id="public-disclaimer" class="sp-hero-meta">This is a dated snapshot, not live agent telemetry. It grants no execution permission.</p>
+      <div class="sp-actions">
+        <button id="public-cta" type="button" class="sp-btn sp-btn-quiet">What Focusa Workforce is</button>
+      </div>
+      <p id="public-failure" class="sp-gap" hidden>Public snapshot unavailable — this demo could not load its curated checkpoint.</p>
+    </section>
   </main>
-  <footer><span>Focusa Workforce</span><span>Private by default · daemon remains canonical</span></footer>
+
+  <footer class="sp-footer">
+    <span class="sp-footer-meta" id="start-build">Focusa Workforce</span>
+  </footer>
+
   <script type="module" src="startpage.mjs"></script>
 </body>
 </html>

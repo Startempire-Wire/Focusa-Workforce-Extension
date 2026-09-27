@@ -1,145 +1,135 @@
-/**
- * Focusa Workforce design tokens — docs/13 §4–§7.
- *
- * Light is the primary shipped theme (docs/13 §2); dark is intentionally not
- * half-shipped. Every surface consumes these semantic tokens rather than raw
- * color so a later dark set maps the same names.
- */
+/* ════════════════════════════════════════════════════════════════════════════
+   FOCUSA WORKFORCE — TOKEN LAYER (docs/13 visual system)
+   One token contract for every surface: Toolbar, Side Panel, Start Page,
+   Wall, Full Workforce. Semantic names only — no surface invents values.
+   ════════════════════════════════════════════════════════════════════════════ */
+
 :root {
   color-scheme: light;
 
-  /* Typography (docs/13 §3) — no remote font dependency. */
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  --text-display: 28px;
-  --text-page-title: 24px;
-  --text-section: 17px;
-  --text-card-title: 15px;
-  --text-body: 14px;
-  --text-small: 12px;
-  --text-micro: 11px;
-
-  --leading-display: 34px;
-  --leading-page-title: 30px;
-  --leading-section: 24px;
-  --leading-card-title: 22px;
-  --leading-body: 21px;
-  --leading-small: 18px;
-  --leading-micro: 16px;
-
-  --weight-regular: 450;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 650;
-
-  /* Surfaces and text (docs/13 §4) */
-  --bg-app: #f7f8fa;
+  /* ── Surfaces ── */
+  --bg-app: #f4f7fc;
   --bg-surface: #ffffff;
-  --bg-subtle: #f2f4f7;
-  --bg-hover: #eef1f5;
-  --bg-selected: #eaf2ff;
+  --bg-subtle: #eef3fb;
+  --bg-raised: #e6eefa;
+  --bg-inset: #f8faff;
 
-  --text-primary: #17191c;
-  --text-secondary: #475467;
-  --text-muted: #667085;
-  --text-disabled: #98a2b3;
-  --text-inverse: #ffffff;
-
-  --border-default: #e4e7ec;
-  --border-strong: #d0d5dd;
+  /* ── Borders ── */
+  --border-default: #d5deee;
+  --border-strong: #b9cbe6;
   --border-focus: #2563eb;
+  --border-subtle: #e6edf8;
 
+  /* ── Text ── */
+  --text-primary: #101b30;
+  --text-secondary: #4a5872;
+  --text-muted: #7c8aa3;
+  --text-inverse: #f7faff;
+
+  /* ── Semantic state ── */
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
-  --accent-subtle: #eaf2ff;
+  --accent-weak: #dbe8fd;
+  --accent-edge: #93b8f8;
+  --success: #15803d;
+  --success-weak: #dcfce7;
+  --warning: #b45309;
+  --warning-weak: #fef3c7;
+  --danger: #b91c1c;
+  --danger-weak: #fee2e2;
+  --info: #0e7490;
+  --info-weak: #cffafe;
+  --violet: #7c3aed;
+  --violet-weak: #ede9fe;
+  --settled: #047857;
+  --settled-weak: #d1fae5;
 
-  --success: #16794a;
-  --success-subtle: #eaf7f0;
-  --warning: #a15c00;
-  --warning-subtle: #fff4e5;
-  --danger: #b42318;
-  --danger-subtle: #fdecec;
-  --info: #175cd3;
-  --info-subtle: #eff4ff;
-  --violet: #6941c6;
-  --violet-subtle: #f4f0ff;
-  --settled: #0f766e;
-  --settled-subtle: #e7f7f4;
+  /* ── Type ── */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Spacing — base unit 4px (docs/13 §6) */
-  --space-micro: 4px;
-  --space-tight: 8px;
-  --space-compact: 12px;
+  --text-display: 650 28px/1.18 var(--font-sans);
+  --text-display-2: 600 20px/1.25 var(--font-sans);
+  --text-title: 600 17px/1.3 var(--font-sans);
+  --text-body: 400 14px/1.5 var(--font-sans);
+  --text-body-strong: 600 14px/1.5 var(--font-sans);
+  --text-small: 400 12.5px/1.45 var(--font-sans);
+  --text-small-strong: 600 12.5px/1.4 var(--font-sans);
+  --text-micro: 500 11px/1.35 var(--font-sans);
+  --text-kicker: 700 10.5px/1.2 var(--font-sans);
+
+  /* ── Space ── */
+  --space-tight: 4px;
+  --space-unit: 8px;
   --space-standard: 16px;
-  --space-roomy: 20px;
-  --space-section: 24px;
+  --space-loose: 24px;
   --space-major: 32px;
-  --space-page: 40px;
+  --page-gutter: 28px;
+  --card-pad: 16px;
+  --panel-pad: 22px;
 
-  /* Radius (docs/13 §7) */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  /* ── Radius ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
 
-  /* Elevation — quiet, structural (docs/13 §7) */
-  --elevation-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --elevation-overlay: 0 8px 24px rgba(16, 24, 40, 0.12);
+  /* ── Elevation ── */
+  --elevation-1: 0 1px 2px rgba(16, 27, 48, .06);
+  --elevation-2: 0 2px 10px rgba(16, 27, 48, .07);
+  --elevation-3: 0 12px 34px rgba(16, 27, 48, .14);
+  --elevation-card: var(--elevation-2);
+  --elevation-drawer: var(--elevation-3);
 
-  /* Page gutter (docs/13 §6) */
-  --page-gutter: 16px;
+  /* ── Motion ── */
+  --motion-fast: 120ms ease;
+  --motion-base: 180ms ease;
 
-  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
+  /* ── Focus ── */
+  --focus-ring: 0 0 0 2px var(--bg-app), 0 0 0 4px var(--border-focus);
 }
 
-@media (min-width: 480px) { :root { --page-gutter: 20px; } }
-@media (min-width: 860px) { :root { --page-gutter: 24px; } }
-@media (min-width: 1180px) { :root { --page-gutter: 28px; } }
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Dark theme (docs/13 §2): maps the SAME semantic tokens, so every surface
-   inherits it without a second visual language. Values continue the palette the
-   extension's existing surfaces already ship.
-   ───────────────────────────────────────────────────────────────────────── */
+/* ── Dark theme: same semantic names, remapped (docs/13) ── */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --bg-app: #09111f;
-    --bg-surface: #122139;
-    --bg-subtle: #172b49;
-    --bg-hover: #1d3355;
-    --bg-selected: #1c2f4f;
+    --bg-app: #0a1120;
+    --bg-surface: #111c30;
+    --bg-subtle: #16233a;
+    --bg-raised: #1c2b46;
+    --bg-inset: #0d1626;
 
-    --text-primary: #f4f7ff;
-    --text-secondary: #b6c4dc;
-    --text-muted: #8fa0bd;
-    --text-disabled: #6b7c99;
-    --text-inverse: #08121f;
+    --border-default: #24354f;
+    --border-strong: #33496a;
+    --border-focus: #7aa9ff;
+    --border-subtle: #1b2a42;
 
-    --border-default: #24405f;
-    --border-strong: #33547c;
-    --border-focus: #86adff;
+    --text-primary: #eef3fb;
+    --text-secondary: #a8b9d4;
+    --text-muted: #7b8ba6;
+    --text-inverse: #0a1120;
 
-    --accent: #86adff;
-    --accent-hover: #a3c1ff;
-    --accent-subtle: #16294a;
+    --accent: #7aa9ff;
+    --accent-hover: #9cc0ff;
+    --accent-weak: #17294a;
+    --accent-edge: #3d5f96;
 
-    --success: #73dfb0;
-    --success-subtle: #102a22;
-    --warning: #ffd27d;
-    --warning-subtle: #2b2312;
-    --danger: #ff8f9b;
-    --danger-subtle: #2c1519;
-    --info: #8ab6ff;
-    --info-subtle: #152238;
-    --violet: #b9a2ff;
-    --violet-subtle: #241d3d;
-    --settled: #6fd8cd;
-    --settled-subtle: #102b2a;
+    --success: #57d38c;
+    --success-weak: #10281d;
+    --warning: #f2c15c;
+    --warning-weak: #2a2313;
+    --danger: #f08c8c;
+    --danger-weak: #2d1618;
+    --info: #6bd3e8;
+    --info-weak: #10262c;
+    --violet: #b79cf5;
+    --violet-weak: #1f1a35;
+    --settled: #63d9a8;
+    --settled-weak: #0f2720;
 
-    --elevation-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
-    --focus-ring: 0 0 0 3px rgba(134, 173, 255, 0.35);
+    --elevation-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --elevation-2: 0 2px 12px rgba(0, 0, 0, .45);
+    --elevation-3: 0 16px 40px rgba(0, 0, 0, .55);
   }
 }

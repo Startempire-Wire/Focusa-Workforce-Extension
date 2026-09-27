@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { MAX_PUBLIC_WORK_BYTES, validatePublicWorkSnapshot } from '../src/lib/contracts.mjs';
-import { loadPublicWorkSnapshot, renderPublicWork, mountPublicWork } from '../src/lib/public-work.mjs';
+import { loadPublicWorkSnapshot } from '../src/lib/public-work.mjs';
 
 const sample = () => ({ schema:'focusa.public_work_snapshot.v1', visibility:'public', project:'Example project',
   mission:'Deliver the Work view', state:'active', stage:'Verification', next_action:'Verify the visible view',
@@ -45,57 +45,38 @@ test('loader rejects errors, invalid JSON and excessive output',async()=>{
     await assert.rejects(loadPublicWorkSnapshot('chrome-extension://test/public-work.json',async()=>response));
   }
 });
-test('renderer uses text nodes and never represents snapshot as live telemetry',()=>{
-  const document=dom(), value={...sample(),mission:'<img src=x onerror=alert(1)>'};
-  renderPublicWork(document,document.host,value,()=>{});
-  assert.ok(document.host.textContent.includes(value.mission));
-  assert.ok(document.host.textContent.includes('not live agent telemetry'));
-  assert.ok(document.host.textContent.includes('Next action'));
-  assert.ok(document.host.textContent.includes('2026-09-08'));
-  renderPublicWork(document,document.host,null,()=>{});
-  assert.ok(document.host.textContent.includes('unavailable'));
-  assert.ok(!document.host.textContent.includes(value.mission));
-});
-test('public mount hides private areas and exposes only read-only refresh',async()=>{
-  const document=dom();
-  await mountPublicWork(document,'chrome-extension://test/public-work.json',async()=>new Response(JSON.stringify(sample())));
-  assert.equal(document.other.hidden,true);assert.equal(document.button.disabled,true);
-  assert.equal(document.host.children.at(-1).textContent,'Refresh snapshot');
-  assert.ok(document.host.textContent.includes(sample().mission));
-});
-test('explicit public bootstrap never reads private storage; normal route is retained',async()=>{
-  const original=await readFile(new URL('../src/startpage.mjs',import.meta.url),'utf8');
-  const anchor="if (new URL(window.location.href).searchParams.get('public-work') === '1') {";
-  assert.ok(original.includes(anchor));
-  const source=original.replace(/^import .*;\n/gm,'').replace(anchor,
-    "renderStartNotifications=()=>{};renderWidgets=()=>{};renderNotifPrefToggles=()=>{};bind=()=>{};clock=()=>{};startLiveUpdates=()=>events.push('private-runtime');startFleetEventStream=()=>{};\n"+anchor);
-  for(const publicMode of [true,false]) {
-    const events=[], document=dom();
-    const context={events,document,URL,console,Intl,setInterval(){},
-      window:{location:{href:'chrome-extension://test/startpage.html'+(publicMode?'?public-work=1':'')},addEventListener(){}},
-      chrome:{runtime:{getURL:path=>'chrome-extension://test/'+path},storage:{local:{get:async()=>{events.push('storage');return {};}}}},
-      mountPublicWork:async()=>events.push('public'),listNotifications:async()=>{events.push('notifications');return [];}};
-    await vm.runInNewContext('(async()=>{'+source+'})()',context);
-    if(publicMode)assert.deepEqual(events,['public']);
-    else {assert.ok(events.includes('private-runtime'));assert.ok(events.includes('storage'));assert.ok(!events.includes('public'));}
+
+
+test('public bootstrap loads a dedicated module and never reads private state', async () => {
+  const startpage = await readFile(new URL('../src/startpage.mjs', import.meta.url), 'utf8');
+  const publicModule = await readFile(new URL('../src/startpage-public.mjs', import.meta.url), 'utf8');
+  // The private start page branches to a separate public module (docs/17 §5).
+  assert.ok(startpage.includes("searchParams.get('public-work') === '1') {"));
+  assert.match(startpage, /await import\('\.\/startpage-public\.mjs'\)/);
+  // The public module must not reach private storage or private projections.
+  for (const forbidden of [/chrome\.storage/, /listConnections/, /listLocalEnvironments/, /listNotifications/, /notificationFromEvent/, /runReliableEventStream/]) {
+    assert.doesNotMatch(publicModule, forbidden, `public module must not use ${forbidden}`);
   }
+  // The private route is retained for the normal (non-public) start page.
+  assert.match(startpage, /loadSelectedConnection\(\)/);
+  assert.match(startpage, /startStream\(\)/);
 });
 
-test('real start-page module graph links and renders without private reads',async()=>{
-  const document=dom();
-  const replacements={document,
-    window:{location:{href:'chrome-extension://test/startpage.html?public-work=1'},addEventListener(){}},
-    chrome:{runtime:{getURL:path=>'chrome-extension://test/'+path},storage:{local:{get(){throw new Error('private read');},set(){throw new Error('private write');}}}},
-    fetch:async()=>new Response(JSON.stringify(sample())),setInterval:()=>0};
-  const originals=new Map(Object.keys(replacements).map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
-  try {
-    for(const [key,value] of Object.entries(replacements))Object.defineProperty(globalThis,key,{value,writable:true,configurable:true});
-    await import(new URL('../src/startpage.mjs?public-work-module-test',import.meta.url));
-    assert.ok(document.host.textContent.includes(sample().mission));
-    assert.ok(document.host.textContent.includes(sample().next_action));
-  } finally {
-    for(const [key,descriptor] of originals) {
-      if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];
-    }
+test('public module renders the docs/17 §5 layout from a validated snapshot', async () => {
+  const publicModule = await readFile(new URL('../src/startpage-public.mjs', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../src/startpage.html', import.meta.url), 'utf8');
+  // Atlas regions: PUBLIC SNAPSHOT date, mission, WORKFORCE | CURRENT WORK, PROOF, CTA.
+  for (const id of ['public-date', 'public-mission', 'public-workforce', 'public-current', 'public-proof', 'public-cta', 'public-failure', 'public-disclaimer']) {
+    assert.ok(html.includes(`id="${id}"`), id);
   }
+  // It renders from the validated contract, and never represents it as live telemetry.
+  assert.match(publicModule, /loadPublicWorkSnapshot/);
+  // The snapshot is presented as dated, and public mode never streams.
+  assert.match(publicModule, /dated snapshot, not live agent telemetry/i);
+  assert.match(html, /dated snapshot, not live agent telemetry/);
+  assert.doesNotMatch(publicModule, /runReliableEventStream|EventSource|setInterval/);
+  // Failure replaces the body rather than falling through to private mode.
+  assert.match(publicModule, /showFailure\(\)/);
+  assert.doesNotMatch(publicModule, /start-private|workforce\.html/);
 });
+

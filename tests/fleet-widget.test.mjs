@@ -8,12 +8,12 @@ const html = fs.readFileSync(path.join(root, 'startpage.html'), 'utf8');
 const js = fs.readFileSync(path.join(root, 'startpage.mjs'), 'utf8');
 const api = fs.readFileSync(path.join(root, 'lib', 'api-client.mjs'), 'utf8');
 
-// F1 client slice: fleet widget consumes the daemon bridge read-only.
-test('browser fleet widget consumes daemon bridge read-only', () => {
-  assert.match(html, /data-widget="fleet"/);
-  assert.match(html, /id="fleet-pools"/);
+// The browser-fleet projection feeds the Start Page WORKING NOW column
+// (docs/17 §4) read-only, instead of a standalone dashboard widget.
+test('browser fleet projection feeds the start page working column read-only', () => {
+  assert.match(html, /id="start-working"/);
   assert.match(js, /fetchBrowserFleet/);
-  assert.match(js, /renderFleet/);
+  assert.match(js, /projectWorkLoop/);
   assert.match(api, /browser_fleet/);
 });
 

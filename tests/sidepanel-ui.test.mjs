@@ -15,7 +15,7 @@ const requiredIds = [
 ];
 
 test('sidepanel preserves behavior hooks and accessible landmarks', () => {
-  assert.match(html, /<main>/);
+  assert.match(html, /<main[^>]*>/);
   assert.match(html, /<header[^>]*class="app-header"/);
   for (const id of requiredIds) assert.match(html, new RegExp(`id="${id}"`), id);
   assert.match(html, /aria-live="polite"/);
@@ -23,10 +23,20 @@ test('sidepanel preserves behavior hooks and accessible landmarks', () => {
   assert.match(html, /<script type="module" src="sidepanel\.mjs"><\/script>/);
 });
 
+test('sidepanel follows the docs/17 §3 region order', () => {
+  const order = ['app-header', 'sp-scope', 'orientation-heading', 'sp-needs-heading', 'sp-working-heading', 'sp-verified-heading', 'sp-footer'];
+  let cursor = -1;
+  for (const region of order) {
+    const at = html.indexOf(region);
+    assert.ok(at > cursor, region + ' appears in atlas order');
+    cursor = at;
+  }
+});
+
 test('sidepanel visual system supports responsive, light, and reduced-motion users', () => {
-  assert.match(css, /@media\(max-width:420px\)/);
-  assert.match(css, /prefers-color-scheme:light/);
-  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(css, /@media\s*\(max-width:\s*420px\)/);
+  assert.match(css, /prefers-color-scheme:\s*light/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /:focus-visible/);
-  assert.match(css, /backdrop-filter:blur/);
+  assert.match(css, /backdrop-filter:\s*blur/);
 });

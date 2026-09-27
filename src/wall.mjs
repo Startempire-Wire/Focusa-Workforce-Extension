@@ -1,13 +1,123 @@
-import { fetchWorkLoop } from './lib/api-client.mjs';
-import { listConnections } from './lib/storage.mjs';
-import { listNotifications, notificationFromEvent, saveNotification, unreadNotificationCount } from './lib/notifications.mjs';
+/**
+ * Wall (docs/17 §16) — read-only ambient surface.
+ *
+ * The wall renders owner projections and owner events. It has no mutation
+ * authority: every control on the face either hands off to Full Workforce or
+ * refreshes a read. Freshness is always owner-sourced and always visible.
+ */
+import { fetchWorkLoop, fetchRoster } from './lib/api-client.mjs';
+import { projectRoster, projectWorkLoop } from './lib/projections.mjs';
 import { runReliableEventStream } from './lib/reconnect.mjs';
+import { listConnections, listLocalEnvironments } from './lib/storage.mjs';
 
-let connection=null;let abort=null;let cursor=null;let notifications=[];
-const $=(selector)=>document.querySelector(selector);
-function clock(){$('#clock').textContent=new Intl.DateTimeFormat(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date());}
-function stateLabel(node,label,tone='degraded'){node.textContent=label;node.className=`state ${tone}`;}
-function renderSignals(){const node=$('#signals');node.replaceChildren();for(const item of notifications.slice(0,6)){const row=document.createElement('div');row.className='signal';const dot=document.createElement('span');dot.className='signal-dot';const copy=document.createElement('div');copy.className='signal-copy';const title=document.createElement('strong');title.textContent=item.title;const body=document.createElement('small');body.textContent=`${item.body} · ${item.timestamp}`;copy.append(title,body);row.append(dot,copy);node.append(row);}if(!notifications.length)node.append(Object.assign(document.createElement('p'),{className:'empty',textContent:'No important signals.'}));$('#signal-count').textContent=String(unreadNotificationCount(notifications));}
-async function refresh(){const records=await listConnections();connection=records[0]||null;if(!connection){$('#source').textContent='No daemon connected';stateLabel($('#freshness'),'OFFLINE');return false;}$('#source').textContent=connection.label;$('#daemon-label').textContent=connection.label;try{const body=await fetchWorkLoop({baseUrl:connection.base_url,token:connection.token});const task=body.current_task?.title||body.current_task?.id||'No active task';$('#task').textContent=task;$('#project-status').textContent=body.project_status||body.status||'Unknown';$('#wall-summary').textContent=body.enabled===true?'Live governed execution is visible below.':'The Work Loop is idle; no mutation controls are available on this wall.';$('#projection-time').textContent=new Date().toLocaleTimeString();stateLabel($('#loop-state'),String(body.status||'READY').toUpperCase(),'ready');stateLabel($('#freshness'),'FRESH','ready');return true;}catch(error){stateLabel($('#loop-state'),'DEGRADED');stateLabel($('#freshness'),error?.kind==='unauthenticated'?'UNAUTHORIZED':'STALE');$('#wall-summary').textContent='The last verified wall state is unavailable. Waiting for a safe refresh.';return false;}}
-async function start(){notifications=await listNotifications().catch(()=>[]);renderSignals();if(!await refresh())return;abort=new AbortController();await runReliableEventStream({baseUrl:connection.base_url,token:connection.token,initialCursor:cursor,signal:abort.signal,onEvent:async(event)=>{await refresh();const notification=notificationFromEvent(event);if(notification){notifications=await saveNotification(notification);renderSignals();}},commitCursor:async(value)=>{cursor=value;},onState:(value)=>{$('#stream-state').textContent=value.phase;$('#projection-time').textContent=value.phase==='live'?'Live':$('#projection-time').textContent;}}).catch(()=>{if(!abort.signal.aborted){stateLabel($('#freshness'),'RECONNECTING');$('#stream-state').textContent='Reconnecting';}});}
-clock();setInterval(clock,30000);start();window.addEventListener('pagehide',()=>abort?.abort());
+const $ = (selector) => {
+  const node = document.querySelector(selector);
+  if (!node) throw new Error(`required wall element missing: ${selector}`);
+  return node;
+};
+
+const el = {
+  source: $('#source'),
+  freshness: $('#freshness'),
+  focusTitle: $('#wall-focus-heading'),
+  task: $('#task'),
+  loopState: $('#loop-state'),
+  signals: $('#signals'),
+  needs: $('#wall-needs'),
+  verified: $('#wall-verified'),
+  workingCount: $('#working-count'),
+  needsCount: $('#needs-count'),
+  verifiedCount: $('#verified-count'),
+  exception: $('#wall-exception'),
+  exceptionText: $('#wall-exception-text'),
+  stream: $('#stream-state'),
+  open: $('#open-workforce'),
+};
+
+let connection = null;
+let streamAbort = null;
+
+function requestOptions() {
+  if (!connection) throw new Error('no environment selected');
+  return { base_url: connection.base_url, token: connection.token };
+}
+
+function setFreshness(state, note = '') {
+  el.freshness.className = `wall-fresh ${state}`;
+  el.freshness.textContent = note || state;
+}
+
+function row(title, meta) {
+  const li = document.createElement('li');
+  li.append(Object.assign(document.createElement('span'), { className: 'wall-row-title', textContent: title }));
+  if (meta) li.append(Object.assign(document.createElement('span'), { className: 'wall-row-meta', textContent: meta }));
+  return li;
+}
+
+function emptyRow(message) {
+  return Object.assign(document.createElement('li'), { className: 'wall-empty', textContent: message });
+}
+
+function render(loop, roster) {
+  const focus = loop?.current_task ?? null;
+  el.focusTitle.textContent = focus?.title ?? focus?.description ?? '— no current focus reported';
+  el.task.textContent = focus?.detail ?? focus?.objective ?? '—';
+  el.loopState.textContent = [loop?.state, loop?.status, loop?.current_task?.id].filter(Boolean).join(' · ') || '—';
+
+  const working = roster.filter((m) => /working|active|running/i.test(String(m.state ?? '')));
+  el.signals.replaceChildren(...(working.length ? working.slice(0, 5).map((m) => row(m.label, m.state)) : [emptyRow('No active work reported.')]));
+  el.workingCount.textContent = `${working.length}`;
+
+  const needs = roster.filter((m) => /needs|attention|blocked|waiting/i.test(`${m.state ?? ''}`));
+  el.needs.replaceChildren(...(needs.length ? needs.slice(0, 5).map((m) => row(m.label, m.state)) : [emptyRow('Nothing needs you right now.')]));
+  el.needsCount.textContent = `${needs.length}`;
+
+  el.verified.replaceChildren(emptyRow('No settled proof reported by the owner.'));
+
+  const material = loop?.degraded === true || /error|unavailable|degraded/i.test(String(loop?.status ?? ''));
+  el.exception.hidden = !material;
+  if (material) el.exceptionText.textContent = `Focusa reports ${loop.status}. Open Workforce for the full owner surface.`;
+}
+
+async function refresh() {
+  if (!connection) { setFreshness('unavailable', 'No environment'); return; }
+  el.source.textContent = connection.label;
+  try {
+    const [loopBody, rosterBody] = await Promise.all([fetchWorkLoop(requestOptions()), fetchRoster(requestOptions())]);
+    const loop = projectWorkLoop(loopBody);
+    const roster = projectRoster(rosterBody);
+    setFreshness('ok', 'Fresh');
+    render(loop, roster);
+    startStream();
+  } catch (error) {
+    setFreshness('unavailable', 'Unavailable');
+    el.focusTitle.textContent = '— owner unavailable';
+    el.exception.hidden = false;
+    el.exceptionText.textContent = `${error?.kind ?? 'error'}: ${String(error?.message ?? error).slice(0, 140)}`;
+  }
+}
+
+function startStream() {
+  streamAbort?.abort();
+  streamAbort = new AbortController();
+  runReliableEventStream({
+    ...requestOptions(),
+    initialCursor: connection.last_cursor,
+    signal: streamAbort.signal,
+    onState: (state) => { el.stream.textContent = `stream ${state.phase}`; },
+    onEvent: () => { refresh(); },
+    commitCursor: async (cursor) => { connection = { ...connection, last_cursor: cursor }; },
+  }).catch((error) => { if (error?.name !== 'AbortError') el.stream.textContent = `stream ${error?.status ?? 'error'}`; });
+}
+
+el.open.addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('workforce.html') }));
+window.addEventListener('pagehide', () => streamAbort?.abort());
+
+Promise.all([listConnections(), listLocalEnvironments().catch(() => [])])
+  .then(([paired, local]) => {
+    const records = [...local, ...paired];
+    connection = records[0] ?? null;
+    if (!connection) { setFreshness('unavailable', 'No environment'); return; }
+    return refresh();
+  })
+  .catch(() => setFreshness('unavailable', 'No environment'));

@@ -24,13 +24,29 @@ test('audit view excludes raw event payload', () => {
   assert.doesNotMatch(JSON.stringify(rows), /secret|token|payload/);
 });
 
-test('panel has four labelled regions, keyboard-native controls, and live text status', async () => {
+test('side panel regions follow the docs/17 §3 atlas order', async () => {
   const html = await readFile(new URL('../src/sidepanel.html', import.meta.url), 'utf8');
   const script = await readFile(new URL('../src/sidepanel.mjs', import.meta.url), 'utf8');
-  for (const heading of ['Orientation','Creation','Workforce','Audit']) assert.match(html, new RegExp(`>${heading}<|>\\d\\. ${heading}<`));
-  assert.match(html, /aria-live="polite"/); assert.match(html, /<button/g); assert.match(html, /<label for=/g);
+  const order = ['app-header', 'sp-scope', 'sp-foreman-objective', 'sp-direct', 'sp-needs-heading', 'sp-working-heading', 'sp-verified-heading', 'sp-footer'];
+  let cursor = -1;
+  for (const region of order) {
+    const at = html.indexOf(region);
+    assert.ok(at > cursor, region + ' appears in atlas order');
+    cursor = at;
+  }
+  assert.match(html, /aria-live="polite"/);
+  assert.match(html, /<button/g);
+  assert.match(html, /<label[^>]*for="[^"]+"/g);
   assert.doesNotMatch(html, /onclick=|tabindex="-[0-9]/);
-  const pagehide = script.split("window.addEventListener('pagehide'",2)[1];
-  assert.match(pagehide, /streamAbort\?\.abort/); assert.doesNotMatch(pagehide, /orchestrateAction|controlSession/);
+  const pagehide = script.split("window.addEventListener('pagehide'", 2)[1];
+  assert.match(pagehide, /streamAbort\?\.abort/);
+  assert.doesNotMatch(pagehide, /orchestrateAction|controlSession/);
   assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML/);
 });
+
+test('side panel enforces the docs/17 §3 content caps', async () => {
+  const script = await readFile(new URL('../src/sidepanel.mjs', import.meta.url), 'utf8');
+  assert.match(script, /slice\(0, 3\)/, 'Needs You / Verified Recently cap at 3');
+  assert.match(script, /slice\(0, 5\)/, 'Working Now caps at 5');
+});
+
