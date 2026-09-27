@@ -42,9 +42,18 @@
   let uiaiProvider = $state('');
 
   /* ── derived scope + counts (docs/17 §1 priority) ── */
+  const hasOwner = $derived(Boolean(store.active));
   const healthState = $derived(store.resultOf('health')?.state ?? 'no environment');
-  const freshClass = $derived(healthState === 'ok' ? 'ok' : healthState === 'degraded' ? 'stale' : 'unavailable');
-  const freshLabel = $derived(healthState === 'ok' ? 'Fresh' : healthState === 'degraded' ? 'Degraded' : 'Unavailable');
+  const freshClass = $derived(
+    !hasOwner ? 'idle'
+      : healthState === 'ok' ? 'ok'
+        : healthState === 'degraded' ? 'stale' : 'unavailable',
+  );
+  const freshLabel = $derived(
+    !hasOwner ? 'Not connected'
+      : healthState === 'ok' ? 'Fresh'
+        : healthState === 'degraded' ? 'Degraded' : 'Unavailable',
+  );
   const verifiedEntries = $derived(store.evidenceTrail.entries.filter((e) => e.kind === 'receipt' || e.kind === 'projection'));
   const needsItems = $derived(store.needsYou.items);
   const workingNow = $derived(store.roster.filter((r) => /working|active|running/i.test(String(r.state ?? ''))));
@@ -63,6 +72,16 @@
   const steerTarget = $derived(store.directionTarget);
   const navLabel = $derived(navItemForRoute(route));
   const settingsSection = $derived(ctx.params.section ?? 'connections');
+  // Which places discovery has actually reached, so the search reads as progress.
+  const discoveryPlaces = $derived.by(() => {
+    const answers = store.discovery.answers ?? [];
+    const answered = new Map(answers.map((a) => [a.baseUrl, a]));
+    const pick = (urls) => urls.map((url) => ({ url, ok: answered.get(url)?.ok === true }));
+    return [
+      { label: 'This device', urls: ['http://100.115.92.26:8787', 'http://100.127.113.90:8787'] },
+      { label: 'Loopback', urls: ['http://127.0.0.1:8787', 'http://localhost:8787', 'http://[::1]:8787'] },
+    ].map((place) => ({ label: place.label, ok: pick(place.urls).some((u) => u.ok) }));
+  });
   const exceptionText = $derived(
     [store.anyBlocked ? 'entitlement policy is denying canonical operations' : '', envError].filter(Boolean).join(' · '),
   );
@@ -115,19 +134,9 @@
       await store.refreshOwner();
       await store.startStream();
     } else {
-      // Automatic discovery: probe the local daemon candidates, keep the first
-      // the owner answers. Discovery never invents scope.
-      for (const candidate of localDaemonCandidates()) {
-        let granted = false;
-        try { granted = await hasDaemonOriginPermission(candidate); } catch { granted = false; }
-        if (!granted) continue;
-        try {
-          await store.addLocalDaemon(candidate);
-          await store.refreshOwner();
-          await store.startStream();
-          break;
-        } catch { /* try the next candidate */ }
-      }
+      // Silent, read-only discovery across loopback, this device's bridges and
+      // the tailnet. Attaching stays a single deliberate click.
+      await store.discover();
     }
     return () => {
       window.removeEventListener('hashchange', onHashChange);
@@ -215,6 +224,40 @@
 
     <div class="main" id="wf-main" tabindex="-1">
       {#if store.bootError}<StateNote label="Extension" result={{ state: 'error', note: store.bootError }} />{/if}
+
+      <!-- Discovery: silent and read-only. Attaching is one deliberate click, so
+           the surface never changes under the operator without being asked. -->
+      {#if store.discovery.state === 'discovering'}
+        <div class="connect-bar searching" role="status">
+          <p class="connect-lead">Looking for Focusa</p>
+          <ul class="places">
+            {#each discoveryPlaces as place (place.label)}
+              <li class="place" class:ok={place.ok}><span class="dot" aria-hidden="true"></span>{place.label}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+      {#if store.discovery.state === 'found' && !store.active}
+        <div class="connect-bar found" role="status">
+          <p><strong>Focusa found</strong> at <code>{store.discovery.baseUrl}</code></p>
+          <div class="row">
+            <button type="button" class="wf-btn btn-primary" onclick={() => store.connectDiscovered()}>Connect</button>
+            <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Connect another daemon</a>
+          </div>
+        </div>
+      {/if}
+      {#if store.discovery.state === 'connected'}
+        <p class="connect-bar ok" role="status">Connected to Focusa at <code>{store.discovery.baseUrl}</code></p>
+      {/if}
+      {#if store.discovery.state === 'not_found' && !store.active}
+        <div class="connect-bar" role="status">
+          <p><strong>No Focusa daemon answered</strong> on loopback, this device's bridges or the tailnet.</p>
+          <div class="row">
+            <button type="button" class="wf-btn" onclick={() => store.discover()}>Look again</button>
+            <a class="wf-btn btn-quiet" href="#/settings?section=connections" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=connections'); }}>Pair a remote daemon</a>
+          </div>
+        </div>
+      {/if}
 
       <!-- docs/17 §19 degraded geometry: one banner under the header, last-known retained -->
       {#if healthState !== 'ok' && store.active}

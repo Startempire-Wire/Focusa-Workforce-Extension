@@ -21,9 +21,10 @@ import { buildEvidenceTrail } from '../../lib/evidence-trail.mjs';
 import { buildNeedsYou } from '../../lib/attention.mjs';
 import { evaluateScopeGuard, describeScopeGuard } from '../../lib/scope-guard.mjs';
 import { listNotifications, markNotificationsRead, notificationFromEvent, saveNotification, unreadNotificationCount } from '../../lib/notifications.mjs';
-import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/validation.mjs';
+import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
+import { discoverDaemon, rememberDaemon, hasKnownDaemon } from './discovery.js';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -91,6 +92,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let directing = $state(false);
   let lastDirection = $state(/** @type {any} */ (null));
   let bootError = $state(/** @type {string|null} */ (null));
+  // Silent read-only discovery; attaching is always one explicit click.
+  // state: idle | discovering | found | connected | not_found
+  let discovery = $state(/** @type {{state: string, baseUrl: string|null, answers: any[], returning?: boolean, permitted?: boolean}} */ ({ state: 'idle', baseUrl: null, answers: [] }));
   let discovered = $state(/** @type {any[]} */ ([]));
   let projectBusy = $state(false);
   // Live freshness: owner-sourced event stream state (never synthesized).
@@ -240,6 +244,58 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       base_url: origin,
       created_at: new Date().toISOString(),
     }, chromeApi);
+    await refreshEnvironments();
+    activeId = record.environment_id;
+    await refreshOwner();
+    await startStream();
+    return record.environment_id;
+  }
+
+  /**
+   * Find a Focusa daemon without any operator input.
+   *
+   * Discovery is always silent and read-only (GET /v1/health on each candidate).
+   * Attaching is never automatic: connecting changes what the whole surface
+   * shows and opens an owner stream, so it is always one deliberate click. The
+   * operator never types an address and never meets a configuration form here.
+   */
+  async function discover() {
+    discovery = { state: 'discovering', baseUrl: null, answers: [] };
+    const returning = await hasKnownDaemon(chromeApi);
+    const { connected, answers } = await discoverDaemon(chromeApi);
+    if (!connected) {
+      discovery = { state: 'not_found', baseUrl: null, answers };
+      return null;
+    }
+    const permitted = await hasDaemonOriginPermission(connected.baseUrl).catch(() => false);
+    discovery = { state: 'found', baseUrl: connected.baseUrl, answers, returning, permitted };
+    return null;
+  }
+
+  /** One click: connect to the daemon discovery found. */
+  async function connectDiscovered() {
+    if (!discovery.baseUrl) return null;
+    const origin = discovery.baseUrl;
+    // Local/tailnet origins are already permitted, so this is a single click
+    // with no permission prompt at all. A peer origin outside those asks Chrome
+    // for that one origin and nothing else.
+    const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
+    if (!granted) return null;
+    await attachDaemon(origin, 'Focusa daemon');
+    discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers };
+    return origin;
+  }
+
+  async function attachDaemon(baseUrl, label) {
+    const origin = normalizeDaemonOrigin(baseUrl);
+    const record = await saveLocalEnvironment({
+      schema: 'focusa.workforce_local_environment.v1',
+      environment_id: `local:${origin}`,
+      label: `${label} (${origin})`,
+      base_url: origin,
+      created_at: new Date().toISOString(),
+    }, chromeApi);
+    await rememberDaemon(chromeApi, { baseUrl: origin, label: record.label, seen_at: new Date().toISOString() });
     await refreshEnvironments();
     activeId = record.environment_id;
     await refreshOwner();
@@ -818,6 +874,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get uiaiBusy() { return uiaiBusy; },
     get uiaiTakeovers() { return uiaiTakeovers; },
     get bootError() { return bootError; },
+    get discovery() { return discovery; },
+    discover,
+    connectDiscovered,
     refreshEnvironments,
     refreshOwner,
     setEnvironment,

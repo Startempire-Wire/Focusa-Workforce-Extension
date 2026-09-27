@@ -14,11 +14,12 @@ if (JSON.stringify(actualPermissions) !== JSON.stringify(exactPermissions)) {
   throw new Error(`manifest permissions must equal ${exactPermissions.join(', ')}`);
 }
 if ('content_scripts' in manifest) throw new Error('content scripts are forbidden in the MVP');
-// Static host permissions: exactly the LOCAL daemon origins (operator
-// requirement 2026-09-27 — discovery must be automatic with no manual
-// entries). Least-privilege preserved: no wildcards, no remote hosts —
-// remote pairing still uses the optional host-permission flow.
-const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*'];
+// Static host permissions: exactly THIS DEVICE's origins (operator requirement
+// 2026-09-27 — discovery is automatic and attaching is one click, so no address
+// is ever typed). Least-privilege preserved: loopback, this device's crosvm veth
+// bridge, its UIAI bridge and this device's own tailnet node. Any other network
+// peer still needs that one origin granted on connect.
+const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*', 'http://100.127.113.90/*'];
 if (JSON.stringify([...(manifest.host_permissions ?? [])].sort()) !== JSON.stringify([...localOrigins].sort())) {
   throw new Error(`host permissions must be exactly ${localOrigins.join(', ')} (local daemon origins only)`);
 }

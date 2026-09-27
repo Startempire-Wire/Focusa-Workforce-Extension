@@ -1,4 +1,4 @@
-import { normalizeDaemonOrigin } from './validation.mjs';
+import { isLocalDaemonHost, normalizeDaemonOrigin } from './validation.mjs';
 
 const encoder = new TextEncoder();
 function bounded(value, field, max) {
@@ -72,8 +72,8 @@ export function validateLocalEnvironment(input) {
   if (!input || input.schema !== 'focusa.workforce_local_environment.v1') throw new TypeError('local environment schema mismatch');
   const baseUrl = normalizeDaemonOrigin(input.base_url);
   const host = new URL(baseUrl).hostname;
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    throw new TypeError('a local environment must be a loopback origin; pair remote daemons instead');
+  if (!isLocalDaemonHost(host)) {
+    throw new TypeError('a discovered environment must be this device or a tailnet address; pair other remote daemons instead');
   }
   if ('token' in input && input.token != null) throw new TypeError('a local environment must not store a token');
   return Object.freeze({
