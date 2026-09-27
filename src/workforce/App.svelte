@@ -58,12 +58,40 @@
 
   /* ---- local-search shortcut (docs/12 `key`: focus existing search, else no-op) ---- */
   function onKeyDown(event) {
-    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
-    const tag = event.target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    const local = document.querySelector('[data-local-search]');
-    if (local && typeof local.focus === 'function') local.focus();
-    // No local search element today → `/` is a correctly documented no-op.
+    const target = event.target;
+    const typing =
+      (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) || false;
+    // `/`: focus an existing local search; otherwise a correct no-op (docs/17 §20).
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !typing) {
+      const local = document.querySelector('[data-local-search]');
+      if (local && typeof local.focus === 'function') local.focus();
+      return;
+    }
+    // `D`: focus Direction on the Work faces when not typing (docs/17 §20).
+    if ((event.key === 'd' || event.key === 'D') && !event.ctrlKey && !event.metaKey && !event.altKey && !typing) {
+      if (route === '#/work' || route === '#/work/detail') {
+        const dir = document.querySelector('[data-direction]');
+        if (dir && !dir.disabled) {
+          event.preventDefault();
+          dir.focus();
+        }
+      }
+      return;
+    }
+    // `Cmd/Ctrl+Enter`: submit Direction when valid (docs/17 §20).
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.altKey && route === '#/work/detail') {
+      const dir = document.querySelector('[data-direction]');
+      if (dir && !dir.disabled && instruction.trim()) {
+        event.preventDefault();
+        const form = dir.closest('form');
+        if (form) form.requestSubmit();
+      }
+      return;
+    }
+    // `Esc`: close the presentation-only context rail; never cancel canonical work (docs/17 §20).
+    if (event.key === 'Escape' && railOpen) {
+      railOpen = false;
+    }
   }
 
   /* ---- app state ---- */
@@ -714,7 +742,7 @@
               {/if}
             </p>
             <form onsubmit={submitDirection}>
-              <textarea rows="3" aria-label="Direction instruction" placeholder="Direct this work…" bind:value={instruction} disabled={store.directing}></textarea>
+              <textarea data-direction rows="3" aria-label="Direction instruction" placeholder="Direct this work…" bind:value={instruction} disabled={store.directing}></textarea>
               <div class="row">
                 <button type="submit" class="wf-btn wf-btn-primary" disabled={store.directing || !instruction.trim()}>
                   {store.directing ? 'Submitting…' : 'Send Direction'}
@@ -828,7 +856,7 @@
               <span class="origin {store.directionTargetOrigin}">{store.directionTargetOrigin === 'owner_roster' ? 'Focusa roster (authoritative)' : store.directionTargetOrigin === 'owner_create' ? 'Focusa create response (authoritative)' : 'operator binding (stopgap)'}</span>
             </p>
             <form onsubmit={submitDirection}>
-              <textarea rows="3" aria-label="Direction instruction" placeholder="Direct this work…" bind:value={instruction} disabled={store.directing}></textarea>
+              <textarea data-direction rows="3" aria-label="Direction instruction" placeholder="Direct this work…" bind:value={instruction} disabled={store.directing}></textarea>
               <div class="row">
                 <button type="submit" class="wf-btn wf-btn-primary" disabled={store.directing || !instruction.trim()}>{store.directing ? 'Submitting…' : 'Send Direction'}</button>
                 {#each ['start', 'pause', 'resume', 'cancel'] as action (action)}
