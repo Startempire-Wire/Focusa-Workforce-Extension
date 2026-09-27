@@ -142,3 +142,42 @@ test('an origin the device cannot reach is reported, never invented', async () =
   assert.deepEqual(result.found, []);
   assert.ok(result.answers.every((a) => a.ok === false));
 });
+
+test('discovery only probes origins this extension is actually granted', async () => {
+  const { reachableOriginFilter, discoverDaemon } = await import('../src/workforce/lib/discovery.js');
+  // This device's manifest grants these three (plus the UIAI bridge).
+  const chromeApi = {
+    permissions: { getAll: async () => ({ origins: ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*'] }) },
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+  };
+  const reachable = await reachableOriginFilter(chromeApi);
+  assert.equal(await reachable('http://127.0.0.1:8787'), true);
+  assert.equal(await reachable('http://100.115.92.26:8787'), true);
+  // Not granted: probing it would be refused by CORS and print an error.
+  assert.equal(await reachable('http://[::1]:8787'), false);
+  assert.equal(await reachable('https://kh.example:8787'), false);
+
+  const probed = [];
+  const result = await discoverDaemon(chromeApi, {
+    fetchImpl: async (url) => { probed.push(String(url)); return new Response(JSON.stringify({ status: 'healthy' }), { status: 200 }); },
+  });
+  assert.ok(!probed.some((u) => u.includes('[::1]')), 'an ungranted candidate is never requested');
+  assert.ok(probed.every((u) => !u.includes('kh.example')), 'remote candidates need pairing first');
+  assert.ok(result.found.length >= 1);
+});
+
+test('with no permissions API nothing is filtered', async () => {
+  const { reachableOriginFilter } = await import('../src/workforce/lib/discovery.js');
+  const reachable = await reachableOriginFilter({ storage: { local: { get: async () => ({}) } } });
+  assert.equal(await reachable('http://[::1]:8787'), true);
+});
+
+test('a seed the device cannot reach is refused before any request', async () => {
+  const { seedCandidates } = await import('../src/workforce/lib/discovery.js');
+  const { reachableOriginFilter } = await import('../src/workforce/lib/discovery.js');
+  const chromeApi = { permissions: { getAll: async () => ({ origins: ['http://127.0.0.1/*'] }) } };
+  const reachable = await reachableOriginFilter(chromeApi);
+  const results = [];
+  for (const origin of seedCandidates('100.64.9.9')) if (await reachable(origin)) results.push(origin);
+  assert.deepEqual(results, [], 'an ungranted tailnet seed is refused rather than probed');
+});

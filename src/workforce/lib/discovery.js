@@ -50,6 +50,39 @@ export const DEVICE_CANDIDATES = Object.freeze([
 
 export const PROBE_TIMEOUT_MS = 2500;
 
+/**
+ * Reachability: an origin is only worth probing if this extension is actually
+ * granted access to it. In MV3 a fetch to any other origin is treated as
+ * cross-origin and refused by CORS, which both fails and prints an error. Asking
+ * the permissions the browser already holds keeps discovery honest and quiet.
+ *
+ * With no permissions API (unit tests, preview harnesses) nothing is filtered.
+ *
+ * @param {any} chromeApi
+ * @returns {Promise<(baseUrl: string) => boolean>}
+ */
+export async function reachableOriginFilter(chromeApi) {
+  const getAll = chromeApi?.permissions?.getAll;
+  if (typeof getAll !== 'function') return async () => true;
+  let patterns = [];
+  try {
+    patterns = (await getAll.call(chromeApi.permissions))?.origins ?? [];
+  } catch { return async () => true; }
+  if (!patterns.length) return async () => true;
+  return (baseUrl) => {
+    let url;
+    try { url = new URL(baseUrl); } catch { return false; }
+    return patterns.some((pattern) => {
+      const match = /^([a-z]+):\/\/(\[[^\]]+\]|[^/]+)\//i.exec(pattern);
+      if (!match) return false;
+      const [, scheme, host] = match;
+      if (scheme.toLowerCase() !== url.protocol.replace(':', '').toLowerCase()) return false;
+      // Granted patterns carry no port, so compare hosts rather than origins.
+      return host === url.hostname || host === url.host;
+    });
+  };
+}
+
 /** What kind of place an origin is, so the UI can say it plainly. */
 export function classifyBaseUrl(baseUrl) {
   let host;
@@ -225,8 +258,15 @@ function collapseAliases(found) {
 }
 
 export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [] } = {}) {
+  const reachable = await reachableOriginFilter(chromeApi);
   const candidates = [...new Set([...extra, ...(await discoveryCandidates(chromeApi))])];
-  const answers = await Promise.all(candidates.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs })));
+  // Skip origins this extension cannot reach, so a candidate the browser will
+  // refuse never turns into a visible CORS error.
+  const probeable = [];
+  for (const baseUrl of candidates) {
+    if (await reachable(baseUrl)) probeable.push(baseUrl);
+  }
+  const answers = await Promise.all(probeable.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs })));
   const found = collapseAliases(answers
     .filter((answer) => answer.ok)
     .map((answer) => {

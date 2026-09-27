@@ -24,7 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
-import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates } from './discovery.js';
+import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter } from './discovery.js';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -328,7 +328,17 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       discovery = { ...discovery, state: 'not_found', seedError: 'That does not look like a host name or address' };
       return [];
     }
-    await discover({ extra });
+    const reachable = await reachableOriginFilter(chromeApi);
+    const usable = [];
+    for (const origin of extra) if (await reachable(origin)) usable.push(origin);
+    if (!usable.length) {
+      discovery = {
+        ...discovery, state: 'not_found',
+        seedError: 'This device is not permitted to reach that address yet — pair it in Settings to grant access',
+      };
+      return [];
+    }
+    await discover({ extra: usable });
     if (discovery.state === 'not_found') {
       discovery = { ...discovery, seedError: 'No Focusa daemon answered on that address' };
     }
