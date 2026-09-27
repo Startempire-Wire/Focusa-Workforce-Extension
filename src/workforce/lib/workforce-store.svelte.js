@@ -24,7 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
-import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter } from './discovery.js';
+import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter, previewDaemon } from './discovery.js';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -96,6 +96,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // state: idle | discovering | found | connected | not_found
   let discovery = $state(/** @type {{state: string, baseUrl: string|null, answers: any[], daemons?: any[], returning?: boolean, permitted?: boolean, alive?: boolean, lastSeenAt?: string|null}} */ ({ state: 'idle', baseUrl: null, answers: [], daemons: [] }));
   let stopLiveness = null;
+  // Live previews of what each discovered daemon actually is, read before
+  // connecting: process liveness and the projects it holds.
+  let previews = $state(/** @type {Record<string, any>} */ ({}));
   let discovered = $state(/** @type {any[]} */ ([]));
   let projectBusy = $state(false);
   // Live freshness: owner-sourced event stream state (never synthesized).
@@ -265,8 +268,20 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
    */
   async function discover({ extra = [] } = {}) {
     discovery = { state: 'discovering', baseUrl: null, answers: [], daemons: [] };
+    previews = {};
     const returning = await hasKnownDaemon(chromeApi);
-    const { found, answers } = await discoverDaemons(chromeApi, { extra });
+    const { found, answers } = await discoverDaemons(chromeApi, {
+      extra,
+      // Report the search as it happens, and preview each daemon the moment it
+      // answers so the surface is alive rather than blank.
+      onAnswer: (answer) => {
+        discovery = { ...discovery, answers: [...discovery.answers, answer] };
+        if (!answer.ok) return;
+        previewDaemon({ baseUrl: answer.baseUrl }).then((preview) => {
+          previews = { ...previews, [answer.baseUrl]: preview };
+        }).catch(() => {});
+      },
+    });
     if (!found.length) {
       discovery = { state: 'not_found', baseUrl: null, answers, daemons: [] };
       return null;
@@ -284,6 +299,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     stopLiveness?.();
     stopLiveness = watchLiveness(connected.baseUrl, (beat) => {
       discovery = { ...discovery, alive: beat.ok, lastSeenAt: beat.at };
+      if (!beat.ok) return;
+      previewDaemon({ baseUrl: connected.baseUrl }).then((preview) => {
+        previews = { ...previews, [connected.baseUrl]: preview };
+      }).catch(() => {});
     });
     return null;
   }
@@ -314,6 +333,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       await attachDaemon(origin, 'Focusa daemon');
     }
     discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString() };
+    stopLiveness?.();
+    stopLiveness = watchLiveness(origin, (beat) => {
+      discovery = { ...discovery, alive: beat.ok, lastSeenAt: beat.at };
+      if (!beat.ok) return;
+      previewDaemon({ baseUrl: origin }).then((preview) => { previews = { ...previews, [origin]: preview }; }).catch(() => {});
+    });
     return origin;
   }
 
@@ -915,6 +940,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get activity() { return activity; },
     get projects() { return projects; },
     get capabilities() { return capabilities; },
+    get previews() { return previews; },
     get needsYou() { return needsYou; },
     get notifications() { return notifications; },
     get unreadCount() { return unreadCount; },

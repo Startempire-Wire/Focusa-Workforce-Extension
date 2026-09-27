@@ -81,9 +81,19 @@
   --elevation-card: var(--elevation-2);
   --elevation-drawer: var(--elevation-3);
 
-  /* ── Motion ── */
-  --motion-fast: 120ms ease;
-  --motion-base: 180ms ease;
+  /* ── Motion ──
+     One language for the whole product: short for feedback, base for state
+     changes, slow for surfaces. Every use is disabled under prefers-reduced-
+     motion, so these durations never become mandatory animation. */
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 340ms;
+  --ease-out: cubic-bezier(.22, .68, .32, 1);
+  --ease-in-out: cubic-bezier(.5, .05, .3, 1);
+  --ease-spring: cubic-bezier(.28, 1.36, .5, 1);   /* a small overshoot, for presses */
+  --press-scale: .97;
+  --lift-distance: -1px;
 
   /* ── Focus ── */
   --focus-ring: 0 0 0 2px var(--bg-app), 0 0 0 4px var(--border-focus);

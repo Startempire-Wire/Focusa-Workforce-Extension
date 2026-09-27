@@ -26,6 +26,21 @@
 
   const d = $derived(store.discovery);
   const daemons = $derived(d.daemons ?? []);
+  const live = $derived(d.baseUrl ? store.previews?.[d.baseUrl] ?? null : null);
+  // Which places discovery is actually looking in, and which have answered.
+  const places = $derived.by(() => {
+    const answered = new Set((d.answers ?? []).filter((a) => a.ok).map((a) => new URL(a.baseUrl).hostname));
+    return [
+      { label: 'This browser', hosts: ['127.0.0.1', 'localhost', '[::1]'] },
+      { label: 'This device', hosts: ['100.115.92.26', '100.127.113.90'] },
+      { label: 'Tailnet', hosts: null },
+    ].map((place) => ({
+      label: place.label,
+      ok: place.hosts
+        ? place.hosts.some((host) => answered.has(host))
+        : [...answered].some((host) => /^\d{1,3(\.\d{1,3}){3}$/.test(host) && host.startsWith('100.') && Number(host.split('.')[1]) >= 64 && Number(host.split('.')[1]) <= 127),
+    }));
+  });
   const projects = $derived(store.projects?.projects?.length ?? 0);
   const activeProject = $derived(
     store.projects?.projects?.find((p) => p.root === store.selection.projectRoot)?.name ?? null,
@@ -38,10 +53,18 @@
 {#if show}
   <div class="strip" data-state={d.state} transition:fade={{ duration: dur }}>
     {#if d.state === 'discovering'}
-      <div class="strip-body" in:fly={{ y: 4, duration: out }}>
+      <div class="strip-body searching" in:fly={{ y: 4, duration: out }}>
         <span class="pulse" aria-hidden="true"></span>
         <strong>Looking for Focusa</strong>
-        <span class="dim">this browser · this device · tailnet</span>
+        <ul class="places">
+          {#each places as place (place.label)}
+            <li class="place" class:ok={place.ok}>
+              <span class="dot" aria-hidden="true"></span>
+              <span class="pl">{place.label}</span>
+              <span class="pv">{place.ok ? 'found' : 'checking'}</span>
+            </li>
+          {/each}
+        </ul>
       </div>
 
     {:else if d.state === 'connected'}
@@ -52,6 +75,11 @@
         <span class="dim">
           {#if activeProject}{activeProject}{:else if projects}{projects} project(s){:else}no project selected{/if}
         </span>
+        {#if live}
+          <span class="telemetry">
+            <b>{live.batches ?? '—'}</b> writes · <b>{live.failures ?? '—'}</b> failures · <b>{live.projectCount ?? '—'}</b> projects
+          </span>
+        {/if}
         <button type="button" class="quiet" onclick={() => store.disconnect()} title="Detach this browser from the daemon">
           <Icon name="disconnect" size={15} /> Disconnect
         </button>
@@ -63,16 +91,32 @@
         <strong>{daemons.length > 1 ? `${daemons.length} Focusa daemons` : 'Focusa is live'}</strong>
         <ul class="daemons">
           {#each daemons as daemon (daemon.baseUrl)}
+            {@const preview = store.previews?.[daemon.baseUrl] ?? null}
             <li class="daemon" class:lead={daemon.baseUrl === d.baseUrl}>
-              <Icon name={daemon.kind === 'remote' ? 'globe' : daemon.kind === 'tailnet' ? 'link' : 'monitor'} size={15} />
-              <span class="dn">{daemon.kindLabel}</span>
-              <code>{daemon.baseUrl}</code>
-              <button
-                type="button"
-                class="connect"
-                class:primary={daemon.baseUrl === d.baseUrl}
-                onclick={() => store.connectDiscovered(daemon.baseUrl)}
-              >Connect</button>
+              <div class="dhead">
+                <Icon name={daemon.kind === 'remote' ? 'globe' : daemon.kind === 'tailnet' ? 'link' : 'monitor'} size={15} />
+                <span class="dn">{daemon.kindLabel}</span>
+                <code>{daemon.baseUrl}</code>
+                <button
+                  type="button"
+                  class="connect"
+                  class:primary={daemon.baseUrl === d.baseUrl}
+                  onclick={() => store.connectDiscovered(daemon.baseUrl)}
+                >Connect</button>
+              </div>
+              {#if preview}
+                <p class="preview">
+                  <span class="pv-item"><b>{preview.batches ?? '—'}</b> writes persisted</span>
+                  <span class="pv-item" class:warn={(preview.failures ?? 0) > 0}><b>{preview.failures ?? '—'}</b> failures</span>
+                  <span class="pv-item"><b>{preview.projectCount ?? '—'}</b> projects</span>
+                  <span class="pv-item"><b>{preview.pid ?? '—'}</b> pid</span>
+                </p>
+                {#if preview.projects?.length}
+                  <p class="pprojects">{preview.projects.join(' · ')}</p>
+                {/if}
+              {:else}
+                <p class="preview pending">reading what this daemon holds…</p>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -143,10 +187,26 @@
   }
   .seed input::placeholder { color: var(--text-muted); }
 
+  .places { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 0; }
+  .place { display: inline-flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--text-muted); }
+  .place .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
+  .place.ok { color: var(--success); }
+  .place.ok .dot { background: var(--success); }
+  .place .pv { color: var(--text-muted); }
+
+  .dhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+  .preview { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0 0; font: var(--text-micro); color: var(--text-secondary); }
+  .preview b { color: var(--text-primary); font-weight: 700; }
+  .preview .warn, .preview .warn b { color: var(--danger); }
+  .preview.pending { color: var(--text-muted); }
+  .pprojects { margin: 2px 0 0; font: var(--text-micro); color: var(--text-muted); overflow-wrap: anywhere; }
+  .telemetry { font: var(--text-micro); color: var(--text-secondary); }
+  .telemetry b { color: var(--text-primary); }
+
   .daemons { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .daemon {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    padding: 6px 8px 6px 10px; border-radius: var(--radius-md);
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 9px 11px; border-radius: var(--radius-md);
     border: 1px solid var(--border-subtle); background: var(--bg-inset);
   }
   .daemon.lead { border-color: color-mix(in srgb, var(--success) 40%, transparent); }
@@ -161,6 +221,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .pulse { animation: strip-breathe 1.9s ease-in-out infinite; }
+    .place:not(.ok) .dot { animation: strip-breathe 1.9s ease-in-out infinite; }
     .beat.live { animation: strip-heart 2.4s ease-in-out infinite; }
     .connect.primary { animation: strip-halo 2.4s ease-out infinite; }
   }

@@ -181,3 +181,45 @@ test('a seed the device cannot reach is refused before any request', async () =>
   for (const origin of seedCandidates('100.64.9.9')) if (await reachable(origin)) results.push(origin);
   assert.deepEqual(results, [], 'an ungranted tailnet seed is refused rather than probed');
 });
+
+test('a daemon previews what it actually holds, before connecting', async () => {
+  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const preview = await previewDaemon({
+    baseUrl: 'http://127.0.0.1:8787',
+    fetchImpl: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === '/v1/health') {
+        return new Response(JSON.stringify({ ok: true, daemon: { pid: 330 }, persistence: { batches_total: 1675, failures_total: 0, queue_depth: 0, last_write_duration_ms: 8 } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ project_count: 2, projects: [{ canonical_name: 'focusa-workforce-extension' }, { canonical_name: 'veragensia' }] }), { status: 200 });
+    },
+  });
+  assert.equal(preview.alive, true);
+  assert.equal(preview.pid, 330);
+  assert.equal(preview.batches, 1675);
+  assert.equal(preview.failures, 0);
+  assert.equal(preview.projectCount, 2);
+  assert.deepEqual(preview.projects, ['focusa-workforce-extension', 'veragensia']);
+  assert.equal(preview.degraded, false);
+});
+
+test('a preview degrades honestly when only health answers', async () => {
+  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const preview = await previewDaemon({
+    baseUrl: 'http://100.64.1.9:8787',
+    fetchImpl: async (url) => (new URL(String(url)).pathname === '/v1/health'
+      ? new Response(JSON.stringify({ ok: true, daemon: { pid: 9 }, persistence: { batches_total: 3, failures_total: 2 } }), { status: 200 })
+      : new Response('{}', { status: 403 })),
+  });
+  assert.equal(preview.alive, true);
+  assert.equal(preview.projectListKnown, false, 'an unreadable project list is not invented');
+  assert.equal(preview.projectCount, null);
+  assert.equal(preview.degraded, true, 'reported failures are surfaced, not hidden');
+});
+
+test('an unreachable daemon previews as not alive rather than throwing', async () => {
+  const { previewDaemon } = await import('../src/workforce/lib/discovery.js');
+  const preview = await previewDaemon({ baseUrl: 'http://127.0.0.1:8787', fetchImpl: async () => { throw new Error('down'); } });
+  assert.equal(preview.alive, false);
+  assert.equal(preview.batches, null);
+});

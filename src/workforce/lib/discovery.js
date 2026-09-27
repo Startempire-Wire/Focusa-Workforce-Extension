@@ -239,6 +239,49 @@ export async function probeDaemon(baseUrl, { fetchImpl = globalThis.fetch, timeo
 }
 
 /**
+ * A live preview of a daemon, read BEFORE connecting.
+ *
+ * Everything here is owner-reported: process liveness from /v1/health and the
+ * project inventory from /v1/project/list. Each half degrades on its own, so a
+ * daemon that answers health but refuses the project list still previews
+ * honestly rather than not at all.
+ *
+ * @param {{baseUrl: string, fetchImpl?: function, timeoutMs?: number, token?: string|null}} input
+ */
+export async function previewDaemon({ baseUrl, fetchImpl = globalThis.fetch, timeoutMs = PROBE_TIMEOUT_MS, token = null }) {
+  const read = async (path) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(new URL(path, baseUrl), {
+        method: 'GET', cache: 'no-store', signal: controller.signal,
+        headers: { accept: 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!response.ok) return null;
+      return await response.json().catch(() => null);
+    } catch { return null; } finally { clearTimeout(timer); }
+  };
+
+  const [health, projects] = await Promise.all([read(HEALTH_PATH), read('/v1/project/list')]);
+  const daemon = health?.daemon ?? null;
+  const persistence = health?.persistence ?? null;
+  const list = Array.isArray(projects?.projects) ? projects.projects : null;
+  return Object.freeze({
+    baseUrl,
+    alive: health?.ok === true || Boolean(daemon),
+    pid: daemon?.pid ?? null,
+    batches: persistence?.batches_total ?? null,
+    failures: persistence?.failures_total ?? null,
+    queueDepth: persistence?.queue_depth ?? null,
+    lastWriteMs: persistence?.last_write_duration_ms ?? null,
+    projectCount: projects?.project_count ?? list?.length ?? null,
+    projects: Object.freeze((list ?? []).slice(0, 6).map((p) => p?.canonical_name ?? p?.project_id ?? p?.project_root ?? 'project')),
+    projectListKnown: list !== null,
+    degraded: projects?.runtime?.degraded === true || health?.persistence?.failures_total > 0,
+  });
+}
+
+/**
  * Probe candidates concurrently and report every answer, so an unreachable
  * address is never silently presented as "the daemon is down".
  *
@@ -257,7 +300,7 @@ function collapseAliases(found) {
   return [preferred, ...rest];
 }
 
-export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [] } = {}) {
+export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {
   const reachable = await reachableOriginFilter(chromeApi);
   const candidates = [...new Set([...extra, ...(await discoveryCandidates(chromeApi))])];
   // Skip origins this extension cannot reach, so a candidate the browser will
@@ -266,7 +309,12 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
   for (const baseUrl of candidates) {
     if (await reachable(baseUrl)) probeable.push(baseUrl);
   }
-  const answers = await Promise.all(probeable.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs })));
+  // Each candidate is reported the moment it answers, so the surface can show
+  // the search progressing instead of appearing to hang.
+  const answers = await Promise.all(probeable.map((baseUrl) => probeDaemon(baseUrl, { fetchImpl, timeoutMs }).then((answer) => {
+    onAnswer?.(answer);
+    return answer;
+  })));
   const found = collapseAliases(answers
     .filter((answer) => answer.ok)
     .map((answer) => {
@@ -284,8 +332,8 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
  * @param {any} chromeApi
  * @param {{fetchImpl?: function, timeoutMs?: number}} [options]
  */
-export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [] } = {}) {
-  const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs, extra });
+export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {
+  const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs, extra, onAnswer });
   let paired = [];
   try {
     const { listConnections } = await import('../../lib/storage.mjs');

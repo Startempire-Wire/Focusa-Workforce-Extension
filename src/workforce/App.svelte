@@ -239,7 +239,7 @@
       </ul>
       <div class="nav-spacer" aria-hidden="true"></div>
       <ul class="nav-list nav-nonmain">
-        <li><a class="nav-item" class:active={navLabel === 'Needs You'} href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}><Icon name="attention" size={17} /><span>Needs You</span> <span class="nav-count" aria-label={`${needsItems.length} items`}>{needsItems.length}</span></a></li>
+        <li><a class="nav-item" class:active={navLabel === 'Needs You'} href="#/needs-you" onclick={(e) => { e.preventDefault(); navigate('#/needs-you'); }}><Icon name="attention" size={17} /><span>Needs You</span> {#key needsItems.length}<span class="nav-count" aria-label={`${needsItems.length} items`}>{needsItems.length}</span>{/key}</a></li>
         <li><a class="nav-item" class:active={navLabel === 'Wall'} href="#/wall" onclick={(e) => { e.preventDefault(); navigate('#/wall'); }}><Icon name="wall" size={17} /><span>Wall</span></a></li>
       </ul>
     </nav>
@@ -318,7 +318,7 @@
 
           <!-- NEEDS YOU (top 3) -->
           <section class="card ov-needs" aria-labelledby="wf-overview-needs">
-            <div class="card-head"><h2 id="wf-overview-needs"><Icon name="attention" size={16} /> Needs You</h2><span class="count-chip">{needsItems.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-needs"><Icon name="attention" size={16} /> Needs You</h2>{#key needsItems.length}<span class="count-chip">{needsItems.length}</span>{/key}</div>
             {#if needsItems.length === 0}
               <p class="empty">Nothing needs a human decision right now.</p>
             {:else}
@@ -337,7 +337,7 @@
 
           <!-- WORKING NOW -->
           <section class="card ov-working" aria-labelledby="wf-overview-working">
-            <div class="card-head"><h2 id="wf-overview-working"><Icon name="activity" size={16} /> Working Now</h2><span class="count-chip">{workingNow.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-working"><Icon name="activity" size={16} /> Working Now</h2>{#key workingNow.length}<span class="count-chip">{workingNow.length}</span>{/key}</div>
             {#if workingNow.length === 0}
               <p class="empty">No active work reported by the owner.</p>
             {:else}
@@ -355,7 +355,7 @@
 
           <!-- VERIFIED RECENTLY -->
           <section class="card ov-verified" aria-labelledby="wf-overview-verified">
-            <div class="card-head"><h2 id="wf-overview-verified"><Icon name="shield" size={16} /> Verified Recently</h2><span class="count-chip">{verifiedEntries.length}</span></div>
+            <div class="card-head"><h2 id="wf-overview-verified"><Icon name="shield" size={16} /> Verified Recently</h2>{#key verifiedEntries.length}<span class="count-chip">{verifiedEntries.length}</span>{/key}</div>
             {#if verifiedEntries.length === 0}
               <p class="empty">No settled proof reported yet.</p>
             {:else}
@@ -1005,18 +1005,21 @@
       {#if route === '#/settings'}
         <div class="settings">
           <div class="card-head">
-            <h2 class="settings-title">Settings</h2>
+            <h2 class="settings-title"><Icon name="settings" size={18} /> Settings</h2>
             <nav class="settings-nav" aria-label="Settings sections">
-              {#each [['connections', 'Connections'], ['appearance', 'Appearance'], ['notifications', 'Notifications'], ['browser-permissions', 'Browser & context permissions'], ['public-demo', 'Public demo / local behavior'], ['uiai', 'UIAI Engine'], ['advanced', 'Advanced / debug']] as [key, label] (key)}
-                <a href={`#/settings?section=${key}`} class:active={settingsSection === key} onclick={(e) => { e.preventDefault(); navigate(`#/settings?section=${key}`); }}>{label}</a>
+              {#each [['connections', 'Connections', 'link'], ['appearance', 'Appearance', 'monitor'], ['notifications', 'Notifications', 'bell'], ['browser-permissions', 'Browser & context permissions', 'browser'], ['public-demo', 'Public demo / local behavior', 'globe'], ['uiai', 'UIAI Engine', 'browser'], ['advanced', 'Advanced / debug', 'settings']] as [key, label, icon] (key)}
+                <a href={`#/settings?section=${key}`} class:active={settingsSection === key} onclick={(e) => { e.preventDefault(); navigate(`#/settings?section=${key}`); }}>
+                  <Icon name={icon} size={14} /> {label}
+                </a>
               {/each}
             </nav>
           </div>
 
+          {#key settingsSection}<div class="set-body" in:fly={{ y: enterDy, duration: enterMs }} out:fade={{ duration: reduceMotion ? 0 : 120 }}>
           {#if settingsSection === 'connections'}
             <div class="settings-split">
               <section class="set-group">
-                <h3>Your environments</h3>
+                <h3><Icon name="monitor" size={15} /> Your environments</h3>
                 {#if store.environments.length === 0}
                   <p class="empty">No environment connected yet — pair one on the right.</p>
                 {:else}
@@ -1047,7 +1050,7 @@
               </section>
 
               <section class="set-group">
-                <h3>Pair Focusa</h3>
+                <h3><Icon name="link" size={15} /> Pair Focusa</h3>
                 {#if !store.pairing}
                   <form class="set-group" onsubmit={(e) => { e.preventDefault(); store.beginPairing({ baseUrl: pairUrl, label: pairLabel || 'Focusa daemon' }); }}>
                     <label class="field"><span>Environment label</span><input type="text" aria-label="Environment label" bind:value={pairLabel} /></label>
@@ -1071,7 +1074,7 @@
             </div>
           {:else if settingsSection === 'uiai'}
             <section class="set-group">
-              <h3>UIAI Engine</h3>
+              <h3><Icon name="browser" size={15} /> UIAI Engine</h3>
               <p class="muted tiny">Browser execution body at <code>http://100.115.92.26:7456</code> (bridged from loopback).</p>
               <div class="row">
                 <button type="button" class="wf-btn" onclick={() => store.checkUiai()} disabled={store.uiaiBusy}>Check engine</button>
@@ -1131,7 +1134,7 @@
             </section>
           {:else}
             <section class="set-group">
-              <h3>Advanced / debug</h3>
+              <h3><Icon name="settings" size={16} /> Advanced / debug</h3>
               <dl class="facts">
                 <dt>Loaded build</dt><dd>{ctx.refVersion ?? 'dev'}</dd>
                 <dt>Addressable routes</dt><dd>{ROUTES.length}</dd>
@@ -1141,6 +1144,7 @@
               <p class="muted tiny">All Workforce data is local to this extension; nothing is synced to a private surface.</p>
             </section>
           {/if}
+          </div>{/key}
         </div>
       {/if}
       </div>
