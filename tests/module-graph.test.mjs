@@ -60,3 +60,45 @@ test('shared runtime modules live in the copied lib, not in the bundled page tre
   assert.ok(await exists(resolve(dist, 'lib', 'storage.mjs')));
   assert.ok(!(await exists(resolve(dist, 'workforce', 'lib'))), 'the vite-bundled page tree is not shipped raw');
 });
+
+test('every click handler in a shipped surface points at a declared function', async (t) => {
+  await t.test('preparing the build', () => {
+    const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+  });
+
+  // A rename that misses one call site compiles cleanly and only throws when
+  // the operator clicks that control - which is exactly how "disconnectDaemon is
+  // not defined" reached a live extension. Every handler reference must resolve
+  // to something the module declares or imports.
+  const files = (await moduleFiles(dist)).filter((f) => !f.includes('workforce-assets'));
+  const problems = [];
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    const declared = new Set();
+    for (const m of source.matchAll(/(?:^|[\n;])\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g)) declared.add(m[1]);
+    for (const m of source.matchAll(/(?:^|[\n;])\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) declared.add(m[1]);
+    // parameters are legitimate targets (a handler passed in by the caller)
+    for (const m of source.matchAll(/(?:function\s*[A-Za-z_$][\w$]*\s*|\([^)]*\)\s*=>|,\s*function\s*)\(([^)]*)\)/g)) {
+      for (const part of m[1].split(',')) {
+        const name = part.split(/[:=]/)[0].trim().replace(/^\.\.\./, '');
+        if (/^[A-Za-z_$][\w$]*$/.test(name)) declared.add(name);
+      }
+    }
+    for (const m of source.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+      for (const part of m[1].split(',')) {
+        const name = part.split(/\s+as\s+/).pop().trim();
+        if (/^[A-Za-z_$][\w$]*$/.test(name)) declared.add(name);
+      }
+    }
+    // addEventListener('click', handler) and onclick={handler(...)} in markup
+    const references = [
+      ...[...source.matchAll(/addEventListener\(\s*['"]click['"]\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g)].map((m) => m[1]),
+      ...[...source.matchAll(/\.addEventListener\(\s*['"]click['"]\s*,\s*\(\)\s*=>\s*([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1]),
+    ];
+    for (const name of references) {
+      if (!declared.has(name)) problems.push(`${file.slice(dist.length + 1)}: click handler '${name}' is not declared`);
+    }
+  }
+  assert.deepEqual(problems, [], 'every click handler must resolve');
+});

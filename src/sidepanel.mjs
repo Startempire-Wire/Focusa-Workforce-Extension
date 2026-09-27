@@ -265,18 +265,6 @@ function placeRows() {
   }));
 }
 
-function previewLine(baseUrl) {
-  const preview = previews[baseUrl];
-  if (!preview) return '<p class="sp-preview pending">reading what this daemon holds…</p>';
-  const parts = [
-    `<span><b>${preview.batches ?? '—'}</b> writes</span>`,
-    `<span class="${(preview.failures ?? 0) > 0 ? 'warn' : ''}"><b>${preview.failures ?? '—'}</b> failures</span>`,
-    `<span><b>${preview.projectCount ?? '—'}</b> projects</span>`,
-  ];
-  const names = (preview.projects ?? []).join(' · ');
-  return `<p class="sp-preview">${parts.join('')}</p>${names ? `<p class="sp-names">${names}</p>` : ''}`;
-}
-
 function node(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -320,7 +308,7 @@ function renderConnection() {
     }
     const disconnect = node('button', 'btn btn-quiet', 'Disconnect');
     disconnect.type = 'button';
-    disconnect.addEventListener('click', disconnectDaemon);
+    disconnect.addEventListener('click', disconnectFromDaemon);
     body.append(disconnect);
     return;
   }
