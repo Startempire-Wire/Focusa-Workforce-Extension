@@ -24,6 +24,7 @@
   import { groupRoster, personFacts, distinctStates, matchingMembers } from './lib/roster-groups.js';
   import { needsBuckets } from './lib/needs-buckets.js';
   import { evidenceBuckets, evidenceSources } from './lib/evidence-buckets.js';
+  import { localDaemonCandidates } from './lib/local-daemon.js';
   import {
     ROUTES,
     INTENTS,
@@ -313,10 +314,15 @@
 
   async function connectLocal() {
     environmentError = '';
-    try {
-      await store.addLocalDaemon();
-    } catch (error) {
-      environmentError = error instanceof Error ? error.message : String(error);
+    // The browser sees a different loopback than the container: probe the
+    // local candidates in order and keep the first the daemon answers.
+    for (const candidate of localDaemonCandidates()) {
+      try {
+        await store.addLocalDaemon(candidate);
+        return;
+      } catch (error) {
+        environmentError = `${candidate} unresolved (${error instanceof Error ? error.message : String(error)})`;
+      }
     }
   }
 
