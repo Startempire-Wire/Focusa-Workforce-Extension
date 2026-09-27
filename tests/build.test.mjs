@@ -52,7 +52,14 @@ test('manifest is least-privilege MV3 with no content script', async () => {
   assert.deepEqual([...manifest.permissions].sort(), ['activeTab', 'sidePanel', 'storage']);
   assert.deepEqual([...manifest.optional_host_permissions].sort(), ['http://*/*', 'https://*/*']);
   assert.equal(manifest.content_scripts, undefined);
-  assert.equal(manifest.host_permissions, undefined);
+  // Local daemon origins are static so discovery is automatic (operator
+  // requirement 2026-09-27): no wildcards, no remote hosts; remote pairing
+  // keeps the optional host-permission flow.
+  assert.deepEqual([...manifest.host_permissions].sort(), [
+    'http://100.115.92.26/*',
+    'http://127.0.0.1/*',
+    'http://localhost/*',
+  ]);
 });
 
 test('unpacked build is deterministic and complete', async () => {

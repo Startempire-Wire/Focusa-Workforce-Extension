@@ -50,5 +50,10 @@
       },
       "description": "Open the full Focusa Workforce page"
     }
-  }
+  },
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "http://100.115.92.26/*"
+  ]
 }

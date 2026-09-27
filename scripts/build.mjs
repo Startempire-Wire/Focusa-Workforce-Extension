@@ -14,7 +14,14 @@ if (JSON.stringify(actualPermissions) !== JSON.stringify(exactPermissions)) {
   throw new Error(`manifest permissions must equal ${exactPermissions.join(', ')}`);
 }
 if ('content_scripts' in manifest) throw new Error('content scripts are forbidden in the MVP');
-if ('host_permissions' in manifest) throw new Error('persistent host permissions are forbidden');
+// Deliberate relaxation (operator requirement 2026-09-27): daemon discovery
+// must be automatic with no manual entries, so the LOCAL daemon origins are
+// declared statically. Least-privilege is preserved: no wildcards, no remote
+// hosts — remote pairing still uses the optional host-permission flow.
+const localOrigins = ['http://127.0.0.1/*', 'http://localhost/*', 'http://100.115.92.26/*'];
+if (JSON.stringify([...(manifest.host_permissions ?? [])].sort()) !== JSON.stringify([...localOrigins].sort())) {
+  throw new Error(`host permissions must be exactly ${localOrigins.join(', ')} (local daemon origins only)`);
+}
 const optional = [...(manifest.optional_host_permissions ?? [])].sort();
 if (JSON.stringify(optional) !== JSON.stringify(['http://*/*', 'https://*/*'])) {
   throw new Error('optional host permissions must be bounded to http(s) origins');

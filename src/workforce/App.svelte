@@ -25,6 +25,7 @@
   import { needsBuckets } from './lib/needs-buckets.js';
   import { evidenceBuckets, evidenceSources } from './lib/evidence-buckets.js';
   import { localDaemonCandidates } from './lib/local-daemon.js';
+  import { hasDaemonOriginPermission } from '../lib/validation.mjs';
   import {
     ROUTES,
     INTENTS,
@@ -297,6 +298,28 @@
     if (store.active) {
       await store.refreshOwner();
       await store.startStream();
+    } else {
+      // First-run code-side connect: Chrome's optional host-permission model
+      // (docs/17 §15 + scripts/build.mjs: persistent host_permissions are
+      // forbidden) requires ONE user-gesture grant; after that the permission
+      // persists and every launch auto-connects silently.
+      for (const candidate of localDaemonCandidates()) {
+        let granted = false;
+        try {
+          granted = await hasDaemonOriginPermission(candidate);
+        } catch {
+          granted = false; // non-Chrome context (dev) — skip silently
+        }
+        if (!granted) continue;
+        try {
+          await store.addLocalDaemon(candidate);
+          await store.refreshOwner();
+          await store.startStream();
+          break;
+        } catch {
+          // try the next candidate; leave the empty state if none answer
+        }
+      }
     }
     return () => {
       window.removeEventListener('hashchange', onHashChange);
