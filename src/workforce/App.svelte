@@ -21,7 +21,7 @@
   import { onMount } from 'svelte';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
   import StateNote from './components/StateNote.svelte';
-  import { groupRoster, personFacts, distinctStates } from './lib/roster-groups.js';
+  import { groupRoster, personFacts, distinctStates, matchingMembers } from './lib/roster-groups.js';
   import { needsBuckets } from './lib/needs-buckets.js';
   import { evidenceBuckets, evidenceSources } from './lib/evidence-buckets.js';
   import {
@@ -217,6 +217,16 @@
   const wallWorking = $derived(store.roster.filter((entry) => /working|active/.test(String(entry.state ?? ''))));
   const wallVerified = $derived(store.evidenceTrail.entries.filter((entry) => entry.kind === 'receipt' || entry.kind === 'projection'));
 
+  /* docs/17 §18 deep-link ingress: exact-match disambiguation + revoked handoff */
+  const handoffCandidates = $derived(
+    routeCtx.refState === 'ok' ? matchingMembers(store.roster, routeCtx.ref) : [],
+  );
+
+  function goBackOrOverview() {
+    if (window.history.length > 1) window.history.back();
+    else navigate('#/overview');
+  }
+
   const freshLabel = $derived(
     store.foremanCard.freshness ?? (store.lastEventAt ? `last owner event ${store.lastEventAt}` : 'no owner event yet'),
   );
@@ -391,6 +401,37 @@
             {/each}
           </ul>
         </div>
+      {/if}
+
+      <!-- docs/17 §18: a handoff whose guard denies renders the revoked card in MAIN (no modal, no new route). -->
+      {#if store.scopeGuard.level !== 'ok' && routeCtx.refState === 'ok'}
+        <section class="card" aria-labelledby="wf-handoff-revoked">
+          <div class="card-head"><h2 id="wf-handoff-revoked">Revoked handoff</h2></div>
+          <p class="gap">This handoff no longer grants access to this context. {store.scopeGuardLabel}</p>
+          <div class="row">
+            <button type="button" class="wf-btn" onclick={goBackOrOverview}>Return</button>
+            <button type="button" class="wf-btn" onclick={() => navigate('#/overview')}>Open Workforce</button>
+          </div>
+          <p class="muted tiny">No credential is transported in the visible URL (docs/17 §18).</p>
+        </section>
+      {/if}
+      <!-- docs/17 §18: two or more exact candidates → choose destination in the MAIN region. -->
+      {#if handoffCandidates.length > 1 && (route === '#/work/detail' || route === '#/people/detail')}
+        <section class="card" aria-labelledby="wf-choose-dest">
+          <div class="card-head"><h2 id="wf-choose-dest">Choose destination</h2></div>
+          <p class="muted tiny">This reference names more than one member — Workforce does not guess.</p>
+          <ul class="items compact">
+            {#each handoffCandidates as candidate (candidate.id)}
+              <li>
+                <button type="button" class="wf-btn"
+                  onclick={() => navigate(buildRoute('#/people/detail', { env: routeCtx.params.env, ref: { session_id: candidate.id } }))}>
+                  {candidate.label}
+                </button>
+                <span class="muted tiny">{candidate.state}{#if candidate.role} · {candidate.role}{/if}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
       {/if}
 
       {#if routeCtx.refState === 'incompatible'}

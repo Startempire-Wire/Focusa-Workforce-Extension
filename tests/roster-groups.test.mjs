@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupRoster, personFacts, distinctStates } from '../src/workforce/lib/roster-groups.js';
+import { groupRoster, personFacts, distinctStates, matchingMembers } from '../src/workforce/lib/roster-groups.js';
 
 test('groupRoster groups by owner-reported role, first-seen order', () => {
   const rows = [
@@ -69,4 +69,23 @@ test('distinctStates returns unique owner-reported states', () => {
   ];
   assert.deepEqual(distinctStates(rows), ['active', 'paused']);
   assert.deepEqual(distinctStates([]), []);
+});
+
+test('matchingMembers returns ALL exact matches for deep-link disambiguation', () => {
+  const roster = [
+    { id: 's1', label: 'Builder-1' },
+    { id: 's1', session_id: 's1', label: 'Builder-2' },
+    { id: 's2', label: 'Verifier-1' },
+  ];
+  const both = matchingMembers(roster, { kind: 'focusa.workforce.ref.v1', session_id: 's1' });
+  assert.equal(both.length, 2);
+  const one = matchingMembers(roster, { id: 's2' });
+  assert.equal(one.length, 1);
+  assert.equal(one[0].label, 'Verifier-1');
+});
+
+test('matchingMembers is null/ref-id-less safe and never guesses', () => {
+  assert.deepEqual(matchingMembers(null, null), []);
+  assert.deepEqual(matchingMembers([{ id: 's1' }], { session_id: 'missing' }), []);
+  assert.deepEqual(matchingMembers([{ id: 's1' }], null), []);
 });

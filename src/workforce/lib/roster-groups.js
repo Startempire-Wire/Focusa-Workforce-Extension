@@ -71,3 +71,17 @@ export function distinctStates(roster) {
   }
   return [...seen];
 }
+
+/**
+ * Deep-link disambiguation (docs/17 §18): a typed ref may name more than one
+ * exact member. Workforce never guesses — it returns ALL exact owner-reported
+ * matches and lets the shell render the candidate list.
+ * @param {any[]} roster
+ * @param {{session_id?: string, id?: string, ref_id?: string}|any} ref
+ * @returns {any[]}
+ */
+export function matchingMembers(roster, ref = null) {
+  const refId = ref?.session_id ?? ref?.id ?? ref?.ref_id ?? null;
+  if (refId == null) return [];
+  return (roster ?? []).filter((entry) => entry?.id === refId || entry?.session_id === refId);
+}
