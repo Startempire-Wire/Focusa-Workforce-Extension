@@ -94,6 +94,17 @@ export async function getUiaiSession({ chromeApi, sessionId }) {
   return Object.freeze(await response.json());
 }
 
+/** Get session details including takeover state. */
+export async function getUiaiSessionDetail({ chromeApi, sessionId, fetchImpl = globalThis.fetch }) {
+  const token = await getUiaiToken(chromeApi);
+  if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured');
+  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, UIAI_ORIGIN), {
+    method: 'GET', headers: headers(token),
+  });
+  if (!response.ok) throw new UiaiError('rejected', 'session detail failed', response.status);
+  return Object.freeze(await response.json());
+}
+
 /** Close a session. */
 export async function closeUiaiSession({ chromeApi, sessionId }) {
   const token = await getUiaiToken(chromeApi);
@@ -119,3 +130,38 @@ export async function shareUiaiSession({ chromeApi, sessionId, minutes = 60 }) {
 
 /** Fetch the bridge health probe for UI display. */
 export { probeUiaiBridge as checkUiaiHealth };
+
+/**
+ * Check if a UIAI session needs operator takeover (captcha, auth, etc.).
+ * The engine surfaces takeover via session.status === 'needs_human' or
+ * a challenge/escalation field in the detail response.
+ * Returns {needsTakeover: boolean, reason?: string, challenge?: object, fpvShareUrl?: string}.
+ */
+export async function checkUiaiTakeover({ chromeApi, sessionId, fetchImpl = globalThis.fetch }) {
+  try {
+    const detail = await getUiaiSessionDetail({ chromeApi, sessionId, fetchImpl });
+    // Heuristic: status field or challenge/escalation presence
+    const needs = detail.status === 'needs_human' ||
+      detail.challenge !== undefined ||
+      detail.escalation !== undefined ||
+      detail.operator_escalation === true;
+    return {
+      needsTakeover: needs,
+      reason: detail.challenge?.type ?? detail.escalation?.reason ?? detail.status,
+      challenge: detail.challenge,
+      fpvShareUrl: detail.fpv_share_url ?? detail.share_url ?? null,
+      raw: detail,
+    };
+  } catch (error) {
+    return { needsTakeover: false, error: String(error) };
+  }
+}
+
+/** Poll all active UIAI sessions for takeover needs. */
+export async function pollUiaiTakeover({ chromeApi, sessionIds, fetchImpl = globalThis.fetch }) {
+  const results = [];
+  for (const sessionId of sessionIds) {
+    results.push({ sessionId, ...(await checkUiaiTakeover({ chromeApi, sessionId, fetchImpl })) });
+  }
+  return results.filter((r) => r.needsTakeover);
+}

@@ -1813,6 +1813,31 @@
               {:else}
                 <p class="muted tiny">No active UIAI sessions.</p>
               {/if}
+              <hr style="margin: 12px 0;">
+              <div class="set-group">
+                <h4>Operator takeover (MLG-6.2)</h4>
+                <p class="muted tiny">UIAI sessions with captcha/auth challenges surface here. Engine config: operator_escalation=true, challenge_policy=solve_and_retry.</p>
+                <div class="row">
+                  <button type="button" class="wf-btn" onclick={() => store.pollUiaiTakeover()} disabled={store.uiaiBusy}>Check for takeover needs</button>
+                </div>
+                {#if Object.keys(store.uiaiTakeovers).length}
+                  <ul class="items">
+                    {#each Object.entries(store.uiaiTakeovers) as [sessionId, t] (sessionId)}
+                      <li class="takeover-item">
+                        <span class="kind">takeover</span>
+                        <strong>{sessionId}</strong>
+                        <span class="muted tiny">{t.reason ?? t.challenge?.type ?? 'needs human'}</span>
+                        <div class="row">
+                          <button type="button" class="wf-btn wf-btn-primary" onclick={() => { store.shareUiai(sessionId).then(r => { if(r?.share_url) window.open(r.share_url, '_blank', 'noopener,noreferrer'); }); }}>Take over in UIAI</button>
+                          <button type="button" class="wf-btn" onclick={() => { delete store.uiaiTakeovers[sessionId]; }}>Dismiss</button>
+                        </div>
+                      </li>
+                    {/each}
+                  </ul>
+                {:else}
+                  <p class="muted tiny">No sessions currently need takeover.</p>
+                {/if}
+              </div>
             </div>
           {:else}
             <div class="set-group">
@@ -1868,6 +1893,23 @@
         <p class="muted tiny">{verifiedCount} receipt/projection refs this scope</p>
         <a class="inline-link" href="#/evidence" onclick={(e) => { e.preventDefault(); navigate('#/evidence'); }}>Open Evidence</a>
       </section>
+
+      {#if Object.keys(store.uiaiTakeovers).length}
+        <section class="rail-block" aria-labelledby="rail-uiai-takeover">
+          <h3 id="rail-uiai-takeover">UIAI Takeover</h3>
+          <p class="count-big">{Object.keys(store.uiaiTakeovers).length}</p>
+          <ul class="items compact">
+            {#each Object.entries(store.uiaiTakeovers) as [sessionId, t] (sessionId)}
+              <li>
+                <span class="kind">takeover</span>
+                <strong>{sessionId.slice(0, 12)}…</strong>
+                <span class="muted tiny">{t.reason ?? 'needs human'}</span>
+              </li>
+            {/each}
+          </ul>
+          <a class="inline-link" href="#/settings?section=uiai" onclick={(e) => { e.preventDefault(); navigate('#/settings?section=uiai'); }}>Open UIAI Engine</a>
+        </section>
+      {/if}
 
       <section class="rail-block" aria-labelledby="rail-source">
         <h3 id="rail-source">Source posture</h3>

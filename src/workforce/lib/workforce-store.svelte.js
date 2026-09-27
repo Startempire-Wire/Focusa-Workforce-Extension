@@ -25,7 +25,7 @@ import { normalizeDaemonOrigin, requestDaemonOriginPermission } from '../../lib/
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
 import { promptBodyFor } from '../../lib/page-context.mjs';
-import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth } from '../../lib/uiai-client.mjs';
+import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
 
 const SELECTION_KEY = 'focusa.workforce.selection.v1';
@@ -117,6 +117,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let uiaiToken = $state('');
   let uiaiHealth = $state(null);
   let uiaiSessions = $state(/** @type {Record<string, any>} */ ({}));
+  let uiaiTakeovers = $state(/** @type {Record<string, any>} */ ({}));
   let uiaiBusy = $state(false);
   let notifications = $state(/** @type {any[]} */ ([]));
   let outputCursor = $state(/** @type {string|null} */ (null));
@@ -682,6 +683,18 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     return shareUiaiSession({ chromeApi, sessionId, minutes });
   }
 
+  /** Poll active UIAI sessions for takeover needs (MLG-6.2). */
+  async function pollUiaiTakeover() {
+    if (!uiaiToken) return [];
+    const sessionIds = Object.keys(uiaiSessions);
+    if (!sessionIds.length) return [];
+    const takeovers = await pollUiaiTakeover({ chromeApi, sessionIds });
+    const next = { ...uiaiTakeovers };
+    for (const t of takeovers) next[t.sessionId] = { ...t, detectedAt: new Date().toISOString() };
+    uiaiTakeovers = next;
+    return takeovers;
+  }
+
   async function setSelection({ projectRoot, continuityId }) {
     selection = {
       projectRoot: projectRoot ?? selection.projectRoot,
@@ -803,6 +816,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get uiaiHealth() { return uiaiHealth; },
     get uiaiSessions() { return uiaiSessions; },
     get uiaiBusy() { return uiaiBusy; },
+    get uiaiTakeovers() { return uiaiTakeovers; },
     get bootError() { return bootError; },
     refreshEnvironments,
     refreshOwner,
@@ -833,5 +847,6 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     createUiai,
     closeUiai,
     shareUiai,
+    pollUiaiTakeover,
   };
 }
