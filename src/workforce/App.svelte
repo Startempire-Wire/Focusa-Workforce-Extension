@@ -22,6 +22,7 @@
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
   import StateNote from './components/StateNote.svelte';
   import { groupRoster, personFacts, distinctStates } from './lib/roster-groups.js';
+  import { needsBuckets } from './lib/needs-buckets.js';
   import {
     ROUTES,
     INTENTS,
@@ -140,6 +141,19 @@
         if (hit) return hit;
       }
       return store.roster.find((entry) => entry.id === store.selectedSessionId) ?? null;
+    })(),
+  );
+
+  /* ---- Needs You face state (docs/17 §11) ---- */
+  const needsBucketed = $derived(needsBuckets(store.needsYou.items));
+  const needForDetail = $derived(
+    (() => {
+      const { refState, ref } = routeCtx;
+      if (refState === 'ok' && ref) {
+        const refId = ref.session_id ?? ref.id ?? ref.workpoint_id ?? String(ref);
+        return store.needsYou.items.find((item) => item.label === refId || item.label === ref) ?? null;
+      }
+      return null;
     })(),
   );
 
@@ -950,12 +964,9 @@
           </section>
         {/if}
 
-      {:else if route === '#/needs-you' || route === '#/needs-you/detail'}
-        <!-- ============ NEEDS YOU (docs/17 §21; non-nav route) ============ -->
-        {#if route === '#/needs-you/detail' && routeCtx.params.env}
-          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
-        {/if}
-        <section class="card needs-you" aria-labelledby="wf-needs">
+      {:else if route === '#/needs-you'}
+        <!-- ============ NEEDS YOU INDEX (docs/17 §11; non-nav route) ============ -->
+        <section class="card needs-you needs-index" aria-labelledby="wf-needs">
           <div class="card-head">
             <h2 id="wf-needs">Needs You</h2>
             <span class="count-chip">{counts.needsYou}</span>
@@ -964,18 +975,82 @@
           {#if store.needsYou.items.length === 0}
             <p class="empty">Nothing needs a human decision in this scope right now.</p>
           {:else}
+            <h3 class="bucket">NOW</h3>
             <ul class="items">
-              {#each store.needsYou.items as item (`${item.kind}:${item.label}`)}
+              {#each needsBucketed.now as item (`${item.kind}:${item.label}`)}
                 <li>
                   <span class="kind">{item.kind.replace('_', ' ')}</span>
-                  <strong>{item.label}</strong>
+                  <a class="item-link" href="#/needs-you/detail" onclick={(e) => { e.preventDefault(); navigate(`#/needs-you/detail?ref=${encodeURIComponent(item.label)}`); }}>
+                    <strong>{item.label}</strong>
+                  </a>
                   {#if item.detail}<span class="detail">{item.detail}</span>{/if}
                   <span class="muted tiny">via {item.source}</span>
                 </li>
               {/each}
             </ul>
+            {#if needsBucketed.soon.length}
+              <h3 class="bucket">SOON / EXPIRING</h3>
+              <ul class="items">
+                {#each needsBucketed.soon as item (`${item.kind}:${item.label}`)}
+                  <li><span class="kind">{item.kind.replace('_', ' ')}</span><strong>{item.label}</strong>{#if item.detail}<span class="detail">{item.detail}</span>{/if}<span class="muted tiny">via {item.source}</span></li>
+                {/each}
+              </ul>
+            {/if}
+            <p class="muted tiny">SOON/SNOOZED/RESOLVED appear only when the owner reports due/expiry or status (docs/17 §11); none is invented.</p>
           {/if}
+          <StateNote label="Attention" result={store.resultOf('attention')} />
         </section>
+
+      {:else if route === '#/needs-you/detail'}
+        <!-- ============ NEEDS YOU DETAIL (docs/17 §11) ============ -->
+        {#if routeCtx.params.env}
+          <p class="context-line">Deep-linked: {detailCtxLine()}</p>
+        {/if}
+        {#if needForDetail}
+          {@const need = needForDetail}
+          <section class="card needs-you needs-index" aria-labelledby="wf-need-detail">
+            <div class="card-head">
+              <h2 id="wf-need-detail">Needs You</h2>
+              <button type="button" class="wf-btn" onclick={() => navigate('#/needs-you')}>All needs</button>
+            </div>
+            <dl class="facts">
+              <dt>What needs you</dt><dd>{need.label}</dd>
+              {#if need.detail}<dt>Why now</dt><dd>{need.detail}</dd>{/if}
+              <dt>Source state</dt><dd class="{need.source}">{need.source} · {store.needsYou.disclosure}</dd>
+              <dt>Freshness</dt><dd>{store.lastEventAt ?? store.needsYou.items.length > 0 ? 'owner-returned with this read' : 'none yet'}</dd>
+            </dl>
+            <h3 class="bucket">Decision context</h3>
+            <p class="muted tiny">
+              This need surfaced from {need.source === 'roster' ? 'the owner roster (a session reported requiring human attention)' : need.source === 'trajectory' ? 'the owner trajectory (a clarity blocker on the next step)' : 'the owner attention projection'}.
+              Workforce confirms decision consequences only through the owner; none are invented here.
+            </p>
+            <h3 class="bucket">Consequence of each allowed action</h3>
+            <ul class="items">
+              {#if need.kind === 'session'}
+                <li><strong>Open the person</strong><span class="detail">inspects the session and its owner-reported status before you direct it</span></li>
+                <li><strong>Direct on Work</strong><span class="detail">the direction composer sends an explicit owner instruction (accepted/rejected is answered by the owner)</span></li>
+                <li><strong>Wait</strong><span class="detail">the need stays on this queue until the owner state changes</span></li>
+              {:else}
+                <li><strong>Resolve the clarity blocker</strong><span class="detail">record the missing decision on the owner trajectory; the frontier advances the next time the owner commits</span></li>
+                <li><strong>Wait</strong><span class="detail">the blocker stays listed until the owner reports it cleared</span></li>
+              {/if}
+            </ul>
+            <div class="row">
+              {#if need.kind === 'session'}
+                <a class="wf-btn wf-btn-primary" href="#/people/detail" onclick={(e) => { e.preventDefault(); navigate('#/people/detail'); }}>Open in People</a>
+              {:else}
+                <a class="wf-btn wf-btn-primary" href="#/work/detail" onclick={(e) => { e.preventDefault(); navigate('#/work/detail'); }}>Open Work detail</a>
+              {/if}
+              <span class="muted tiny">primary source action stays with the owner surface; Workforce navigates, the owner decides.</span>
+            </div>
+          </section>
+        {:else}
+          <section class="card needs-you needs-index" aria-labelledby="wf-need-none">
+            <h2 id="wf-need-none">Need not found</h2>
+            <p class="gap">No owner-reported need matches this detail reference ({routeCtx.refReason ?? 'no reference'}). Workforce renders no invented need.</p>
+            <button type="button" class="wf-btn" onclick={() => navigate('#/needs-you')}>Back to Needs You</button>
+          </section>
+        {/if}
 
       {:else if route === '#/evidence' || route === '#/evidence/detail'}
         <!-- ============ EVIDENCE ============ -->
@@ -1506,6 +1581,13 @@
   .person-meta { display: flex; flex-wrap: wrap; gap: var(--space-compact); font-size: var(--text-small); color: var(--text-secondary); align-items: baseline; }
   .person-meta .cap { font-size: var(--text-micro); text-transform: uppercase; letter-spacing: 0.06em; font-weight: var(--weight-semibold); color: var(--violet); }
   .person-meta code { font-family: var(--font-mono); font-size: var(--text-micro); background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: 0 var(--space-tight); }
+
+  /* ---------- Needs You (docs/17 §11) ---------- */
+  .needs-index { max-width: 900px; }
+  .bucket { margin: var(--space-compact) 0 0; font-size: var(--text-micro); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet); }
+  .item-link { text-decoration: none; color: inherit; }
+  .item-link strong { color: var(--accent); }
+  .item-link:hover strong { text-decoration: underline; }
 
   /* ===================== RESPONSIVE (docs/18 §4) ===================== */
   /* ≥1180: nav · main · rail, all in flow. Reflow between breakpoints is
