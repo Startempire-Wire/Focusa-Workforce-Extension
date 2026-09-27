@@ -8,8 +8,9 @@
 import { captureActiveTab, createOrientationPacket, renderOrientationMission } from './lib/orientation.mjs';
 import { startPairing, pollPairing } from './lib/pairing.mjs';
 import { listConnections, listLocalEnvironments, saveLocalEnvironment, forgetLocalEnvironment } from './lib/storage.mjs';
-import { fetchHealth, fetchWorkLoop, fetchRoster } from './lib/api-client.mjs';
-import { projectHealth, projectRoster, projectWorkLoop } from './lib/projections.mjs';
+import {
+  createWorkforceClient, rosterFromOwner, projectsFromOwner, eventsFromOwner,
+} from './lib/workforce-client.mjs';
 import { runReliableEventStream } from './lib/reconnect.mjs';
 import { buildSafeSessionConfig, createPreflightedSession, preflightSafeSession } from './lib/session-create.mjs';
 import { orchestrateAction } from './lib/orchestration.mjs';
@@ -19,6 +20,7 @@ import {
   discoverDaemons, previewDaemon, rememberDaemon, reachableOriginFilter, seedCandidates, watchLiveness,
 } from './lib/discovery.mjs';
 import { hasDaemonOriginPermission, requestDaemonOriginPermission } from './lib/validation.mjs';
+import { BUILD } from './lib/build-info.mjs';
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -56,6 +58,8 @@ const el = {
   auditCount: $('#audit-count'),
   auditFilter: $('#audit-filter'),
   connectBody: $('#connect-body'),
+  buildStamp: $('#build-stamp'),
+  surfaceError: $('#surface-error'),
   seed: $('#pair-base-url'),
   auditState: $('#audit-state'),
   clearAudit: $('#clear-audit'),
@@ -81,15 +85,48 @@ function setStatus(node, state, note = '') {
   node.textContent = note || state;
 }
 
+/**
+ * Run an interaction and show any failure IN the surface. A rejected handler
+ * must never be console-only: the operator has to see that the thing they
+ * pressed did not happen, in the place they pressed it.
+ */
+async function guard(label, work) {
+  try {
+    await work();
+  } catch (error) {
+    showSurfaceError(`${label} failed: ${safeError(error)}`);
+  }
+}
+
+function showSurfaceError(message) {
+  el.surfaceError.textContent = message;
+  el.surfaceError.hidden = false;
+}
+
+function clearSurfaceError() {
+  el.surfaceError.hidden = true;
+  el.surfaceError.textContent = '';
+}
+
+// Nothing in this surface fails silently, including failures nobody expected.
+window.addEventListener('unhandledrejection', (event) => {
+  showSurfaceError(`Something did not finish: ${safeError(event.reason)}`);
+});
+
 function safeError(error) {
   return String(error?.kind || error?.failure_class || error?.message || 'unknown failure').slice(0, 180);
 }
 
 function randomKey(prefix) { return `${prefix}:${crypto.randomUUID()}`; }
 
+/**
+ * Shared request options. The runtime libs take `baseUrl`; this panel was
+ * passing `base_url`, so every owner read and every governed mutation failed
+ * with "daemon URL is required" the moment a connection existed.
+ */
 function requestOptions() {
   if (!connection) throw new Error('paired connection required');
-  return { base_url: connection.base_url, token: connection.token };
+  return { baseUrl: connection.base_url, token: connection.token ?? null };
 }
 
 const INTENT_KEY = 'focusa.workforce.intents.v1';
@@ -173,26 +210,53 @@ function renderAudit() {
   el.auditCount.textContent = `${rows.length}/${auditRecords.length} events`;
 }
 
-/* ── owner reads ── */
+/* ── owner reads ──────────────────────────────────────────────────────────
+   The panel reads through the SAME client the full page uses, so a local
+   daemon is read with its tokenless local-loopback principal exactly as the
+   full page reads it. The legacy paired-only client required a token and
+   therefore never worked here at all. */
+function ownerClient() {
+  return createWorkforceClient({ baseUrl: connection.base_url, token: connection.token ?? null });
+}
+
 async function refreshObservation() {
   if (!connection) return;
   try {
-    const [healthBody, loopBody, rosterBody] = await Promise.all([
-      fetchHealth(requestOptions()), fetchWorkLoop(requestOptions()), fetchRoster(requestOptions()),
-    ]);
-    const health = projectHealth(healthBody);
-    const loop = projectWorkLoop(loopBody);
-    const roster = projectRoster(rosterBody);
-    setStatus(el.status, health.status === 'healthy' ? 'paired' : 'degraded', `${connection.label} · ${health.status}`);
-    el.loop.textContent = `${loop.state} · ${loop.status}`;
-    el.frontier.textContent = loop.current_task?.description ?? loop.current_task?.id ?? '— no frontier reported';
-    renderNeedsYou(roster);
-    renderWorkingNow(roster);
+    const client = ownerClient();
+    const health = await client.health();
+    const projects = await client.projectList();
+    const projectRoot = el.projectRoot.value.trim() || projects?.data?.effective_project?.project_root || '';
+    const continuityId = el.continuityId.value.trim() || projects?.data?.effective_project?.continuity_id || '';
+    const scope = projectRoot ? { projectRoot, continuityId: continuityId || undefined } : {};
+
+    if (health.state === 'ok') setStatus(el.status, 'paired', `${connection.label} · healthy`);
+    else setStatus(el.status, 'degraded', `${connection.label} · ${health.state}`);
+
+    // A daemon with no project chosen is a real, common state: say so plainly
+    // instead of showing an empty workforce.
+    if (projectRoot) {
+      const [loop, sessions] = await Promise.all([
+        client.workLoopStatus(scope).catch(() => null),
+        client.sessions(projectRoot).catch(() => null),
+      ]);
+      const loopData = loop?.state === 'ok' ? loop.data : null;
+      el.loop.textContent = loopData
+        ? `${loopData.state ?? '—'} · ${loopData.status ?? '—'}`
+        : (loop?.note ?? '—');
+      el.frontier.textContent = loopData?.current_task?.title ?? loopData?.current_task?.id ?? '— no frontier reported';
+      const roster = sessions?.state === 'ok' ? rosterFromOwner(sessions.data) : [];
+      renderNeedsYou(roster);
+      renderWorkingNow(roster);
+    } else {
+      el.loop.textContent = 'no project chosen';
+      el.frontier.textContent = 'Choose a project to scope this panel.';
+      renderNeedsYou([]);
+      renderWorkingNow([]);
+    }
     renderVerified();
     startStream();
   } catch (error) {
-    const kind = error?.kind;
-    setStatus(el.status, kind === 'unauthenticated' ? 'unauthorized' : kind === 'forbidden' ? 'scope_denied' : 'degraded', safeError(error));
+    setStatus(el.status, 'degraded', safeError(error));
   }
 }
 
@@ -201,6 +265,7 @@ function startStream() {
   streamAbort = new AbortController();
   runReliableEventStream({
     ...requestOptions(),
+    token: connection?.token ?? null,
     initialCursor: connection.last_cursor,
     signal: streamAbort.signal,
     onState: (state) => { el.stream.textContent = `stream ${state.phase}${state.delay_ms ? ` ${state.delay_ms / 1000}s` : ''}`; },
@@ -272,27 +337,45 @@ function node(tag, className, text) {
   return node;
 }
 
-function previewNodes(baseUrl) {
-  const preview = previews[baseUrl];
+/**
+ * What an operator is actually choosing between: which daemon, how long it has
+ * been up, and what work it holds. Persistence counters are diagnostics and stay
+ * out of the headline - leading with "1857 writes" means nothing to a person.
+ */
+function previewNodes(daemon) {
+  const preview = daemon?.preview ?? previews[daemon?.baseUrl];
   if (!preview) return [node('p', 'sp-preview pending', 'reading what this daemon holds…')];
-  const stats = node('p', 'sp-preview');
-  const add = (label, value, warn) => {
-    const span = node('span', warn ? 'warn' : null);
+  const facts = node('p', 'sp-preview');
+  const add = (value, label) => {
+    const span = node('span');
     span.append(node('b', null, String(value)), document.createTextNode(` ${label}`));
-    stats.append(span);
+    facts.append(span);
   };
-  add('writes', preview.batches ?? '—');
-  add('failures', preview.failures ?? '—', (preview.failures ?? 0) > 0);
-  add('projects', preview.projectCount ?? '—');
-  const nodes = [stats];
-  if (preview.projects?.length) nodes.push(node('p', 'sp-names', preview.projects.join(' · ')));
+  if (preview.version) add(preview.version, 'version');
+  if (preview.uptimeMs != null) add(`${Math.max(1, Math.round(preview.uptimeMs / 60000))}m`, 'up');
+  const nodes = [facts];
+  if (preview.projects?.length) {
+    nodes.push(node('p', 'sp-names', preview.projects.join(' · ')));
+  } else if (preview.projectSelectionRequired) {
+    nodes.push(node('p', 'sp-names', 'No project chosen yet — pick one to scope this workforce.'));
+  }
+  if ((preview.failures ?? 0) > 0) nodes.push(node('p', 'sp-names warn', `${preview.failures} write failure(s) reported`));
+  if ((daemon?.addresses?.length ?? 0) > 1) {
+    nodes.push(node('p', 'sp-names', `Reachable at ${daemon.addresses.length} addresses`));
+  }
   return nodes;
 }
 
 function renderConnection() {
-  el.pairSection.hidden = false;
+  // Once a daemon is attached, the panel shows the workforce interface. The
+  // connection surface belongs to first run and to Disconnect - it must never
+  // take the surface back from a working panel (operator requirement 2026-09-27).
+  el.pairSection.hidden = Boolean(connection);
   const body = el.connectBody;
   body.replaceChildren();
+  if (connection && discoveryState.state !== 'connected') {
+    discoveryState = { ...discoveryState, state: 'connected', baseUrl: connection.base_url, alive: true };
+  }
 
   if (discoveryState.state === 'connected') {
     const live = node('p', 'sp-live');
@@ -302,13 +385,14 @@ function renderConnection() {
     if (preview) {
       const line = node('p', 'sp-telemetry');
       const b = (v) => node('b', null, String(v));
-      line.append(b(preview.batches ?? '—'), document.createTextNode(' writes · '), b(preview.failures ?? '—'),
-        document.createTextNode(' failures · '), b(preview.projectCount ?? '—'), document.createTextNode(' projects'));
+      if (preview.version) line.append(b(preview.version), document.createTextNode(' · '));
+      if (preview.uptimeMs != null) line.append(b(`${Math.max(1, Math.round(preview.uptimeMs / 60000))}m`), document.createTextNode(' up · '));
+      line.append(preview.projects?.length ? preview.projects.join(' · ') : 'no project chosen yet');
       body.append(line);
     }
     const disconnect = node('button', 'btn btn-quiet', 'Disconnect');
     disconnect.type = 'button';
-    disconnect.addEventListener('click', disconnectFromDaemon);
+    disconnect.addEventListener('click', () => guard('Disconnect', disconnectFromDaemon));
     body.append(disconnect);
     return;
   }
@@ -323,8 +407,8 @@ function renderConnection() {
       head2.append(node('span', 'sp-kind', daemon.kindLabel), node('code', null, daemon.baseUrl));
       const button = node('button', `btn${daemon.baseUrl === discoveryState.baseUrl ? ' btn-primary' : ''}`, 'Connect');
       button.type = 'button';
-      button.addEventListener('click', () => connectDaemon(daemon.baseUrl));
-      item.append(head2, ...previewNodes(daemon.baseUrl), button);
+      button.addEventListener('click', () => guard('Connect', () => connectDaemon(daemon.baseUrl)));
+      item.append(head2, ...previewNodes(daemon), button);
       list.append(item);
     }
     body.append(head, list);
@@ -350,7 +434,7 @@ function renderConnection() {
   );
   const again = node('button', 'btn', 'Look again');
   again.type = 'button';
-  again.addEventListener('click', () => discover({}));
+  again.addEventListener('click', () => guard('Look again', () => discover({})));
   body.append(again);
 }
 
@@ -548,14 +632,25 @@ Promise.all([listNotifications(), listAuditRecords()])
   .then(([items, audits]) => { notifications = items; auditRecords = audits; renderVerified(); renderAudit(); })
   .catch(() => { renderVerified(); renderAudit(); });
 
+el.buildStamp && (el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committedAt ? ` · ${BUILD.committedAt.slice(0, 10)}` : ''}`);
+
 // The panel discovers first, then adopts any stored connection, so the surface
 // is alive from the moment it opens.
 (async () => {
-  await discover({});
+  clearSurfaceError();
+  // Adopt any stored connection FIRST: a returning panel goes straight to work.
   await loadConnectionOptions().catch((error) => setStatus(el.status, 'degraded', safeError(error)));
   if (connection) {
     discoveryState = { ...discoveryState, state: 'connected', baseUrl: connection.base_url, alive: true };
     renderConnection();
     loadPreview(connection.base_url);
+    stopHeartbeat?.();
+    stopHeartbeat = watchLiveness(connection.base_url, (beat) => {
+      discoveryState = { ...discoveryState, alive: beat.ok };
+      if (beat.ok) loadPreview(connection.base_url);
+    });
+  } else {
+    // First run on this device: discover in the open.
+    await guard('Discovery', () => discover({}));
   }
 })();

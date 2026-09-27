@@ -16,6 +16,21 @@ import {
 } from './lib/discovery.mjs';
 import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaemonOrigin } from './lib/validation.mjs';
 import { saveLocalEnvironment } from './lib/storage.mjs';
+import { BUILD } from './lib/build-info.mjs';
+
+/** Run an interaction and show any failure IN the surface. */
+async function guard(label, work) {
+  try { await work(); } catch (error) { showSurfaceError(`${label} failed: ${String(error?.message ?? error).slice(0, 160)}`); }
+}
+
+function showSurfaceError(message) {
+  el.surfaceError.textContent = message;
+  el.surfaceError.hidden = false;
+}
+
+window.addEventListener('unhandledrejection', (event) => {
+  showSurfaceError(`Something did not finish: ${String(event.reason?.message ?? event.reason).slice(0, 160)}`);
+});
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -49,6 +64,8 @@ const el = {
   seedInput: $('#start-seed-input'),
   seedNote: $('#start-seed-note'),
   telemetry: $('#start-telemetry'),
+  buildStamp: $('#build-stamp'),
+  surfaceError: $('#surface-error'),
   publicDate: $('#public-date'),
   publicMission: $('#public-mission'),
   publicWorkforce: $('#public-workforce'),
@@ -87,7 +104,15 @@ function setFreshness(state, text) {
    The Start Page is the calmest face, but it is not inert: it discovers
    automatically, previews each daemon with that daemon's own reported
    liveness, and keeps a heartbeat running so freshness is a live fact. */
-let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [] };
+let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [], known: [] };
+
+/** Daemons this browser has used before, so an absence is explained, not silent. */
+async function readKnownDaemons() {
+  try {
+    const raw = (await chrome.storage.local.get('focusa.workforce.discovered.v1'))['focusa.workforce.discovered.v1'];
+    return Array.isArray(raw) ? raw.slice(0, 6) : [];
+  } catch { return []; }
+}
 let previews = {};
 let stopHeartbeat = null;
 
@@ -110,11 +135,18 @@ function renderDiscovery() {
     el.connect.innerHTML = `
       <ul class="sp-daemons">
         ${discoveryState.daemons.map((daemon) => {
-          const preview = previews[daemon.baseUrl];
+          const preview = daemon.preview ?? previews[daemon.baseUrl];
           const lead = daemon.baseUrl === discoveryState.baseUrl;
+          // Lead with what a person chooses between: which daemon, how long it
+          // has been up, what work it holds. Write counters are diagnostics.
           const stats = preview
-            ? `<p class="sp-preview"><span><b>${preview.batches ?? '—'}</b> writes</span><span class="${(preview.failures ?? 0) > 0 ? 'warn' : ''}"><b>${preview.failures ?? '—'}</b> failures</span><span><b>${preview.projectCount ?? '—'}</b> projects</span></p>
-               ${preview.projects?.length ? `<p class="sp-names">${preview.projects.join(' · ')}</p>` : ''}`
+            ? `<p class="sp-preview">${preview.version ? `<span><b>${preview.version}</b> version</span>` : ''}${preview.uptimeMs != null ? `<span><b>${Math.max(1, Math.round(preview.uptimeMs / 60000))}m</b> up</span>` : ''}</p>
+               ${preview.projects?.length
+                 ? `<p class="sp-names">${preview.projects.join(' · ')}</p>`
+                 : preview.projectSelectionRequired
+                   ? '<p class="sp-names">No project chosen yet — pick one to scope this workforce.</p>' : ''}
+               ${(daemon.addresses?.length ?? 0) > 1 ? `<p class="sp-names">Reachable at ${daemon.addresses.length} addresses</p>` : ''}
+               ${(preview.failures ?? 0) > 0 ? `<p class="sp-names warn">${preview.failures} write failure(s) reported</p>` : ''}`
             : '<p class="sp-preview pending">reading what this daemon holds…</p>';
           return `<li class="sp-daemon${lead ? ' lead' : ''}">
             <div class="sp-dhead"><span class="sp-kind">${daemon.kindLabel}</span><code>${daemon.baseUrl}</code></div>
@@ -124,12 +156,23 @@ function renderDiscovery() {
         }).join('')}
       </ul>`;
     el.connect.querySelectorAll('[data-connect]').forEach((button) => {
-      button.addEventListener('click', () => connect(button.dataset.connect));
+      button.addEventListener('click', () => guard('Connect', () => connect(button.dataset.connect)));
     });
     return;
   }
   if (discoveryState.state === 'none') {
-    el.connect.innerHTML = `<p class="sp-empty-line">No Focusa daemon answered on loopback, this device's bridges or the tailnet.</p>`;
+    const remembered = (discoveryState.known ?? []);
+    el.connect.innerHTML = `<p class="sp-empty-line">No Focusa daemon answered on loopback, this device's bridges or the tailnet.</p>`
+      + (remembered.length
+        ? `<ul class="sp-daemons">${remembered.map((item) => `<li class="sp-daemon dim">
+            <div class="sp-dhead"><span class="sp-kind">Known</span><code>${item.baseUrl}</code></div>
+            <p class="sp-names">Not answering right now. It will be tried again next time you open this tab.</p>
+            <button type="button" class="sp-btn" data-connect="${item.baseUrl}">Try again</button>
+          </li>`).join('')}</ul>`
+        : '');
+    el.connect.querySelectorAll('[data-connect]').forEach((button) => {
+      button.addEventListener('click', () => guard('Connect', () => connect(button.dataset.connect)));
+    });
     return;
   }
   const answered = new Set((discoveryState.answers ?? []).filter((a) => a.ok).map((a) => new URL(a.baseUrl).hostname));
@@ -162,7 +205,12 @@ async function discover({ extra = [] } = {}) {
     extra,
     onAnswer: (answer) => { discoveryState.answers = [...discoveryState.answers, answer]; renderDiscovery(); },
   });
-  if (!found.length) { discoveryState = { state: 'none', daemons: [], answers }; renderDiscovery(); return; }
+  if (!found.length) {
+    const remembered = await readKnownDaemons();
+    discoveryState = { state: 'none', daemons: [], answers, known: remembered };
+    renderDiscovery();
+    return;
+  }
   discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
   renderDiscovery();
   for (const daemon of found) loadPreview(daemon.baseUrl);
@@ -212,7 +260,7 @@ async function disconnect() {
 }
 
 el.connect?.addEventListener('click', (event) => {
-  if (event.target?.id === 'start-disconnect') disconnect();
+  if (event.target?.id === 'start-disconnect') guard('Disconnect', disconnect);
 });
 el.seedForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -331,8 +379,11 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
   notifications = await listNotifications().catch(() => []);
   // Discovery runs first so the face is alive immediately, then any stored
   // connection is adopted.
-  await discover({});
+  if (el.buildStamp) el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committedAt ? ` · ${BUILD.committedAt.slice(0, 10)}` : ''}`;
+  // A returning tab goes straight to the workforce interface; discovery is for
+  // first run (operator requirement 2026-09-27: auto-load after initial connect).
   const connected = await loadSelectedConnection();
+  if (!connected) await guard('Discovery', () => discover({}));
   if (connected) {
     await refresh();
     startStream();

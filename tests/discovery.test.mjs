@@ -189,18 +189,33 @@ test('a daemon previews what it actually holds, before connecting', async () => 
     fetchImpl: async (url) => {
       const path = new URL(String(url)).pathname;
       if (path === '/v1/health') {
-        return new Response(JSON.stringify({ ok: true, daemon: { pid: 330 }, persistence: { batches_total: 1675, failures_total: 0, queue_depth: 0, last_write_duration_ms: 8 } }), { status: 200 });
+        return new Response(JSON.stringify({ ok: true, version: '0.9.194-dev', uptime_ms: 93000000, daemon: { pid: 330, start_token: 'start-token-1' }, persistence: { batches_total: 1675, failures_total: 0, queue_depth: 0, last_write_duration_ms: 8 } }), { status: 200 });
       }
       return new Response(JSON.stringify({ project_count: 2, projects: [{ canonical_name: 'focusa-workforce-extension' }, { canonical_name: 'veragensia' }] }), { status: 200 });
     },
   });
   assert.equal(preview.alive, true);
   assert.equal(preview.pid, 330);
-  assert.equal(preview.batches, 1675);
+  assert.equal(preview.batches, 1675, 'persistence counters stay available as diagnostics');
   assert.equal(preview.failures, 0);
-  assert.equal(preview.projectCount, 2);
   assert.deepEqual(preview.projects, ['focusa-workforce-extension', 'veragensia']);
+  // Identity is what lets one daemon be shown once, however many addresses reach it.
+  assert.equal(preview.identity, 'start-token-1');
   assert.equal(preview.degraded, false);
+});
+
+test('a daemon with no project chosen says so, instead of claiming zero projects', async () => {
+  const { previewDaemon } = await import('../src/lib/discovery.mjs');
+  const preview = await previewDaemon({
+    baseUrl: 'http://100.64.1.9:8787',
+    fetchImpl: async (url) => (new URL(String(url)).pathname === '/v1/health'
+      ? new Response(JSON.stringify({ ok: true, version: '0.9.194-dev', uptime_ms: 93000000, daemon: { pid: 7, start_token: 'tok' } }), { status: 200 })
+      : new Response(JSON.stringify({ failure_class: 'project_root_selection_required', project_count: 0, projects: [] }), { status: 200 })),
+  });
+  assert.equal(preview.projectSelectionRequired, true);
+  assert.deepEqual(preview.projects, []);
+  assert.equal(preview.version, '0.9.194-dev');
+  assert.ok(preview.uptimeMs > 0);
 });
 
 test('a preview degrades honestly when only health answers', async () => {
@@ -213,7 +228,7 @@ test('a preview degrades honestly when only health answers', async () => {
   });
   assert.equal(preview.alive, true);
   assert.equal(preview.projectListKnown, false, 'an unreadable project list is not invented');
-  assert.equal(preview.projectCount, null);
+  assert.deepEqual(preview.projects, []);
   assert.equal(preview.degraded, true, 'reported failures are surfaced, not hidden');
 });
 

@@ -102,3 +102,36 @@ test('every click handler in a shipped surface points at a declared function', a
   }
   assert.deepEqual(problems, [], 'every click handler must resolve');
 });
+
+test('the package carries a real build identity the operator can see', async (t) => {
+  await t.test('preparing the build', () => {
+    const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+  });
+  const stamp = await readFile(resolve(dist, 'lib', 'build-info.mjs'), 'utf8');
+  // Not the development default: a stale module in a browser is diagnosable.
+  assert.match(stamp, /sha: "[0-9a-f]{7,}"/, 'the packaged build names its commit');
+  assert.doesNotMatch(stamp, /sha: "dev"/, 'the development default is never shipped');
+  // Commit identity, so the build stays byte-deterministic (tests/build.test.mjs).
+  assert.match(stamp, /committedAt: "\d{4}-\d{2}-\d{2}T/, 'the packaged build carries its commit date');
+
+  // and every plain surface shows it in footer/advanced meta (docs/17 §4)
+  for (const [file, marker] of [['sidepanel.mjs', 'build-stamp'], ['startpage.mjs', 'build-stamp']]) {
+    const source = await readFile(resolve(dist, file), 'utf8');
+    assert.match(source, /BUILD/, `${file} imports the build identity`);
+    assert.match(source, new RegExp(marker), `${file} shows it`);
+  }
+});
+
+test('a failing interaction is shown in the surface, not only in the console', async (t) => {
+  await t.test('preparing the build', () => {
+    const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+  });
+  for (const file of ['sidepanel.mjs', 'startpage.mjs']) {
+    const source = await readFile(resolve(dist, file), 'utf8');
+    assert.match(source, /unhandledrejection/, `${file} surfaces unhandled rejections`);
+    assert.match(source, /async function guard\(/, `${file} guards its interactions`);
+    assert.match(source, /showSurfaceError/, `${file} shows the failure in the surface`);
+  }
+});

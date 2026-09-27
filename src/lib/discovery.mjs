@@ -266,18 +266,26 @@ export async function previewDaemon({ baseUrl, fetchImpl = globalThis.fetch, tim
   const daemon = health?.daemon ?? null;
   const persistence = health?.persistence ?? null;
   const list = Array.isArray(projects?.projects) ? projects.projects : null;
+  const effective = projects?.effective_project ?? null;
   return Object.freeze({
     baseUrl,
     alive: health?.ok === true || Boolean(daemon),
+    // Identity: one daemon process, however many addresses reach it.
+    identity: daemon?.start_token ?? null,
+    version: health?.version ?? null,
+    uptimeMs: health?.uptime_ms ?? null,
     pid: daemon?.pid ?? null,
+    // What it actually holds, stated plainly.
+    projects: Object.freeze((list ?? []).slice(0, 6).map((p) => p?.canonical_name ?? p?.project_id ?? p?.project_root ?? 'project')),
+    activeProject: effective?.canonical_name ?? effective?.project_root ?? null,
+    projectSelectionRequired: projects?.failure_class === 'project_root_selection_required' || (!list?.length && !effective),
+    projectListKnown: list !== null,
+    // Diagnostics, deliberately secondary: these are not what an operator is
+    // choosing between, so they never lead the card.
     batches: persistence?.batches_total ?? null,
     failures: persistence?.failures_total ?? null,
     queueDepth: persistence?.queue_depth ?? null,
-    lastWriteMs: persistence?.last_write_duration_ms ?? null,
-    projectCount: projects?.project_count ?? list?.length ?? null,
-    projects: Object.freeze((list ?? []).slice(0, 6).map((p) => p?.canonical_name ?? p?.project_id ?? p?.project_root ?? 'project')),
-    projectListKnown: list !== null,
-    degraded: projects?.runtime?.degraded === true || health?.persistence?.failures_total > 0,
+    degraded: projects?.runtime?.degraded === true || (persistence?.failures_total ?? 0) > 0,
   });
 }
 
@@ -334,6 +342,30 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
  */
 export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {
   const { found, answers } = await discoverDaemon(chromeApi, { fetchImpl, timeoutMs, extra, onAnswer });
+  // Preview each daemon so two addresses of ONE process can be recognised.
+  await Promise.all(found.map(async (daemon) => {
+    if (daemon.preview) return;
+    const preview = await previewDaemon({ baseUrl: daemon.baseUrl, fetchImpl });
+    daemon.preview = preview;
+    daemon.identity = preview.identity ?? null;
+  }));
+  // One row per daemon, not per address: the same process reached over loopback
+  // and over this device's bridge is a single choice, and saying otherwise
+  // ("This browser" and "This device" with the same numbers) means nothing.
+  const byIdentity = new Map();
+  for (const daemon of found) {
+    const key = daemon.identity ?? daemon.baseUrl;
+    const existing = byIdentity.get(key);
+    if (!existing) { byIdentity.set(key, { ...daemon, addresses: [daemon.baseUrl] }); continue; }
+    existing.addresses.push(daemon.baseUrl);
+    // Keep the friendliest address as the one we attach to.
+    if (daemon.baseUrl.startsWith('http://127.0.0.1') || daemon.baseUrl.startsWith('http://localhost')) {
+      existing.baseUrl = daemon.baseUrl;
+    }
+  }
+  const unique = [...byIdentity.values()].map((daemon) => ({ ...daemon, kindLabel: daemon.preview?.activeProject ? `${daemon.kindLabel} · ${daemon.preview.activeProject}` : daemon.kindLabel }));
+  found.length = 0;
+  found.push(...unique);
   let paired = [];
   try {
     const { listConnections } = await import('./storage.mjs');

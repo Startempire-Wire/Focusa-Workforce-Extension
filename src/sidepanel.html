@@ -141,7 +141,11 @@
   <footer class="sp-footer">
     <button id="open-workforce" type="button" class="btn btn-primary">Open Workforce</button>
     <button id="watch-uiai" type="button" class="btn">Watch UIAI</button>
+    <p id="build-stamp" class="sp-stamp" title="Which build this panel is running"></p>
   </footer>
+  <!-- A failure in this surface must be visible in the surface, not only in the
+       developer console (docs/17 §19: states replace regions, never hide). -->
+  <p id="surface-error" class="sp-error" role="alert" hidden></p>
 
   <script type="module" src="sidepanel.mjs"></script>
 </body>
