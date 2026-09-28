@@ -39,7 +39,10 @@ const CACHE_TTL_MS = 60_000;
 let memo = null;
 let memoAt = 0;
 
-function fresh(memoAt) { return memoAt > 0 && Date.now() - memoAt < CACHE_TTL_MS && memo; }
+function fresh(since) { return since > 0 && Date.now() - since < CACHE_TTL_MS && memo; }
+
+/** Clear the remembered tailnet (used by tests and by an explicit refresh). */
+export function resetTailnetCache() { memo = null; memoAt = 0; }
 
 function remember(topology) {
   if (!topology) return null;
@@ -166,7 +169,10 @@ function nameOf(peer) {
  *   null when the LocalAPI is not available here.
  */
 export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, timeoutMs = 2500, connectNative, force = false } = {}) {
-  if (!force) {
+  // The cache serves the ambient path only. A caller that names its source
+  // (connectNative: null for the LocalAPI path, or force) is asking a question
+  // about THAT source, and must not be answered from a previous read.
+  if (!force && connectNative === undefined) {
     const warm = fresh(memoAt);
     if (warm) return warm;
     const stored = await cachedFromStorage();

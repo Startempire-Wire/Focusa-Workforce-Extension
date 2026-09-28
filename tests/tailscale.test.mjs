@@ -70,7 +70,7 @@ test('choosing a tailnet machine proves a daemon is there before attaching', asy
   assert.deepEqual(peerOrigins(null), []);
 
   // an ungranted tailnet peer is offered, not probed
-  const roster = await tailnetRoster({}, { fetchImpl: jsonFetch(status) });
+  const roster = await tailnetRoster({}, { connectNative: null, fetchImpl: jsonFetch(status) });
   assert.equal(roster.peers.length, 4);
   assert.ok(roster.peers.every((p) => p.ips.length === 1), 'IPv4 only');
 });
