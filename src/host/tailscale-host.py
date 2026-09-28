@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
-Focusa Workforce — Tailscale native messaging host.
+Focusa Workforce — local host program (native messaging).
 
-Why this exists: tailscaled on this machine is reachable only through its unix
-socket (/var/run/tailscale/tailscaled.sock). The LocalAPI is not exposed on TCP,
-and a browser extension cannot open a unix socket. Native messaging is the
-supported bridge: Chrome starts this host, and the host asks the OS-level
-tailscale client who the tailnet is. No scanning, no guessing, no privileges the
-operator has not already given us, and it works on any machine where the
-extension and the tailscale CLI exist.
+A browser cannot open a unix socket or read this machine's interfaces, so the
+extension asks a program that can. This one answers two questions, read-only:
 
-Protocol: Chrome speaks length-prefixed JSON on stdin/stdout. We answer
-{"peers": [...], "self": {...}, "suffix": "...", "backend": "Running"} and
-never emit anything else on stdout (diagnostics go to stderr).
+  * who is on my tailnet  -> `tailscale status` (when the client is installed)
+  * what addresses am I   -> this machine's own IPv4 addresses
+
+Both are machine-specific by nature, which is exactly why they are read at
+RUNTIME rather than compiled into the product: one build then works on any
+computer. Nothing here is specific to any person, estate or network.
+
+Protocol: Chrome speaks length-prefixed JSON on stdin/stdout. Diagnostics go to
+stderr, never stdout.
 """
 import json
 import os
+import re
 import shutil
+import socket
 import subprocess
 import sys
 
@@ -60,20 +63,59 @@ def short_name(dns_name, host_name):
     return host_name or "peer"
 
 
+def local_ipv4_addresses():
+    """This machine's own IPv4 addresses, however it is networked.
+
+    Tried in order and merged: the OS interface list, then whatever the socket
+    layer reports. A machine behind a Crostini bridge, a VPN or a container
+    therefore reports those addresses without anyone hardcoding them.
+    """
+    found = set()
+    for command in (["ip", "-4", "-o", "addr", "show"],
+                     ["ifconfig", "-a"]):
+        binary = shutil.which(command[0])
+        if not binary:
+            continue
+        try:
+            completed = subprocess.run([binary, *command[1:]], capture_output=True,
+                                       timeout=4, check=False)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        text = completed.stdout.decode("utf-8", "replace")
+        if command[0] == "ip":
+            found.update(re.findall(r"inet (\d{1,3}(?:\.\d{1,3}){3})", text))
+        else:
+            found.update(re.findall(r"inet (?:addr:)?(\d{1,3}(?:\.\d{1,3}){3})", text))
+        if found:
+            break
+    # A socket-based fallback for the address this machine answers on.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("192.0.2.1", 9))          # TEST-NET-1: no packet is sent
+        found.add(probe.getsockname()[0])
+    except OSError:
+        pass
+    finally:
+        probe.close()
+    return sorted(ip for ip in found if not ip.startswith("127."))
+
+
 def read_tailnet():
+    result = {"localAddresses": local_ipv4_addresses(), "self": None, "peers": [],
+              "suffix": None, "backend": None, "tailnet": False}
     try:
         completed = subprocess.run(
             [tailscale_binary(), "status", "--json"],
             capture_output=True, timeout=TIMEOUT_SECONDS, check=False,
         )
-    except (OSError, subprocess.SubprocessError) as error:
-        return {"error": f"tailscale unavailable: {error.__class__.__name__}"}
+    except (OSError, subprocess.SubprocessError):
+        return result  # no tailscale here: still report this machine's addresses
     if completed.returncode != 0:
-        return {"error": "tailscale status failed"}
+        return result
     try:
         body = json.loads(completed.stdout.decode("utf-8", "replace"))
     except ValueError:
-        return {"error": "tailscale status was not JSON"}
+        return result
 
     peers = []
     for peer in (body.get("Peer") or {}).values():
@@ -89,7 +131,8 @@ def read_tailnet():
             "os": peer.get("OS"),
         })
     peers.sort(key=lambda item: (not item["online"], item["name"]))
-    return {
+    result.update({
+        "tailnet": True,
         "self": {
             "id": (body.get("Self") or {}).get("ID"),
             "name": short_name((body.get("Self") or {}).get("DNSName"), (body.get("Self") or {}).get("HostName")),
@@ -98,7 +141,8 @@ def read_tailnet():
         "peers": peers,
         "suffix": body.get("MagicDNSSuffix"),
         "backend": body.get("BackendState"),
-    }
+    })
+    return result
 
 
 def main():

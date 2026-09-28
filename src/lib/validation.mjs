@@ -1,8 +1,8 @@
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
-// Crostini local daemon bridge: the browser's loopback namespace is ChromeOS's,
-// so this device's crosvm veth carries the (loopback-origin) daemon to the
-// browser.
-const LOCAL_BRIDGE_HOSTS = new Set(['100.115.92.26']);
+// A machine may bridge its own daemon onto one of its own addresses (a
+// container bridge, a VPN, a second interface). Those addresses are reported at
+// runtime by the local host program, so nothing about a specific layout is
+// compiled in; the rule below stays purely structural.
 
 /**
  * HTTP is permitted only on this machine and on the tailnet. Tailscale's CGNAT
@@ -25,7 +25,7 @@ function isTailnetHost(hostname) {
  */
 export function isLocalDaemonHost(hostname) {
   if (typeof hostname !== 'string') return false;
-  if (LOOPBACK_HOSTS.has(hostname) || LOCAL_BRIDGE_HOSTS.has(hostname)) return true;
+  if (LOOPBACK_HOSTS.has(hostname)) return true;
   return isTailnetHost(hostname);
 }
 

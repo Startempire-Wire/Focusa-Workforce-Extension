@@ -2,7 +2,7 @@
  * UIAI Engine client (MLG-6.1/6.3.5) — governed bridge for browser sessions.
  *
  * The uiai-engine runs on loopback 7456; the extension reaches it through the
- * socat bridge at 100.115.92.26:7456 (host permission granted). Contract
+ * local bridge on a loopback-reachable port (host permission granted). Contract
  * verified against the live engine config 2026-09-27:
  *   /health              GET  -> {status:'healthy',service:'uiai-engine',...}
  *   /v1/sessions         POST -> create browser session
@@ -16,7 +16,13 @@
  */
 import { normalizeDaemonOrigin } from './validation.mjs';
 
-const UIAI_ORIGIN = 'http://100.115.92.26:7456';
+/**
+ * The UIAI engine on this machine. Its address is whatever this computer
+ * reports (loopback first, then the machine's own addresses) - resolved at
+ * runtime, so the build is not tied to one network layout.
+ */
+const UIAI_PORT = 7456;
+const UIAI_CANDIDATES = Object.freeze([`http://127.0.0.1:${UIAI_PORT}`, `http://localhost:${UIAI_PORT}`]);
 
 export class UiaiError extends Error {
   constructor(kind, message, status = null, details = null) {
@@ -41,6 +47,20 @@ export async function setUiaiToken(chromeApi, token) {
   await chromeApi.storage.local.set({ [TOKEN_KEY]: token.trim() });
 }
 
+/** The first UIAI candidate that answers, remembered for the session. */
+let resolved = null;
+function origin() { return resolved ?? UIAI_CANDIDATES[0]; }
+async function resolveOrigin(fetchImpl = globalThis.fetch) {
+  if (resolved) return resolved;
+  for (const candidate of UIAI_CANDIDATES) {
+    try {
+      const response = await fetchImpl(new URL('/health', candidate), { method: 'GET', cache: 'no-store' });
+      if (response.ok) { resolved = candidate; return candidate; }
+    } catch { /* try the next */ }
+  }
+  return origin();
+}
+
 function headers(token) {
   return {
     accept: 'application/json',
@@ -52,7 +72,7 @@ function headers(token) {
 /** Probe the bridge + engine health. Returns {ok, reachable, healthy, body?} */
 export async function probeUiaiBridge(fetchImpl = globalThis.fetch) {
   try {
-    const response = await fetchImpl(new URL('/health', UIAI_ORIGIN), {
+    const response = await fetchImpl(new URL('/health', origin()), {
       method: 'GET', headers: { accept: 'application/json' },
     });
     if (!response.ok) return { ok: false, reachable: true, healthy: false, status: response.status };
@@ -70,7 +90,7 @@ export async function probeUiaiBridge(fetchImpl = globalThis.fetch) {
 export async function createUiaiSession({ chromeApi, profile = 'detect', model, provider }) {
   const token = await getUiaiToken(chromeApi);
   if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured — set it in Settings');
-  const response = await fetchImpl(new URL('/v1/sessions', UIAI_ORIGIN), {
+  const response = await fetchImpl(new URL('/v1/sessions', origin()), {
     method: 'POST', headers: headers(token),
     body: JSON.stringify({ profile, ...(model ? { model } : {}), ...(provider ? { provider } : {}) }),
   });
@@ -87,7 +107,7 @@ export async function createUiaiSession({ chromeApi, profile = 'detect', model, 
 export async function getUiaiSession({ chromeApi, sessionId }) {
   const token = await getUiaiToken(chromeApi);
   if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured');
-  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, UIAI_ORIGIN), {
+  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, origin()), {
     method: 'GET', headers: headers(token),
   });
   if (!response.ok) throw new UiaiError('rejected', 'session status failed', response.status);
@@ -98,7 +118,7 @@ export async function getUiaiSession({ chromeApi, sessionId }) {
 export async function getUiaiSessionDetail({ chromeApi, sessionId, fetchImpl = globalThis.fetch }) {
   const token = await getUiaiToken(chromeApi);
   if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured');
-  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, UIAI_ORIGIN), {
+  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, origin()), {
     method: 'GET', headers: headers(token),
   });
   if (!response.ok) throw new UiaiError('rejected', 'session detail failed', response.status);
@@ -109,7 +129,7 @@ export async function getUiaiSessionDetail({ chromeApi, sessionId, fetchImpl = g
 export async function closeUiaiSession({ chromeApi, sessionId }) {
   const token = await getUiaiToken(chromeApi);
   if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured');
-  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, UIAI_ORIGIN), {
+  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}`, origin()), {
     method: 'DELETE', headers: headers(token),
   });
   if (!response.ok) throw new UiaiError('rejected', 'session close failed', response.status);
@@ -120,7 +140,7 @@ export async function closeUiaiSession({ chromeApi, sessionId }) {
 export async function shareUiaiSession({ chromeApi, sessionId, minutes = 60 }) {
   const token = await getUiaiToken(chromeApi);
   if (!token) throw new UiaiError('unauthenticated', 'UIAI token not configured');
-  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}/share`, UIAI_ORIGIN), {
+  const response = await fetchImpl(new URL(`/v1/sessions/${sessionId}/share`, origin()), {
     method: 'POST', headers: headers(token),
     body: JSON.stringify({ expires_minutes: minutes }),
   });

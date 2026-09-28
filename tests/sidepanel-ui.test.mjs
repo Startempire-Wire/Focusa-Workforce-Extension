@@ -35,7 +35,7 @@ test('sidepanel follows the docs/17 §3 region order', async () => {
   // The panel's connection surface is alive: discovery, previews, heartbeat.
   assert.match(html, /id="connect-body"/);
   assert.match(script, /discoverDaemons|previewDaemon/);
-  assert.match(html, /name or address/);
+  assert.match(html, /host or address/);
 });
 
 test('sidepanel visual system supports responsive, light, and reduced-motion users', () => {

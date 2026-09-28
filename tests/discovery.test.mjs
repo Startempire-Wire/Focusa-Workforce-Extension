@@ -31,39 +31,63 @@ function chromeWith(storage = {}, { envs = [] } = {}) {
   };
 }
 
-const healthOk = (url) => async (input) => {
+// One daemon, answerable on any of its own aliases: the real daemon reports a
+// start_token, which is how two addresses of one process are recognised.
+const healthOk = () => async (input) => {
   const target = String(input);
-  if (target.includes('100.115.92.26')) {
-    return new Response(JSON.stringify({ status: 'healthy', service: 'focusa-daemon' }), { status: 200 });
+  if (target.startsWith('http://127.0.0.1:8787') || target.startsWith('http://localhost:8787')) {
+    return new Response(JSON.stringify({
+      status: 'healthy', service: 'focusa-daemon',
+      daemon: { pid: 330, start_token: 'local-daemon-token' },
+      persistence: { batches_total: 1675, failures_total: 0 },
+    }), { status: 200 });
   }
   return new Response('', { status: 404 });
 };
 
-test('device candidates cover loopback, this device bridges and the tailnet node', () => {
+test('only loopback is compiled in; everything else is discovered', () => {
+  // Portability: a build that hardcoded one machine's bridges or tailnet node
+  // would work on exactly that computer.
   const joined = DEVICE_CANDIDATES.join(' ');
   assert.match(joined, /127\.0\.0\.1/, 'browser loopback');
   assert.match(joined, /localhost/, 'loopback by name');
   assert.match(joined, /\[::1\]/, 'IPv6 loopback');
-  assert.match(joined, /100\.115\.92\.26/, 'crosvm veth bridge');
-  assert.match(joined, /100\.127\.113\.90/, 'this device on the tailnet');
+  assert.doesNotMatch(joined, /100\.\d+/, 'no hardcoded non-loopback address');
+  assert.doesNotMatch(joined, /ts\.net|kh|ovh/i, 'no hardcoded host name');
 });
 
-test('known tailnet hosts are probed before this machine, and never duplicated', async () => {
-  const chromeApi = chromeWith({ [TOKEN_KEY]: [{ baseUrl: 'http://100.64.9.9:8787' }, { baseUrl: 'http://127.0.0.1:8787' }] });
+test("this machine's own addresses come from the machine, not the build", async () => {
+  const { classifyBaseUrl } = await import('../src/lib/discovery.mjs');
+  // Whatever the host program reports is "this device" - on any machine.
+  assert.equal(classifyBaseUrl('http://10.1.2.3:8787', { localAddresses: ['10.1.2.3'] }), 'device');
+  assert.equal(classifyBaseUrl('http://10.1.2.3:8787', { localAddresses: [] }), 'remote');
+  assert.equal(classifyBaseUrl('http://127.0.0.1:8787', { localAddresses: [] }), 'loopback');
+});
+
+test('hosts the operator knows are probed before this machine, never duplicated', async () => {
+  // A host book is RUNTIME data: an operator (or a paired daemon) adds hosts.
+  // Nothing about anyone's estate is compiled into the product.
+  const { addHost } = await import('../src/lib/host-book.mjs');
+  const chromeApi = chromeWith({ [TOKEN_KEY]: [{ baseUrl: 'http://100.64.9.9:8787' }] });
+  await addHost(chromeApi, { host: 'daemon.example.internal', label: 'workhorse' });
   const candidates = await discoveryCandidates(chromeApi);
-  // Remote discovery is over the tailnet, and it leads: the authoritative daemon
-  // is a tailnet host, so the book is probed first (operator direction 2026-09-27).
-  const bookAt = candidates.findIndex((c) => c.startsWith('http://kh:'));
+  const bookAt = candidates.findIndex((c) => c.includes('workhorse') || c.includes('daemon.example.internal'));
   const localAt = candidates.findIndex((c) => c.startsWith('http://127.0.0.1'));
-  assert.ok(bookAt >= 0, 'a known tailnet host is probed');
-  assert.ok(bookAt < localAt, 'tailnet hosts are probed before this machine');
+  assert.ok(bookAt >= 0, 'a known host is probed');
+  assert.ok(bookAt < localAt, 'known hosts are probed before this machine');
   assert.equal(new Set(candidates).size, candidates.length, 'no duplicate candidates');
-  assert.ok(candidates.includes('http://100.115.92.26:8787'), 'this device is still probed');
   assert.ok(candidates.includes('http://100.64.9.9:8787'), 'a learned daemon is still probed');
 });
 
+test('the host book ships empty, so the product is not one person\'s estate', async () => {
+  const { readHostBook, ESTATE_DEFAULTS } = await import('../src/lib/host-book.mjs');
+  assert.deepEqual(ESTATE_DEFAULTS, [], 'no estate is compiled in');
+  const fresh = await readHostBook(chromeWith());
+  assert.deepEqual(fresh, [], 'a new install knows no hosts until it learns some');
+});
+
 test('probe reports honestly and never throws for an unreachable origin', async () => {
-  const ok = await probeDaemon('http://100.115.92.26:8787', { fetchImpl: healthOk() });
+  const ok = await probeDaemon('http://127.0.0.1:8787', { fetchImpl: healthOk() });
   assert.equal(ok.ok, true);
   assert.equal(ok.service, 'focusa-daemon');
 
@@ -75,15 +99,18 @@ test('probe reports honestly and never throws for an unreachable origin', async 
 });
 
 test('discoverDaemon returns the first answering daemon and every answer', async () => {
-  const { discoveryCandidates } = await import('../src/lib/discovery.mjs');
+  const { discoverDaemons } = await import('../src/lib/discovery.mjs');
   const chromeApi = chromeWith();
-  const result = await discoverDaemon(chromeApi, { fetchImpl: healthOk() });
-  // The first ANSWERING candidate wins, and it may now be a tailnet host.
+  const result = await discoverDaemons(chromeApi, { connectNative: null, fetchImpl: healthOk() });
+  // The first ANSWERING candidate wins, whatever part of the environment it is.
   assert.equal(result.connected?.ok, true);
   assert.ok(result.answers.length >= DEVICE_CANDIDATES.length, 'every reachable candidate was probed');
-  assert.equal(result.answers.filter((a) => a.ok).length, 1, 'only the answering candidate reports ok');
-  assert.ok((await discoveryCandidates(chromeApi)).every((c) => result.answers.some((a) => a.baseUrl === c)
-    || true));
+  // 127.0.0.1 and localhost both answer and are ONE daemon. The operator sees
+  // one row with one address - the friendliest - not a duplicate per alias.
+  assert.equal(result.answers.filter((a) => a.ok).length, 2, 'both loopback aliases answered');
+  assert.equal(result.found.length, 1, 'and they are reported as one daemon');
+  assert.equal(result.connected?.baseUrl, 'http://127.0.0.1:8787', 'attached at the friendliest address');
+  assert.deepEqual(result.found[0].addresses, ['http://127.0.0.1:8787'], 'one address per daemon, not per alias');
 });
 
 test('discoverDaemon reports not-found honestly when nothing answers', async () => {
@@ -254,14 +281,10 @@ test('an unreachable daemon previews as not alive rather than throwing', async (
   assert.equal(preview.batches, null);
 });
 
-test('the host book is seeded with the estate and probed before this machine', async () => {
-  const { ESTATE_DEFAULTS, readHostBook, addHost, removeHost, originsForHost, hostBookCandidates } =
+test('an operator-added host joins every future discovery, and can be removed', async () => {
+  const { readHostBook, addHost, removeHost, originsForHost, hostBookCandidates } =
     await import('../src/lib/host-book.mjs');
-  assert.ok(ESTATE_DEFAULTS.length >= 1, 'the estate seeds known tailnet hosts');
-
   const chromeApi = chromeWith();
-  const initial = await readHostBook(chromeApi);
-  assert.ok(initial.some((e) => e.default), 'seeded entries are marked as defaults, not assertions');
 
   // One action, no wizard: the host joins every future discovery.
   await addHost(chromeApi, { host: '100.64.4.4:9999', label: 'KnownHost' });
@@ -298,16 +321,19 @@ test('an operator-added tailnet host may speak plain HTTP; nothing else may', as
 
 test('the authoritative parent is the daemon actually holding work', async () => {
   const { discoverDaemons } = await import('../src/lib/discovery.mjs');
-  const result = await discoverDaemons(chromeWith(), {
+  const { addHost } = await import('../src/lib/host-book.mjs');
+  const chromeApi = chromeWith();
+  await addHost(chromeApi, { host: '100.94.238.56', label: 'parent' });
+  const result = await discoverDaemons(chromeApi, {
     fetchImpl: async (url) => {
       const u = String(url);
-      if (u.includes('kh:8787/v1/health')) {
+      if (u.includes('100.94.238.56:8787/v1/health')) {
         return new Response(JSON.stringify({ ok: true, version: '0.9.194', uptime_ms: 9000000, daemon: { pid: 88, start_token: 'PARENT' }, persistence: { batches_total: 90210, failures_total: 0 } }), { status: 200 });
       }
-      if (u.includes('kh:8787/v1/project/list')) {
+      if (u.includes('100.94.238.56:8787/v1/project/list')) {
         return new Response(JSON.stringify({ project_count: 3, projects: [{ canonical_name: 'Veragensia' }] }), { status: 200 });
       }
-      if (u.includes('kh:8787/v1/silent-sessions')) {
+      if (u.includes('100.94.238.56:8787/v1/silent-sessions')) {
         return new Response(JSON.stringify({ data: { sessions: [{ session_id: 'a' }, { session_id: 'b' }] } }), { status: 200 });
       }
       if (u.includes('127.0.0.1:8787/v1/health')) {
@@ -320,8 +346,8 @@ test('the authoritative parent is the daemon actually holding work', async () =>
     },
   });
   const parent = result.found.find((d) => d.authoritative);
-  assert.equal(parent?.label, 'kh', 'the tailnet daemon holding work is the authoritative parent');
-  assert.equal(result.found[0].baseUrl, 'http://kh:8787', 'and it leads the list');
+  assert.equal(parent?.label, 'parent', 'the daemon holding work is the authoritative parent');
+  assert.equal(result.found[0].baseUrl, 'http://100.94.238.56:8787', 'and it leads the list');
   const local = result.found.find((d) => d.baseUrl === 'http://127.0.0.1:8787');
   assert.equal(local?.authoritative, false, 'this machine holding nothing is not the parent');
 });

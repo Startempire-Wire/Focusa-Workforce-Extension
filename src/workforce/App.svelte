@@ -19,7 +19,6 @@
   import ConnectionStrip from './components/ConnectionStrip.svelte';
   import { buildRoute, navItemForRoute, parseRoute, ROUTES, INTENTS } from './lib/router.js';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
-  import { localDaemonCandidates } from './lib/local-daemon.js';
   import { hasDaemonOriginPermission } from '../lib/validation.mjs';
   import { groupRoster } from './lib/roster-groups.js';
   import { evidenceBuckets } from './lib/evidence-buckets.js';
@@ -95,7 +94,7 @@
     const answered = new Map(answers.map((a) => [a.baseUrl, a]));
     const pick = (urls) => urls.map((url) => ({ url, ok: answered.get(url)?.ok === true }));
     return [
-      { label: 'This device', urls: ['http://100.115.92.26:8787', 'http://100.127.113.90:8787'] },
+      { label: 'This device', urls: (store.tailnet?.self?.ips ?? []).map((ip) => `http://${ip}:8787`) },
       { label: 'Loopback', urls: ['http://127.0.0.1:8787', 'http://localhost:8787', 'http://[::1]:8787'] },
     ].map((place) => ({ label: place.label, ok: pick(place.urls).some((u) => u.ok) }));
   });
@@ -1094,7 +1093,7 @@
           {:else if settingsSection === 'uiai'}
             <section class="set-group">
               <h3><Icon name="browser" size={15} /> UIAI Engine</h3>
-              <p class="muted tiny">Browser execution body at <code>http://100.115.92.26:7456</code> (bridged from loopback).</p>
+              <p class="muted tiny">Browser execution body on this machine (loopback <code>:7456</code>, or a local bridge address it reports).</p>
               <div class="row">
                 <button type="button" class="wf-btn" onclick={() => store.checkUiai()} disabled={store.uiaiBusy}>Check engine</button>
                 {#if store.uiaiHealth}<span class="state-sig {store.uiaiHealth.healthy ? 'done' : 'waiting'}">{store.uiaiHealth.healthy ? 'healthy' : store.uiaiHealth.reachable ? 'degraded' : 'unreachable'}</span>{/if}

@@ -27,7 +27,11 @@ if ('content_scripts' in manifest) throw new Error('content scripts are forbidde
 // 100.94.238.56 / 100.69.132.82 are the estate's own tailnet nodes (AGENTS.md),
 // granted so the authoritative daemon connects with no prompt at all; any other
 // tailnet peer is discovered and granted on connect, one click, that origin only.
-const localOrigins = ['http://127.0.0.1/*', 'http://127.0.0.1:41112/*', 'http://localhost/*', 'http://100.115.92.26/*', 'http://100.115.92.26:7456/*', 'http://100.127.113.90/*', 'http://100.94.238.56/*', 'http://100.69.132.82/*'];
+// Loopback and the local host program's port ONLY. Nothing machine-specific is
+// compiled in: this build is installed on any computer, and every other origin
+// (local bridges, tailnet peers, remote daemons) is discovered at runtime and
+// granted per-origin when the operator connects to it.
+const localOrigins = ['http://127.0.0.1/*', 'http://127.0.0.1:41112/*', 'http://localhost/*'];
 if (JSON.stringify([...(manifest.host_permissions ?? [])].sort()) !== JSON.stringify([...localOrigins].sort())) {
   throw new Error(`host permissions must be exactly ${localOrigins.join(', ')} (local daemon origins only)`);
 }

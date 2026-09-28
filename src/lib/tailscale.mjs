@@ -103,7 +103,7 @@ export function readTailscaleNative({
     }
     port.onMessage.addListener((message) => {
       clearTimeout(timer);
-      if (message && message.peers) finish(normalizeTopology(message));
+      if (message && (message.peers || message.localAddresses)) finish(normalizeTopology(message));
       else finish(null);
     });
     port.onDisconnect.addListener(() => {
@@ -134,7 +134,11 @@ function normalizeTopology(body) {
   })).filter((peer) => peer.ips.length);
   peers.sort((a, b) => (Number(b.online) - Number(a.online)) || String(a.name).localeCompare(String(b.name)));
   const selfBody = body?.self ?? body?.Self ?? {};
+  const localAddresses = Array.isArray(body?.localAddresses)
+    ? body.localAddresses.filter((ip) => typeof ip === 'string' && !ip.includes(':'))
+    : [];
   return Object.freeze({
+    localAddresses: Object.freeze(localAddresses),
     self: Object.freeze({
       id: selfBody?.id ?? selfBody?.ID ?? null,
       name: ((selfBody?.dnsName ?? selfBody?.DNSName ?? '').split('.')[0] || selfBody?.name || selfBody?.HostName || null),
@@ -184,7 +188,7 @@ export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, time
   const native = await (connectNative === undefined
     ? readTailscaleNative()
     : readTailscaleNative({ connectNative })).catch(() => null);
-  if (native?.peers?.length || native?.self) return remember(native);
+  if (native?.peers?.length || native?.self || native?.localAddresses?.length) return remember(native);
   for (const url of LOCALAPI_CANDIDATES) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -29,14 +29,14 @@ const BOOK_KEY = 'focusa.workforce.host_book.v1';
 export const FOCUSA_PORTS = Object.freeze([8787, 8788, 8789, 18787]);
 
 /**
- * The estate's own tailnet nodes, from this project's operating contract
- * (AGENTS.md). These are defaults, not secrets: the operator can remove any of
- * them, and their presence only means "look here on the tailnet".
+ * Ships EMPTY, on purpose.
+ *
+ * A previous version seeded this with one estate's node names, which made the
+ * product specific to one person's machines - the opposite of portable. Nothing
+ * about who or where you run this is compiled in: hosts arrive from the tailnet
+ * itself, from the local host program, or from the addresses the operator adds.
  */
-export const ESTATE_DEFAULTS = Object.freeze([
-  Object.freeze({ host: 'kh', label: 'kh', note: 'estate default' }),
-  Object.freeze({ host: 'ovh', label: 'ovh', note: 'estate default' }),
-]);
+export const ESTATE_DEFAULTS = Object.freeze([]);
 
 function normalizeHost(value) {
   const raw = String(value ?? '').trim().toLowerCase();

@@ -37,12 +37,12 @@
     const answered = new Set((d.answers ?? []).filter((a) => a.ok).map((a) => new URL(a.baseUrl).hostname));
     return [
       { label: 'This browser', hosts: ['127.0.0.1', 'localhost', '[::1]'] },
-      { label: 'This device', hosts: ['100.115.92.26', '100.127.113.90'] },
+      { label: 'This device', hosts: store.tailnet?.self?.ips ?? [] },
       { label: 'Tailnet', hosts: null },
     ].map((place) => ({
       label: place.label,
       ok: place.hosts
-        ? place.hosts.some((host) => answered.has(host))
+        ? (place.hosts.length ? place.hosts.some((host) => answered.has(host)) : [...answered].some((host) => store.tailnet?.self?.ips?.includes(host)))
         : [...answered].some((host) => /^\d{1,3(\.\d{1,3}){3}$/.test(host) && host.startsWith('100.') && Number(host.split('.')[1]) >= 64 && Number(host.split('.')[1]) <= 127),
     }));
   });

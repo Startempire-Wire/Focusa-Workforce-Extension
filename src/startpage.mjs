@@ -283,7 +283,8 @@ let stopHeartbeat = null;
 
 const PLACES = [
   { label: 'This browser', hosts: ['127.0.0.1', 'localhost', '[::1]'] },
-  { label: 'This device', hosts: ['100.115.92.26', '100.127.113.90'] },
+  // whatever the machine itself reported, at runtime
+  { label: 'This device', hosts: [] },
   { label: 'Tailnet', hosts: null },
 ];
 const isTailnet = (host) => {

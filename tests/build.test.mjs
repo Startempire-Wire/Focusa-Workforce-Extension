@@ -55,14 +55,12 @@ test('manifest is least-privilege MV3 with no content script', async () => {
   // Local daemon origins are static so discovery is automatic (operator
   // requirement 2026-09-27): no wildcards, no remote hosts; remote pairing
   // keeps the optional host-permission flow.
+  // Portability: the shipped manifest grants loopback and the local host
+  // program ONLY. Every other origin is discovered at runtime and granted
+  // per-origin, so one build installs on any computer.
   assert.deepEqual([...manifest.host_permissions].sort(), [
-    'http://100.115.92.26/*',
-    'http://100.115.92.26:7456/*',
-    'http://100.127.113.90/*',
-    'http://100.69.132.82/*',   // estate tailnet node (ovh) - known host, no prompt
-    'http://100.94.238.56/*',   // estate tailnet node (kh) - the authoritative daemon
     'http://127.0.0.1/*',
-    'http://127.0.0.1:41112/*',   // Tailscale LocalAPI: how the tailnet is enumerated
+    'http://127.0.0.1:41112/*',
     'http://localhost/*',
   ]);
 });

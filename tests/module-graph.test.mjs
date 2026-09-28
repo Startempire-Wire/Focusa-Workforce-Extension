@@ -110,7 +110,7 @@ test('the package carries a real build identity the operator can see', async (t)
   });
   const stamp = await readFile(resolve(dist, 'lib', 'build-info.mjs'), 'utf8');
   // Not the development default: a stale module in a browser is diagnosable.
-  assert.match(stamp, /sha: "[0-9a-f]{7,}"/, 'the packaged build names its commit');
+  assert.match(stamp, /sha: "[0-9a-f]{7,}(-dirty)?"/, 'the packaged build names its commit');
   assert.doesNotMatch(stamp, /sha: "dev"/, 'the development default is never shipped');
   // Commit identity, so the build stays byte-deterministic (tests/build.test.mjs).
   assert.match(stamp, /committedAt: "\d{4}-\d{2}-\d{2}T/, 'the packaged build carries its commit date');

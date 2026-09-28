@@ -18,11 +18,11 @@
  * simply not there.
  *
  * Verified live on this estate 2026-09-27: the daemon answers on browser
- * loopback and on the Crostini crosvm veth bridge (100.115.92.26). The host's
- * own tailnet node (100.127.113.90) does NOT answer from the container, because
- * the container does not own that interface: exposing the daemon ON the tailnet
- * is host-side forwarding work (operator-owned), and until that exists a tailnet
- * peer legitimately shows as "no answer" here rather than being faked.
+ * loopback and on the machine's own other interfaces (a container bridge, a
+ * VPN, a second NIC). Those addresses differ on every computer, so they are
+ * REPORTED at runtime by the local host program rather than compiled in. Where
+ * no host program is installed, discovery still works: loopback, the hosts the
+ * operator has added, and anything already learned are all probed.
  */
 
 const PORT = 8787;
@@ -41,13 +41,16 @@ import { readTailscaleTopology, tailnetCandidates } from './tailscale.mjs';
 
 const REMEMBERED_KEY = 'focusa.workforce.discovered.v1';
 
-/** Browser loopback, this device's local bridges, and its own tailnet node. */
+/**
+ * Only loopback is compiled in. This machine's own non-loopback addresses
+ * (Crostini bridges, its tailnet node, a VPN) differ on every computer, so they
+ * are REPORTED at runtime by the local host program - never hardcoded, or the
+ * product would only ever work on the machine it was built on.
+ */
 export const DEVICE_CANDIDATES = Object.freeze([
   `http://127.0.0.1:${PORT}`,
   `http://localhost:${PORT}`,
   `http://[::1]:${PORT}`,
-  'http://100.115.92.26:8787',
-  'http://100.127.113.90:8787',
 ]);
 
 export const PROBE_TIMEOUT_MS = 2500;
@@ -86,12 +89,12 @@ export async function reachableOriginFilter(chromeApi) {
 }
 
 /** What kind of place an origin is, so the UI can say it plainly. */
-export function classifyBaseUrl(baseUrl) {
+export function classifyBaseUrl(baseUrl, { localAddresses = [] } = {}) {
   let host;
   try { host = new URL(baseUrl).hostname; } catch { return 'unknown'; }
   if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return 'loopback';
-  if (host === '100.115.92.26') return 'device';
-  if (host === '100.127.113.90') return 'device';
+  // "This device" means whatever the machine itself reported, on any computer.
+  if (localAddresses.includes(host)) return 'device';
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
     const [a, b] = host.split('.').map(Number);
     if (a === 100 && b >= 64 && b <= 127) return 'tailnet';
@@ -170,9 +173,15 @@ export async function discoveryCandidates(chromeApi) {
   // explicit fallback for hosts the LocalAPI does not report.
   const topology = await readTailscaleTopology().catch(() => null);
   const fromTailnet = tailnetCandidates(topology).map((item) => item.origin);
+  // This machine's own non-loopback addresses, reported by the local host
+  // program. Hardcoding them would make the product work on exactly one
+  // computer; asking the machine is what makes one build portable.
+  const fromLocalAddrs = (topology?.localAddresses ?? [])
+    .map((ip) => `http://${ip}:${PORT}`);
   const fromBook = (await hostBookCandidates(chromeApi)).map((item) => item.origin);
   const fromLearned = [...learned].flatMap((host) => hostCandidates(host));
-  const ordered = [...fromTailnet, ...fromBook, ...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
+  const ordered = [...fromTailnet, ...fromBook, ...fromLocalAddrs,
+    ...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
   return Object.freeze([...new Set(ordered)]);
 }
 
@@ -330,6 +339,7 @@ function collapseAliases(found) {
 }
 
 export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {
+  const topology = await readTailscaleTopology().catch(() => null);
   const reachable = await reachableOriginFilter(chromeApi);
   const candidates = [...new Set([...extra, ...(await discoveryCandidates(chromeApi))])];
   // Only origins this extension is GRANTED are probed. A browser may not fetch
@@ -345,10 +355,11 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
     onAnswer?.(answer);
     return answer;
   })));
+  const localAddresses = topology?.localAddresses ?? [];
   const found = collapseAliases(answers
     .filter((answer) => answer.ok)
     .map((answer) => {
-      const kind = classifyBaseUrl(answer.baseUrl);
+      const kind = classifyBaseUrl(answer.baseUrl, { localAddresses });
       return { ...answer, kind, kindLabel: kindLabel(kind), aliases: kind === 'loopback' ? LOOPBACK_ALIASES : [] };
     }));
   return { connected: found[0] ?? null, found, answers };
@@ -441,8 +452,6 @@ export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_
       kindLabel: daemon.preview?.activeProject ? `${daemon.kindLabel} · ${daemon.preview.activeProject}` : daemon.kindLabel,
     };
   }).sort((a, b) => (Number(b.authoritative) - Number(a.authoritative)) || (b.held - a.held));
-  found.length = 0;
-  found.push(...unique);
   let paired = [];
   try {
     const { listConnections } = await import('./storage.mjs');
@@ -455,5 +464,6 @@ export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_
       baseUrl: connection.base_url, ok: null, kind: 'remote', kindLabel: 'Paired',
       label: connection.label ?? connection.base_url, paired: true,
     }));
-  return { found: [...found, ...remote], answers };
+  const all = [...unique, ...remote];
+  return { connected: all[0] ?? null, found: all, answers };
 }
