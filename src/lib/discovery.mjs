@@ -378,8 +378,9 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
  * @param {{fetchImpl?: function, timeoutMs?: number}} [options]
  * @returns {Promise<{self: object|null, peers: any[]}>}
  */
-export async function tailnetRoster(chromeApi, { fetchImpl, timeoutMs } = {}) {
-  const topology = await readTailscaleTopology({ fetchImpl, timeoutMs }).catch(() => null);
+export async function tailnetRoster(chromeApi, { fetchImpl, timeoutMs, connectNative } = {}) {
+  // forward the source choice: a caller naming one is asking about that one
+  const topology = await readTailscaleTopology({ fetchImpl, timeoutMs, connectNative }).catch(() => null);
   if (!topology) return Object.freeze({ self: null, peers: [] });
   return Object.freeze({ self: topology.self, peers: topology.peers });
 }
