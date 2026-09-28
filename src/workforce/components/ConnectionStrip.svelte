@@ -124,6 +124,7 @@
         <code>{d.baseUrl}</code>
         <span class="dim">
           {#if activeProject}{activeProject}{:else if projects}{projects} project(s){:else}no project selected{/if}
+          {#if store.cacheNote} · {store.cacheNote}{/if}
         </span>
         {#if live}
           <span class="telemetry">

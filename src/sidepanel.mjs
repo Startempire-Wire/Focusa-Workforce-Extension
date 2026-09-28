@@ -22,6 +22,7 @@ import {
 import { hasDaemonOriginPermission, requestDaemonOriginPermission } from './lib/validation.mjs';
 import { BUILD } from './lib/build-info.mjs';
 import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
+import { readCache, writeCache, clearCache, isUsable, ageLabel } from './lib/daemon-cache.mjs';
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -223,6 +224,19 @@ function ownerClient() {
   return createWorkforceClient({ baseUrl: connection.base_url, token: connection.token ?? null });
 }
 
+/** Paint the last good observation instantly, labelled with its age. */
+async function hydrateFromCache() {
+  if (!connection) return;
+  const entry = await readCache(chrome, connection.base_url);
+  if (!entry || !isUsable(entry)) return;
+  const { roster = [], loopText = null, frontierText = null } = entry.data ?? {};
+  if (loopText) el.loop.textContent = loopText;
+  if (frontierText) el.frontier.textContent = frontierText;
+  renderNeedsYou(roster);
+  renderWorkingNow(roster);
+  el.loop.textContent += ` (updated ${ageLabel(entry)})`;
+}
+
 async function refreshObservation() {
   if (!connection) return;
   try {
@@ -238,11 +252,13 @@ async function refreshObservation() {
 
     // A daemon with no project chosen is a real, common state: say so plainly
     // instead of showing an empty workforce.
+    let sessions = null;
     if (projectRoot) {
-      const [loop, sessions] = await Promise.all([
+      const [loop, fetched] = await Promise.all([
         client.workLoopStatus(scope).catch(() => null),
         client.sessions(projectRoot).catch(() => null),
       ]);
+      sessions = fetched;
       const loopData = loop?.state === 'ok' ? loop.data : null;
       el.loop.textContent = loopData
         ? `${loopData.state ?? '—'} · ${loopData.status ?? '—'}`
@@ -258,6 +274,11 @@ async function refreshObservation() {
       renderWorkingNow([]);
     }
     renderVerified();
+    // Connected means pulled: refresh the shared cache too.
+    await writeCache(chrome, connection.base_url, {
+      roster: sessions?.state === 'ok' ? rosterFromOwner(sessions.data) : [],
+      loopText: el.loop.textContent, frontierText: el.frontier.textContent,
+    });
     startStream();
   } catch (error) {
     setStatus(el.status, 'degraded', safeError(error));
@@ -512,6 +533,7 @@ async function disconnectFromDaemon() {
   if (connection) await forgetLocalEnvironment(connection.connection_id ?? connection.environment_id, chrome).catch(() => {});
   streamAbort?.abort();
   connection = null;
+  await clearCache(chrome);
   discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [] };
   await loadConnectionOptions();
   renderConnection();
@@ -668,6 +690,9 @@ el.buildStamp && (el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committ
     discoveryState = { ...discoveryState, state: 'connected', baseUrl: connection.base_url, alive: true };
     link = { status: 'connected', baseUrl: connection.base_url, label: connection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
     renderLink();
+    // Render the last good data instantly, then replace it with a live read.
+    await hydrateFromCache();
+    await refreshObservation();
     loadPreview(connection.base_url);
     stopHeartbeat?.();
     stopHeartbeat = watchLiveness(connection.base_url, (beat) => {

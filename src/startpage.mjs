@@ -21,6 +21,7 @@ import { initialConnection, describeConnection, applyBeat, isAttached } from './
 import { createDiagnostics } from './lib/diagnostics.mjs';
 import { createWorkforceClient } from './lib/workforce-client.mjs';
 import { resolveScope, continuityFromTrajectory, loadInspector } from './lib/inspector.mjs';
+import { readCache, writeCache, clearCache, isUsable, ageLabel, ageMs } from './lib/daemon-cache.mjs';
 import { readMergedTopology } from './lib/tailscale.mjs';
 import { readHostBook } from './lib/host-book.mjs';
 
@@ -435,13 +436,24 @@ function renderTelemetry() {
 }
 
 async function discover({ extra = [] } = {}) {
+  const done = diag.step('discover', {});
   discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [] };
   previews = {};
   renderDiscovery();
-  const { found, answers } = await discoverDaemons(chrome, {
-    extra,
-    onAnswer: (answer) => { discoveryState.answers = [...discoveryState.answers, answer]; renderDiscovery(); },
-  });
+  renderDiagnostics();
+  let found = [];
+  let answers = [];
+  try {
+    ({ found, answers } = await discoverDaemons(chrome, {
+      extra,
+      onAnswer: (answer) => { discoveryState.answers = [...discoveryState.answers, answer]; renderDiscovery(); },
+    }));
+  } catch (error) {
+    done(error);
+    renderDiagnostics();
+    throw error;
+  }
+  done(null, { found: found.length, answers: answers.length, ok: answers.filter((a) => a.ok).length });
   if (!found.length) {
     const remembered = await readKnownDaemons();
     discoveryState = { state: 'none', daemons: [], answers, known: remembered };
@@ -450,12 +462,14 @@ async function discover({ extra = [] } = {}) {
     }
     renderLink();
     renderDiscovery();
+    renderDiagnostics();
     return;
   }
   discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
   await loadRoster();
   renderLink();
   renderDiscovery();
+  renderDiagnostics();
   for (const daemon of found) loadPreview(daemon.baseUrl);
 }
 
@@ -505,7 +519,8 @@ async function connect(baseUrl) {
   done(null, { attached: origin });
   renderDiagnostics();
   await refresh();
-  await loadInspector();
+  await loadInspectorIntoUI();
+  startInspectorRefresh();
   startStream();
   stopHeartbeat?.();
   stopHeartbeat = watchLiveness(origin, (beat) => {
@@ -522,6 +537,9 @@ async function disconnect() {
   // An explicit, remembered disconnect: stated plainly, and searched for nothing
   // until the operator asks again.
   link = { status: 'disconnected', baseUrl: null, label: null, since: new Date().toISOString(), lastSeenAt: null, note: 'You disconnected. Nothing is attached.' };
+  stopInspectorRefresh();
+  await clearCache(chrome);
+  diag.log('cache.cleared', {});
   const { forgetLocalEnvironment } = await import('./lib/storage.mjs');
   if (liveConnection?.connection_id?.startsWith('local:')) {
     await forgetLocalEnvironment(liveConnection.connection_id, chrome).catch(() => {});
@@ -658,6 +676,24 @@ el.openWorkforce.addEventListener('click', () => openWorkforce('#/overview'));
 el.pair?.addEventListener('click', () => openWorkforce('#/settings?section=connections'));
 el.refresh.addEventListener('click', refresh);
 el.inspectorRefresh?.addEventListener('click', () => guard('Inspector refresh', loadInspectorIntoUI));
+
+let inspectorTimer = null;
+function stopInspectorRefresh() {
+  if (inspectorTimer) { clearInterval(inspectorTimer); inspectorTimer = null; }
+}
+/** Re-pull the inspector on a loop while attached: connect pulls everything,
+ *  the cache holds it, and the loop refreshes it. A failed round never blanks
+ *  the screen - the last good data stays with its age shown. */
+function startInspectorRefresh() {
+  stopInspectorRefresh();
+  inspectorTimer = setInterval(() => {
+    if (!liveConnection || document.hidden) return;
+    guard('Inspector refresh', loadInspectorIntoUI);
+  }, 30_000);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && liveConnection) guard('Inspector refresh', loadInspectorIntoUI);
+});
 let eventsAbort = null;
 function stopInspectorEvents() {
   eventsAbort?.abort();
@@ -764,6 +800,10 @@ async function loadInspectorIntoUI() {
       ? `The daemon offers ${operationsTotal} governed operations. Everything below is read-only.`
       : 'Everything below is read-only.';
     el.inspectorSections.replaceChildren(...sections.map(renderInspectorSection));
+    await writeCache(chrome, liveConnection.base_url, {
+      scope: ws, sections, operationsTotal, projectListBody,
+    });
+    diag.log('inspector.cached', { sections: sections.length });
     done(null, { sections: sections.length, operationsTotal });
   } catch (error) {
     el.inspectorNote.textContent = `Inspector failed: ${String(error?.message ?? error).slice(0, 160)}`;
@@ -815,7 +855,7 @@ function renderInspectorSection(section) {
   }
   return wrap;
 }
-window.addEventListener('pagehide', () => { streamAbort?.abort(); stopInspectorEvents(); });
+window.addEventListener('pagehide', () => { streamAbort?.abort(); stopInspectorEvents(); stopInspectorRefresh(); });
 
 // docs/17 §5: public mode loads a dedicated module that cannot read private
 // storage or private projections. The private path is never executed.
@@ -837,7 +877,12 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
   if (connected) {
     link = { status: 'connected', baseUrl: liveConnection.base_url, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
     renderLink();
+    // Render the cache first: instant, and proof the connection is real. Then
+    // replace it with live reads as they land.
+    await hydrateFromCache();
     await refresh();
+    await loadInspectorIntoUI();
+    startInspectorRefresh();
     startStream();
     if (liveConnection?.base_url) loadPreview(liveConnection.base_url);
     stopHeartbeat?.();
@@ -847,4 +892,29 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
       if (beat.ok) loadPreview(liveConnection.base_url);
     });
   }
+}
+
+/** Paint the last good inspector snapshot instantly, labelled with its age. */
+async function hydrateFromCache() {
+  if (!liveConnection) return;
+  const done = diag.step('inspector.hydrate', { baseUrl: liveConnection.base_url });
+  const entry = await readCache(chrome, liveConnection.base_url);
+  if (!entry || !isUsable(entry)) {
+    done(null, { hit: false });
+    renderDiagnostics();
+    return;
+  }
+  const { sections, operationsTotal, scope } = entry.data ?? {};
+  if (!Array.isArray(sections)) {
+    done(null, { hit: false, reason: 'unparseable' });
+    renderDiagnostics();
+    return;
+  }
+  el.inspector.hidden = false;
+  el.inspectorNote.hidden = false;
+  el.inspectorNote.textContent = `Last updated ${ageLabel(entry)} — refreshing…`;
+  el.inspectorScope.textContent = scope?.projectRoot ?? '';
+  el.inspectorSections.replaceChildren(...sections.map(renderInspectorSection));
+  done(null, { hit: true, ageMs: ageMs(entry), sections: sections.length });
+  renderDiagnostics();
 }

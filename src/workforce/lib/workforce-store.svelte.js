@@ -24,6 +24,7 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
+import { readCache, writeCache, isUsable, ageLabel } from '../../lib/daemon-cache.mjs';
 import { trustedHosts, readHostBook, addHost, removeHost } from '../../lib/host-book.mjs';
 import { readTailscaleTopology } from '../../lib/tailscale.mjs';
 import { tailnetRoster, peerOrigins } from '../../lib/discovery.mjs';
@@ -96,6 +97,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let directing = $state(false);
   let lastDirection = $state(/** @type {any} */ (null));
   let bootError = $state(/** @type {string|null} */ (null));
+  // Age label for cache-hydrated reads; cleared the moment live reads land.
+  let cacheNote = $state(/** @type {string|null} */ (null));
   // Silent read-only discovery; attaching is always one explicit click.
   // state: idle | discovering | found | connected | not_found
   let discovery = $state(/** @type {{state: string, baseUrl: string|null, answers: any[], daemons?: any[], returning?: boolean, permitted?: boolean, alive?: boolean, lastSeenAt?: string|null}} */ ({ state: 'idle', baseUrl: null, answers: [], daemons: [] }));
@@ -270,6 +273,18 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       if (!selection.projectRoot) {
         const stored = await loadSelection(chromeApi, activeId || environments[0]?.id);
         if (stored.projectRoot || stored.continuityId) selection = stored;
+      }
+      // Render the last good owner data instantly, then replace it with live
+      // reads as they land. A failed refresh never blanks the screen.
+      if (adopted) {
+        const cached = await readCache(chromeApi, adopted.baseUrl);
+        if (cached && isUsable(cached) && cached.data?.reads) {
+          reads = { ...cached.data.reads };
+          if (cached.data.selection?.projectRoot && !selection.projectRoot) {
+            selection = cached.data.selection;
+          }
+          cacheNote = `Last updated ${ageLabel(cached)} — refreshing…`;
+        }
       }
     } catch (error) {
       bootError = error instanceof Error ? error.message : String(error);
@@ -557,6 +572,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('workLoop', await c.workLoopStatus(workstream));
       record('roles', await c.roleProfiles(workstream));
     }
+    cacheNote = null;
+    // Connected means pulled: every successful refresh refreshes the cache too.
+    await writeCache(chromeApi, active.baseUrl, { reads, selection });
   }
 
   /**
@@ -1134,6 +1152,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get uiaiBusy() { return uiaiBusy; },
     get uiaiTakeovers() { return uiaiTakeovers; },
     get bootError() { return bootError; },
+    get cacheNote() { return cacheNote; },
     get discovery() { return discovery; },
     get connection() { return connection; },
     get suppressed() { return suppressed; },

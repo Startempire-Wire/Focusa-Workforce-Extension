@@ -94,6 +94,14 @@ export function createDiagnostics({ chromeApi = globalThis.chrome, now = () => n
     } catch { /* diagnostics must never break the product */ }
   }
 
+  function stackOf(error) {
+    const raw = error?.error?.stack ?? error?.stack ?? null;
+    if (typeof raw !== 'string' || !raw) return null;
+    // First frames only, extension-local paths kept (they name the exact line),
+    // browser internals dropped.
+    return raw.split('\n').slice(0, 6).map((line) => line.trim().slice(0, 220));
+  }
+
   function record(level, name, details = null, error = null) {
     const event = {
       at: now(),
@@ -103,6 +111,7 @@ export function createDiagnostics({ chromeApi = globalThis.chrome, now = () => n
       ...(error == null ? {} : {
         code: error.code ?? classifyError(error.error ?? error),
         message: String(error.error?.message ?? error.error ?? error?.message ?? error).slice(0, 300),
+        stack: stackOf(error),
       }),
     };
     ring.push(event);

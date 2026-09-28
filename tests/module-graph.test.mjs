@@ -61,6 +61,21 @@ test('shared runtime modules live in the copied lib, not in the bundled page tre
   assert.ok(!(await exists(resolve(dist, 'workforce', 'lib'))), 'the vite-bundled page tree is not shipped raw');
 });
 
+test('connect() pulls the inspector UI loader, not the pure data loader', async () => {
+  // This exact mix-up shipped: connect() awaited loadInspector() (pure,
+  // needs client+scope) instead of loadInspectorIntoUI() (wired to the live
+  // connection and the DOM), so every connect threw
+  // "Cannot read properties of undefined (reading 'projectRoot')" and the
+  // inspector never rendered. The pure loader must only ever be called with
+  // both arguments.
+  const source = await readFile(resolve(root, 'src/startpage.mjs'), 'utf8');
+  const body = source.slice(source.indexOf('async function connect('));
+  const end = body.indexOf('\n}\n', body.indexOf('await loadInspectorIntoUI'));
+  const connectBody = end > 0 ? body.slice(0, end) : body;
+  assert.match(connectBody, /await loadInspectorIntoUI\(\)/, 'connect() awaits the UI loader');
+  assert.doesNotMatch(connectBody, /await loadInspector\(/, 'connect() never calls the pure loader bare');
+});
+
 test('every click handler in a shipped surface points at a declared function', async (t) => {
   await t.test('preparing the build', () => {
     const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
