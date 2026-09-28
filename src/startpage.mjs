@@ -17,6 +17,7 @@ import {
 import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaemonOrigin } from './lib/validation.mjs';
 import { saveLocalEnvironment } from './lib/storage.mjs';
 import { BUILD } from './lib/build-info.mjs';
+import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
 
 /** Run an interaction and show any failure IN the surface. */
 async function guard(label, work) {
@@ -40,7 +41,6 @@ const $ = (selector) => {
 
 const el = {
   envLabel: $('#daemon-select-label'),
-  freshness: $('#start-freshness'),
   private: $('#start-private'),
   unpaired: $('#start-unpaired'),
   public: $('#start-public'),
@@ -66,6 +66,11 @@ const el = {
   telemetry: $('#start-telemetry'),
   buildStamp: $('#build-stamp'),
   surfaceError: $('#surface-error'),
+  pill: $('#connection-pill'),
+  pillLabel: $('#conn-label'),
+  pillWhere: $('#conn-where'),
+  pillAction: $('#conn-action'),
+  detail: $('#conn-detail'),
   publicDate: $('#public-date'),
   publicMission: $('#public-mission'),
   publicWorkforce: $('#public-workforce'),
@@ -95,9 +100,10 @@ function emptyRow(message) {
   return Object.assign(document.createElement('li'), { className: 'sp-empty', textContent: message });
 }
 
-function setFreshness(state, text) {
-  el.freshness.textContent = text;
-  el.freshness.className = state;
+/** Owner freshness is reported inside the connection detail line, not beside it. */
+function setFreshness(_state, text) {
+  if (isAttached(link)) link = { ...link, note: text };
+  renderLink();
 }
 
 /* ── the living connection surface ──────────────────────────────────────────
@@ -105,6 +111,30 @@ function setFreshness(state, text) {
    automatically, previews each daemon with that daemon's own reported
    liveness, and keeps a heartbeat running so freshness is a live fact. */
 let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false, answers: [], known: [] };
+let link = initialConnection();
+
+/** The one place the Start Page's connection state is turned into words. */
+function renderLink() {
+  const view = describeConnection(link);
+  el.pill.dataset.tone = view.tone;
+  el.pillLabel.textContent = view.label;
+  el.pillWhere.textContent = link?.baseUrl ? ` ${link.baseUrl}` : '';
+  el.pill.setAttribute('title', view.detail);
+  el.pillAction.textContent = view.status === 'connected' || view.status === 'unreachable' ? 'Disconnect' : 'Connect';
+  el.detail.dataset.tone = view.tone;
+  el.detail.hidden = view.status === 'connected' && !link?.note;
+  el.detail.replaceChildren();
+  if (!el.detail.hidden) {
+    const text = document.createElement('span');
+    text.append(
+      Object.assign(document.createElement('strong'), { textContent: view.headline }),
+      document.createTextNode(view.status === 'connected' ? ' — your workforce is attached.' : ` — ${view.detail}`),
+    );
+    el.detail.append(text);
+  }
+  el.private.hidden = !isAttached(link) || discoveryState.state === 'found';
+  el.unpaired.hidden = isAttached(link) || link?.status === 'disconnected';
+}
 
 /** Daemons this browser has used before, so an absence is explained, not silent. */
 async function readKnownDaemons() {
@@ -208,16 +238,26 @@ async function discover({ extra = [] } = {}) {
   if (!found.length) {
     const remembered = await readKnownDaemons();
     discoveryState = { state: 'none', daemons: [], answers, known: remembered };
+    if (!isAttached(link)) {
+      link = { ...link, status: 'disconnected', baseUrl: null, note: 'No Focusa daemon answered' };
+    }
+    renderLink();
     renderDiscovery();
     return;
   }
   discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
+  if (!isAttached(link)) {
+    link = { ...link, status: 'disconnected', baseUrl: null, note: `${found.length} daemon(s) available` };
+  }
+  renderLink();
   renderDiscovery();
   for (const daemon of found) loadPreview(daemon.baseUrl);
 }
 
 async function connect(baseUrl) {
   const origin = normalizeDaemonOrigin(baseUrl);
+  link = { ...link, status: 'connecting', baseUrl: origin, note: 'Connecting…' };
+  renderLink();
   const already = await hasDaemonOriginPermission(origin).catch(() => false);
   if (!already) {
     const granted = await requestDaemonOriginPermission(origin, chrome).catch(() => false);
@@ -233,22 +273,26 @@ async function connect(baseUrl) {
   await rememberDaemon(chrome, { baseUrl: origin, label: 'Focusa daemon' });
   liveConnection = { connection_id: `local:${origin}`, label: `Focusa daemon (${origin})`, base_url: origin, token: null };
   await chrome.storage.local.set({ [CONNECTION_KEY]: liveConnection.connection_id });
+  link = { status: 'connected', baseUrl: origin, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
   el.connect.hidden = true;
-  el.unpaired.hidden = true;
-  el.private.hidden = false;
-  el.envLabel.textContent = liveConnection.label;
+  renderLink();
   await refresh();
   startStream();
   stopHeartbeat?.();
   stopHeartbeat = watchLiveness(origin, (beat) => {
     discoveryState = { ...discoveryState, alive: beat.ok };
-    if (beat.ok) { el.freshness.className = 'live'; el.freshness.textContent = 'Live'; loadPreview(origin); }
+    link = applyBeat(link, beat);
+    renderLink();
+    if (beat.ok) loadPreview(origin);
   });
 }
 
 async function disconnect() {
   stopHeartbeat?.();
   stopHeartbeat = null;
+  // An explicit, remembered disconnect: stated plainly, and searched for nothing
+  // until the operator asks again.
+  link = { status: 'disconnected', baseUrl: null, label: null, since: new Date().toISOString(), lastSeenAt: null, note: 'You disconnected. Nothing is attached.' };
   const { forgetLocalEnvironment } = await import('./lib/storage.mjs');
   if (liveConnection?.connection_id?.startsWith('local:')) {
     await forgetLocalEnvironment(liveConnection.connection_id, chrome).catch(() => {});
@@ -256,9 +300,16 @@ async function disconnect() {
   await chrome.storage.local.remove(CONNECTION_KEY);
   streamAbort?.abort();
   liveConnection = null;
-  await discover({});
+  discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [], known: [] };
+  renderLink();
 }
 
+el.pillAction?.addEventListener('click', () => {
+  if (isAttached(link)) { guard('Disconnect', disconnect); return; }
+  if (discoveryState.daemons?.length) { guard('Connect', () => connect(discoveryState.baseUrl ?? discoveryState.daemons[0].baseUrl)); return; }
+  guard('Discovery', () => discover({}));
+});
+el.pill?.addEventListener('click', () => el.pillAction?.click());
 el.connect?.addEventListener('click', (event) => {
   if (event.target?.id === 'start-disconnect') guard('Disconnect', disconnect);
 });
@@ -286,9 +337,6 @@ async function loadSelectedConnection() {
     el.envLabel.textContent = liveConnection?.label ?? liveConnection?.environment_id ?? '';
     el.unpaired.hidden = true;
     el.private.hidden = false;
-    el.freshness.insertAdjacentHTML('afterend',
-      '<button type="button" class="sp-link-btn" id="start-disconnect">Disconnect</button>');
-    el.freshness.nextElementSibling?.addEventListener('click', disconnect);
     return true;
   }
   el.envLabel.textContent = 'Not connected';
@@ -350,7 +398,7 @@ function startStream() {
     token: liveConnection.token,
     initialCursor: liveConnection.last_cursor,
     signal: streamAbort.signal,
-    onState: (state) => { el.freshness.textContent = `live ${state.phase}`; },
+    onState: (state) => { if (isAttached(link)) link = { ...link, note: `stream ${state.phase}` }; renderLink(); },
     onEvent: async (event) => {
       const notification = notificationFromEvent(event);
       if (notification) { notifications = await saveNotification(notification); }
@@ -379,19 +427,23 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
   notifications = await listNotifications().catch(() => []);
   // Discovery runs first so the face is alive immediately, then any stored
   // connection is adopted.
+  renderLink();
   if (el.buildStamp) el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committedAt ? ` · ${BUILD.committedAt.slice(0, 10)}` : ''}`;
   // A returning tab goes straight to the workforce interface; discovery is for
   // first run (operator requirement 2026-09-27: auto-load after initial connect).
   const connected = await loadSelectedConnection();
   if (!connected) await guard('Discovery', () => discover({}));
   if (connected) {
+    link = { status: 'connected', baseUrl: liveConnection.base_url, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
+    renderLink();
     await refresh();
     startStream();
     if (liveConnection?.base_url) loadPreview(liveConnection.base_url);
     stopHeartbeat?.();
     stopHeartbeat = watchLiveness(liveConnection.base_url, (beat) => {
-      if (beat.ok) { el.freshness.className = 'live'; el.freshness.textContent = 'Live'; loadPreview(liveConnection.base_url); }
-      else { el.freshness.className = ''; el.freshness.textContent = 'Reachable but not answering'; }
+      link = applyBeat(link, beat);
+      renderLink();
+      if (beat.ok) loadPreview(liveConnection.base_url);
     });
   }
 }

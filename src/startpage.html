@@ -18,8 +18,18 @@
 <body>
   <header class="sp-header">
     <p class="sp-brand">Focusa Workforce</p>
-    <p class="sp-env"><span class="sp-dot" aria-hidden="true"></span> <span id="daemon-select-label">Not connected</span> · <span id="start-freshness">Unavailable</span></p>
+    <div class="sp-env">
+      <!-- One indicator, same words and same signal on every surface. -->
+      <button type="button" class="conn" id="connection-pill" data-tone="off" aria-live="polite">
+        <span class="conn-dot" aria-hidden="true"></span>
+        <span class="conn-text"><span id="conn-label">Disconnected</span><span class="conn-where" id="conn-where"></span></span>
+      </button>
+      <button type="button" class="sp-link-btn" id="conn-action">Connect</button>
+      <span id="daemon-select-label" class="sr-only">Not connected</span>
+    </div>
   </header>
+  <!-- The words, in full, with the action that changes them. -->
+  <p class="conn-detail" id="conn-detail" data-tone="off" hidden></p>
 
   <main class="sp-container">
     <!-- PRIVATE -->

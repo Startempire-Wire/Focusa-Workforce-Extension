@@ -35,11 +35,17 @@ test('wall is read-only and states source + freshness explicitly', () => {
   assert.match(html, /id="wall-exception"[^>]*hidden/);
 });
 
-test('wall consumes canonical projections and the reconnect stream', () => {
-  assert.match(js, /fetchWorkLoop/);
-  assert.match(js, /fetchRoster/);
+test('wall consumes canonical projections and the shared liveness heartbeat', () => {
+  // The wall reads through the SAME owner client as every other surface, so a
+  // local (tokenless) daemon is read correctly - the legacy paired-only client
+  // never worked here at all.
+  assert.match(js, /createWorkforceClient/);
+  assert.match(js, /workLoopStatus/);
+  assert.match(js, /rosterFromOwner/);
   assert.match(js, /runReliableEventStream/);
-  assert.match(js, /initialCursor: connection\.last_cursor/);
+  // and its liveness claim comes from the shared heartbeat, not a private timer
+  assert.match(js, /watchLiveness/);
+  assert.match(js, /from '\.\/lib\/connection\.mjs'/);
 });
 
 test('wall uses the atlas container, gutters and type scale', () => {

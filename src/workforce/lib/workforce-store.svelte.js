@@ -28,6 +28,7 @@ import { trustedHosts, readHostBook, addHost, removeHost } from '../../lib/host-
 import { readTailscaleTopology } from '../../lib/tailscale.mjs';
 import { tailnetRoster, peerOrigins } from '../../lib/discovery.mjs';
 import { discoverDaemon, discoverDaemons, rememberDaemon, hasKnownDaemon, watchLiveness, seedCandidates, reachableOriginFilter, previewDaemon, probeDaemon } from '../../lib/discovery.mjs';
+import { applyBeat } from '../../lib/connection.mjs';
 import { promptBodyFor } from '../../lib/page-context.mjs';
 import { getUiaiToken, setUiaiToken, createUiaiSession, getUiaiSession, closeUiaiSession, shareUiaiSession, checkUiaiHealth, checkUiaiTakeover, pollUiaiTakeover } from '../../lib/uiai-client.mjs';
 import { preflightSafeSession, createPreflightedSession, buildSafeSessionConfig } from '../../lib/session-create.mjs';
@@ -102,6 +103,13 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // Live previews of what each discovered daemon actually is, read before
   // connecting: process liveness and the projects it holds.
   let previews = $state(/** @type {Record<string, any>} */ ({}));
+  // THE connection state. Every surface reads this and nothing else, so the
+  // strip, the header, the side panel and the start page can never disagree
+  // about whether a daemon is attached (operator direction 2026-09-27).
+  // status: connecting | connected | unreachable | disconnected
+  let connection = $state(/** @type {{status: string, baseUrl: string|null, label: string|null, since: string|null, lastSeenAt: string|null, note: string|null}} */ ({
+    status: 'disconnected', baseUrl: null, label: null, since: null, lastSeenAt: null, note: null,
+  }));
   let discovered = $state(/** @type {any[]} */ ([]));
   let projectBusy = $state(false);
   // Live freshness: owner-sourced event stream state (never synthesized).
@@ -228,6 +236,37 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       } catch { /* an invalid stored local record must not break paired environments */ }
       environments = [...local, ...paired];
       if (!activeId && environments.length) activeId = environments[0].id;
+      // Adopting a stored environment IS a connection: the indicator must say so
+      // on the very first paint, not only after a click (operator requirement:
+      // auto-load after the initial connect).
+      const adopted = environments.find((item) => item.id === activeId) ?? null;
+      if (adopted && connection.status === 'disconnected' && !suppressed) {
+        connection = {
+          status: 'connecting', baseUrl: adopted.baseUrl, label: adopted.label,
+          since: connection.since, lastSeenAt: null, note: 'Restoring your connection\u2026',
+        };
+        probeDaemon(adopted.baseUrl).then(async (answer) => {
+          if (!answer.ok) {
+            connection = { ...connection, status: 'unreachable', note: 'The daemon is not answering yet' };
+            return;
+          }
+          connection = { ...connection, status: 'connected', lastSeenAt: answer.at ?? new Date().toISOString(), note: null };
+          // The connection surface must exist while attached: it is where
+          // Disconnect lives, on every surface (operator direction 2026-09-27).
+          if (discovery.state === 'idle' || discovery.state === 'not_found') {
+            discovery = { ...discovery, state: 'connected', baseUrl: adopted.baseUrl, alive: true };
+          }
+          stopLiveness?.();
+          stopLiveness = watchLiveness(adopted.baseUrl, (beat) => {
+            connection = applyBeat(connection, beat);
+            if (beat.ok) {
+              previewDaemon({ baseUrl: adopted.baseUrl }).then((preview) => {
+                previews = { ...previews, [adopted.baseUrl]: preview };
+              }).catch(() => {});
+            }
+          });
+        }).catch(() => {});
+      }
       if (!selection.projectRoot) {
         const stored = await loadSelection(chromeApi, activeId || environments[0]?.id);
         if (stored.projectRoot || stored.continuityId) selection = stored;
@@ -271,6 +310,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
    * operator never types an address and never meets a configuration form here.
    */
   async function discover({ extra = [] } = {}) {
+    // After an explicit Disconnect, stay quiet until the operator asks again.
+    if (suppressed) { discovery = { state: 'idle', baseUrl: null, answers: [], daemons: [] }; return null; }
+    suppressed = false;
     discovery = { state: 'discovering', baseUrl: null, answers: [], daemons: [] };
     previews = {};
     const returning = await hasKnownDaemon(chromeApi);
@@ -303,6 +345,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     stopLiveness?.();
     stopLiveness = watchLiveness(connected.baseUrl, (beat) => {
       discovery = { ...discovery, alive: beat.ok, lastSeenAt: beat.at };
+      // A daemon that stops answering is surfaced immediately, everywhere, rather
+      // than leaving stale numbers on screen.
+      connection = beat.ok
+        ? { ...connection, status: 'connected', lastSeenAt: beat.at, note: null }
+        : { ...connection, status: 'unreachable', lastSeenAt: connection.lastSeenAt, note: 'The daemon stopped answering' };
       if (!beat.ok) return;
       previewDaemon({ baseUrl: connected.baseUrl }).then((preview) => {
         previews = { ...previews, [connected.baseUrl]: preview };
@@ -315,11 +362,13 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function connectDiscovered(target) {
     const origin = typeof target === 'string' ? target : (target?.baseUrl ?? discovery.baseUrl);
     if (!origin) return null;
+    connection = { ...connection, status: 'connecting', baseUrl: origin, note: 'Connecting…' };
     // Prove a daemon is actually there before attaching. Choosing a machine from
     // the tailnet roster must never leave the surface attached to something that
     // is not a Focusa daemon.
     const answer = await probeDaemon(origin).catch(() => ({ ok: false, baseUrl: origin }));
     if (!answer.ok) {
+      connection = { ...connection, status: 'disconnected', baseUrl: null, note: `Nothing answered on ${origin}` };
       discovery = { ...discovery, notAnswering: origin };
       return null;
     }
@@ -329,7 +378,10 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     const alreadyAllowed = await hasDaemonOriginPermission(origin).catch(() => false);
     if (!alreadyAllowed) {
       const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
-      if (!granted) return null;
+      if (!granted) {
+        connection = { ...connection, status: 'disconnected', baseUrl: null, note: 'Access to that machine was not allowed' };
+        return null;
+      }
     }
     stopLiveness?.();
     stopLiveness = null;
@@ -387,13 +439,33 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
    * running; Workforce stops reading and stops streaming. The daemon stays
    * remembered so reconnecting is one click again.
    */
+  /**
+   * Deliberately resume searching after an explicit Disconnect. Until this is
+   * called the surface stays quiet, so a disconnect never looks like a first run
+   * and never re-attaches on its own.
+   */
+  async function rediscover() {
+    suppressed = false;
+    connection = { ...connection, status: 'disconnected', note: 'Looking for a daemon\u2026' };
+    return discover();
+  }
+
   async function disconnect() {
     stopLiveness?.();
     stopLiveness = null;
     const current = active;
     stopStream();
     if (current) await forgetLocalEnvironment(current.id, chromeApi).catch(() => {});
+    // An explicit, remembered disconnect: the surface says so until the operator
+    // connects again, instead of quietly looking like a first run.
+    suppressed = true;
+    connection = {
+      status: 'disconnected', baseUrl: null,
+      label: current?.label ?? null, since: new Date().toISOString(),
+      lastSeenAt: null, note: 'You disconnected. Nothing is attached.',
+    };
     discovery = { state: 'idle', baseUrl: null, answers: [], daemons: [] };
+    previews = {};
     await refreshEnvironments();
     return true;
   }
@@ -411,6 +483,11 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     await rememberDaemon(chromeApi, { baseUrl: origin, label: record.label, seen_at: new Date().toISOString() });
     await refreshEnvironments();
     activeId = record.environment_id;
+    suppressed = false;
+    connection = {
+      status: 'connected', baseUrl: origin, label: record.label,
+      since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null,
+    };
     await refreshOwner();
     // The owner stream is opened in the background: connecting must feel instant,
     // and the stream reaching "open" is reported separately by the Live chip.
@@ -750,6 +827,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   // The tailnet host book: which remote hosts to look for on every launch.
   let hostBook = $state(/** @type {any[]} */ ([]));
+  // Set by an explicit Disconnect: discovery then stays quiet until asked, so the
+  // connect surface does not immediately reappear.
+  let suppressed = false;
 
   // The tailnet roster, read from the tailnet itself, so the surface can show
   // which machines are out there - not just the ones that happen to answer.
@@ -1055,6 +1135,9 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get uiaiTakeovers() { return uiaiTakeovers; },
     get bootError() { return bootError; },
     get discovery() { return discovery; },
+    get connection() { return connection; },
+    get suppressed() { return suppressed; },
+    rediscover,
     discover,
     connectDiscovered,
     disconnect,

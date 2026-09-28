@@ -22,7 +22,10 @@
           <p class="sp-operator">Operator · Partner</p>
         </div>
       </div>
-      <span class="status-dot" aria-hidden="true"></span>
+      <button type="button" class="conn" id="connection-pill" data-tone="off" aria-live="polite">
+        <span class="conn-dot" aria-hidden="true"></span>
+        <span class="conn-text"><span id="conn-label">Disconnected</span><span class="conn-where" id="conn-where"></span></span>
+      </button>
     </div>
     <p id="connection-status" class="status" role="status" aria-live="polite">Not connected</p>
   </header>

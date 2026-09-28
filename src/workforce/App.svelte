@@ -15,6 +15,7 @@
   import { fade, fly } from 'svelte/transition';
   import StateNote from './components/StateNote.svelte';
   import Icon from './components/Icon.svelte';
+  import { describeConnection, isAttached } from '../lib/connection.mjs';
   import ConnectionStrip from './components/ConnectionStrip.svelte';
   import { buildRoute, navItemForRoute, parseRoute, ROUTES, INTENTS } from './lib/router.js';
   import { createWorkforceStore } from './lib/workforce-store.svelte.js';
@@ -52,7 +53,13 @@
   let uiaiProvider = $state('');
 
   /* ── derived scope + counts (docs/17 §1 priority) ── */
-  const hasOwner = $derived(Boolean(store.active));
+  // One connection truth, read from the store (src/lib/connection.mjs), so the
+  // header, the strip, the side panel, the start page and the wall all agree.
+  const connection = $derived(store.connection);
+  const connLabel = $derived(describeConnection(connection).label);
+  const connTone = $derived(describeConnection(connection).tone);
+  const connDetail = $derived(describeConnection(connection).detail);
+  const hasOwner = $derived(isAttached(connection));
   const healthState = $derived(store.resultOf('health')?.state ?? 'no environment');
   const freshClass = $derived(
     !hasOwner ? 'idle'
@@ -213,13 +220,19 @@
     <div class="topbar-right">
       <button type="button" class="wf-btn rail-open-btn" aria-expanded={railOpen} onclick={() => (railOpen = !railOpen)}>Context</button>
       <span class="posture-chip">{store.entitlementState ?? 'unknown'}</span>
-      {#if store.active}
-        <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
-          {store.streamState?.phase === 'open' ? 'Live' : freshLabel}
-        </span>
-      {:else}
-        <span class="fresh {freshClass}">{freshLabel}</span>
-      {/if}
+      <button
+        type="button"
+        class="conn"
+        data-tone={connTone}
+        title={connDetail}
+        onclick={() => navigate(connection.status === 'connected' || connection.status === 'unreachable' ? '#/settings?section=connections' : '#/overview')}
+      >
+        <span class="conn-dot" aria-hidden="true"></span>
+        <span class="conn-text"><span>{connLabel}</span>{#if connection.baseUrl}<span class="conn-where">{connection.baseUrl}</span>{/if}</span>
+      </button>
+      <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
+        {store.streamState?.phase === 'open' ? 'stream live' : freshLabel}
+      </span>
       <button type="button" class="wf-btn" onclick={() => store.refreshOwner()} disabled={!store.active}><Icon name="refresh" size={16} /> Refresh</button>
     </div>
   </header>
@@ -522,13 +535,19 @@
             </div>
             <div class="chips">
               <span class="state-sig">{store.trajectoryView.ladder.currentWorkpoint ?? 'idle'}</span>
-              {#if store.active}
-        <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
-          {store.streamState?.phase === 'open' ? 'Live' : freshLabel}
-        </span>
-      {:else}
-        <span class="fresh {freshClass}">{freshLabel}</span>
-      {/if}
+              <button
+        type="button"
+        class="conn"
+        data-tone={connTone}
+        title={connDetail}
+        onclick={() => navigate(connection.status === 'connected' || connection.status === 'unreachable' ? '#/settings?section=connections' : '#/overview')}
+      >
+        <span class="conn-dot" aria-hidden="true"></span>
+        <span class="conn-text"><span>{connLabel}</span>{#if connection.baseUrl}<span class="conn-where">{connection.baseUrl}</span>{/if}</span>
+      </button>
+      <span class="fresh {freshClass} live-chip" class:streaming={store.streamState?.phase === 'open'}>
+        {store.streamState?.phase === 'open' ? 'stream live' : freshLabel}
+      </span>
               {#each ['full', 'medium', 'short'] as g (g)}
                 <button type="button" class="chip" class:on={granularity === g} onclick={() => (granularity = g)}>{g}</button>
               {/each}

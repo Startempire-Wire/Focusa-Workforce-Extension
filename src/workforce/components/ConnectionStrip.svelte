@@ -13,6 +13,7 @@
    */
   import { fade, fly } from 'svelte/transition';
   import Icon from './Icon.svelte';
+  import { describeConnection } from '../../lib/connection.mjs';
 
   let { store, reduce = false, ondiscover = () => store.discover() } = $props();
   let seed = $state('');
@@ -51,7 +52,18 @@
   );
   const dur = $derived(reduce ? 0 : 240);
   const out = $derived(reduce ? 0 : 180);
-  const show = $derived(d.state === 'discovering' || d.state === 'found' || d.state === 'connected' || d.state === 'not_found');
+  const link = $derived(store.connection ?? { status: 'disconnected' });
+  const linkView = $derived(describeConnection(link));
+  // A deliberate disconnect stays on screen until the operator connects again:
+  // it must never look like a first run, and it must never look connected.
+  // Shown whenever there is something to say: searching, daemons found, an
+  // explicit disconnect, OR an attached daemon - because the Disconnect control
+  // lives here and nowhere else.
+  const show = $derived(
+    d.state === 'discovering' || d.state === 'found' || d.state === 'connected' || d.state === 'not_found'
+    || link.status === 'connected' || link.status === 'unreachable' || link.status === 'connecting'
+    || (link.status === 'disconnected' && d.state === 'idle'),
+  );
 </script>
 
 {#if show}
@@ -81,7 +93,16 @@
       </div>
     {/if}
 
-    {#if d.state === 'discovering'}
+    {#if link.status === 'disconnected' && d.state === 'idle'}
+      <div class="strip-body" in:fly={{ y: 4, duration: out }}>
+        <span class="sp-pulse" aria-hidden="true" style="display:none"></span>
+        <strong>{link.note ?? 'Disconnected'}</strong>
+        <div class="row">
+          <button type="button" class="connect primary" onclick={() => store.rediscover()}>Look for a daemon</button>
+          <a class="quiet" href="#/settings?section=connections">Pair one</a>
+        </div>
+      </div>
+    {:else if d.state === 'discovering'}
       <div class="strip-body searching" in:fly={{ y: 4, duration: out }}>
         <span class="pulse" aria-hidden="true"></span>
         <strong>Looking for Focusa</strong>
@@ -182,7 +203,7 @@
         <strong>No Focusa daemon answered</strong>
         <span class="dim">loopback, this device's bridges and the tailnet were checked</span>
         <button type="button" class="quiet" onclick={ondiscover}>Look again</button>
-        <form class="seed" onsubmit={findSeed}>
+        <form class="seed" onsubmit={addHostToBook}>
           <input bind:value={seed} placeholder="name or address, e.g. kh or 100.64.1.9:8788" aria-label="Find a Focusa daemon by name or address" />
           <button type="submit" class="connect">Find</button>
         </form>

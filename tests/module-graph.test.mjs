@@ -135,3 +135,24 @@ test('a failing interaction is shown in the surface, not only in the console', a
     assert.match(source, /showSurfaceError/, `${file} shows the failure in the surface`);
   }
 });
+
+test('every element a surface looks up actually exists in that surface', async (t) => {
+  await t.test('preparing the build', () => {
+    const build = spawnSync(process.execPath, ['scripts/build.mjs'], { cwd: root, encoding: 'utf8' });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+  });
+  // A $(' #id ') that no longer exists throws at module scope, which kills the
+  // whole surface silently. That happened twice (a renamed element, a removed
+  // freshness chip), so every lookup is checked against its own markup.
+  const pairs = [['sidepanel.mjs', 'sidepanel.html'], ['startpage.mjs', 'startpage.html'], ['wall.mjs', 'wall.html']];
+  const problems = [];
+  for (const [script, markup] of pairs) {
+    const source = await readFile(resolve(dist, script), 'utf8');
+    const html = await readFile(resolve(dist, markup), 'utf8');
+    for (const m of source.matchAll(/\$\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g)) {
+      const id = m[1];
+      if (!html.includes(`id="${id}"`)) problems.push(`${script} looks up #${id}, absent from ${markup}`);
+    }
+  }
+  assert.deepEqual(problems, [], 'no surface may reference a missing element');
+});

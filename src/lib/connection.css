@@ -1,0 +1,47 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   The connection indicator: ONE appearance on every surface, so the Start Page,
+   Side Panel, Full Workforce page and Wall all say the same thing in the same
+   words with the same signal. Meaning is carried by text first, then the dot
+   (docs/17 §21.7 - never colour alone).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.conn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 12px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default); background: var(--bg-subtle);
+  color: var(--text-secondary); font: var(--text-small-strong);
+  text-decoration: none; cursor: pointer;
+}
+.conn:hover { background: var(--bg-raised); color: var(--text-primary); text-decoration: none; }
+.conn .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.conn .conn-text { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.conn .conn-where { font: var(--text-micro); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.conn[data-tone='live'] { background: var(--success-weak); border-color: transparent; color: var(--success); }
+.conn[data-tone='live'] .conn-dot { background: var(--success); }
+.conn[data-tone='pending'] { background: var(--info-weak); border-color: transparent; color: var(--info); }
+.conn[data-tone='pending'] .conn-dot { background: var(--info); }
+.conn[data-tone='lost'] { background: var(--warning-weak); border-color: transparent; color: var(--warning); }
+.conn[data-tone='lost'] .conn-dot { background: var(--warning); }
+.conn[data-tone='off'] { background: var(--bg-subtle); color: var(--text-muted); }
+.conn[data-tone='off'] .conn-dot { background: var(--border-strong); }
+
+/* Liveness is proven, not implied: the breath runs only while a probe answers. */
+@media (prefers-reduced-motion: no-preference) {
+  .conn[data-tone='live'] .conn-dot { animation: conn-heart 2.6s ease-in-out infinite; }
+  .conn[data-tone='pending'] .conn-dot { animation: conn-heart 1.2s ease-in-out infinite; }
+  .conn[data-tone='lost'] .conn-dot { animation: conn-lost 2s ease-in-out infinite; }
+}
+@keyframes conn-heart { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.28); opacity: .7; } }
+@keyframes conn-lost { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+/* The expanded line under the pill: the words, in full, with an action. */
+.conn-detail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); background: var(--bg-surface);
+  font: var(--text-small); color: var(--text-secondary);
+}
+.conn-detail strong { color: var(--text-primary); }
+.conn-detail[data-tone='off'] { border-style: dashed; }
+.conn-detail[data-tone='lost'] { background: var(--warning-weak); border-color: transparent; color: var(--warning); }

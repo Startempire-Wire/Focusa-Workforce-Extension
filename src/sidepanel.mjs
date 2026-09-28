@@ -21,6 +21,7 @@ import {
 } from './lib/discovery.mjs';
 import { hasDaemonOriginPermission, requestDaemonOriginPermission } from './lib/validation.mjs';
 import { BUILD } from './lib/build-info.mjs';
+import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
 
 const $ = (selector) => {
   const node = document.querySelector(selector);
@@ -60,6 +61,9 @@ const el = {
   connectBody: $('#connect-body'),
   buildStamp: $('#build-stamp'),
   surfaceError: $('#surface-error'),
+  pill: $('#connection-pill'),
+  pillLabel: $('#conn-label'),
+  pillWhere: $('#conn-where'),
   seed: $('#pair-base-url'),
   auditState: $('#audit-state'),
   clearAudit: $('#clear-audit'),
@@ -306,6 +310,16 @@ async function controlSession(action, target) {
    daemon previews its own liveness and inventory before anything is attached,
    and the numbers keep moving once a heartbeat is running. */
 let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: false };
+let link = initialConnection();
+
+/** The panel says the same thing as every other surface, from the same state. */
+function renderLink() {
+  const view = describeConnection(link);
+  el.pill.dataset.tone = view.tone;
+  el.pillLabel.textContent = view.label;
+  el.pillWhere.textContent = link?.baseUrl ? ` ${link.baseUrl}` : '';
+  el.pill.setAttribute('title', view.detail);
+}
 let previews = {};
 let stopHeartbeat = null;
 
@@ -464,6 +478,8 @@ async function connectDaemon(baseUrl) {
     const granted = await requestDaemonOriginPermission(baseUrl, chrome).catch(() => false);
     if (!granted) return;
   }
+  connection = { ...connection, status: 'connecting', baseUrl, note: 'Connecting…' };
+  renderConnection();
   await saveLocalEnvironment({
     schema: 'focusa.workforce_local_environment.v1',
     environment_id: `local:${baseUrl}`,
@@ -474,10 +490,13 @@ async function connectDaemon(baseUrl) {
   await rememberDaemon(chrome, { baseUrl, label: 'Focusa daemon' });
   await loadConnectionOptions(`local:${baseUrl}`);
   discoveryState = { ...discoveryState, state: 'connected', baseUrl, alive: true };
+  link = { status: 'connected', baseUrl, label: connection?.label ?? null, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
+  renderLink();
   stopHeartbeat?.();
   stopHeartbeat = watchLiveness(baseUrl, (beat) => {
     discoveryState = { ...discoveryState, alive: beat.ok };
-    renderConnection();
+    link = applyBeat(link, beat);
+    renderLink();
     if (beat.ok) loadPreview(baseUrl);
   });
   renderConnection();
@@ -486,12 +505,14 @@ async function connectDaemon(baseUrl) {
 async function disconnectFromDaemon() {
   stopHeartbeat?.();
   stopHeartbeat = null;
+  link = { status: 'disconnected', baseUrl: null, label: null, since: new Date().toISOString(), lastSeenAt: null, note: 'You disconnected. Nothing is attached.' };
+  renderLink();
   if (connection) await forgetLocalEnvironment(connection.connection_id ?? connection.environment_id, chrome).catch(() => {});
   streamAbort?.abort();
   connection = null;
   discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [] };
   await loadConnectionOptions();
-  await discover({});
+  renderConnection();
 }
 
 el.pairForm?.addEventListener('submit', async (event) => {
@@ -632,6 +653,7 @@ Promise.all([listNotifications(), listAuditRecords()])
   .then(([items, audits]) => { notifications = items; auditRecords = audits; renderVerified(); renderAudit(); })
   .catch(() => { renderVerified(); renderAudit(); });
 
+renderLink();
 el.buildStamp && (el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committedAt ? ` · ${BUILD.committedAt.slice(0, 10)}` : ''}`);
 
 // The panel discovers first, then adopts any stored connection, so the surface
@@ -642,11 +664,14 @@ el.buildStamp && (el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committ
   await loadConnectionOptions().catch((error) => setStatus(el.status, 'degraded', safeError(error)));
   if (connection) {
     discoveryState = { ...discoveryState, state: 'connected', baseUrl: connection.base_url, alive: true };
-    renderConnection();
+    link = { status: 'connected', baseUrl: connection.base_url, label: connection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
+    renderLink();
     loadPreview(connection.base_url);
     stopHeartbeat?.();
     stopHeartbeat = watchLiveness(connection.base_url, (beat) => {
       discoveryState = { ...discoveryState, alive: beat.ok };
+      link = applyBeat(link, beat);
+      renderLink();
       if (beat.ok) loadPreview(connection.base_url);
     });
   } else {
