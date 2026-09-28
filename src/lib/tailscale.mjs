@@ -21,7 +21,131 @@ const LOCALAPI_CANDIDATES = Object.freeze([
   'http://localhost:41112/localapi/v0/status',
 ]);
 
+export const NATIVE_HOST = 'io.focusa.workforce.tailscale';
+const NATIVE_TIMEOUT_MS = 6000;
+const CACHE_KEY = 'focusa.workforce.tailnet_cache.v1';
+const CACHE_TTL_MS = 60_000;
+
+/**
+ * The tailnet is read once and remembered briefly.
+ *
+ * Each read spawns a process (the native host runs `tailscale status`), and a
+ * cold start asks for it more than once - the roster, the candidates, the
+ * labels. Spawning it repeatedly is slow enough that the roster came back empty
+ * on a first paint. A minute of memory (mirrored into extension storage, so a
+ * new tab is instant) removes the flicker without inventing anything: the peer
+ * list is a fact, just not a per-render one.
+ */
+let memo = null;
+let memoAt = 0;
+
+function fresh(memoAt) { return memoAt > 0 && Date.now() - memoAt < CACHE_TTL_MS && memo; }
+
+function remember(topology) {
+  if (!topology) return null;
+  memo = topology;
+  memoAt = Date.now();
+  try {
+    globalThis.chrome?.storage?.local
+      ?.set({ [CACHE_KEY]: { topology, at: memoAt } })
+      ?.catch?.(() => {});
+  } catch { /* the cache is a convenience */ }
+  return topology;
+}
+
+async function cachedFromStorage() {
+  try {
+    const raw = (await globalThis.chrome?.storage?.local?.get(CACHE_KEY))?.[CACHE_KEY];
+    if (raw && Date.now() - raw.at < CACHE_TTL_MS) return raw.topology;
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
+ * Ask the operating system's tailscale client, through Chrome's native
+ * messaging channel.
+ *
+ * This is the path that actually works on this estate: tailscaled is reachable
+ * only through its unix socket, and the LocalAPI is not exposed on TCP (verified
+ * 2026-09-27: no `Listen` preference, nothing on 4111x). A browser cannot open a
+ * unix socket, and native messaging is the supported bridge to a local program.
+ * It is also the portable one: wherever the extension and the tailscale CLI are
+ * installed, the same call works.
+ *
+ * @returns {Promise<null | object>} null when the host is not installed.
+ */
+export function readTailscaleNative({
+  connectNative = globalThis.chrome?.runtime?.connectNative,
+  timeoutMs = NATIVE_TIMEOUT_MS,
+} = {}) {
+  // Explicitly passing null/undefined-as-undefined means "not available here";
+  // only a real function is an available channel.
+  if (typeof connectNative !== 'function') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      try { port?.disconnect(); } catch { /* already gone */ }
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    let port;
+    try {
+      port = connectNative(NATIVE_HOST);
+    } catch {
+      clearTimeout(timer);
+      resolve(null);
+      return;
+    }
+    port.onMessage.addListener((message) => {
+      clearTimeout(timer);
+      if (message && message.peers) finish(normalizeTopology(message));
+      else finish(null);
+    });
+    port.onDisconnect.addListener(() => {
+      clearTimeout(timer);
+      // Not installed, or not permitted for this extension id: not an error.
+      finish(null);
+    });
+    try { port.postMessage({ type: 'who-is-out-there' }); } catch {
+      clearTimeout(timer);
+      finish(null);
+    }
+  });
+}
+
 /** A peer worth probing: a machine that could be running a Focusa daemon. */
+/** One normaliser for both sources, so the two can never disagree. */
+function normalizeTopology(body) {
+  const ipv4 = (ips) => (Array.isArray(ips) ? ips : []).filter((ip) => typeof ip === 'string' && !ip.includes(':'));
+  // The native host returns `peers`; the LocalAPI returns `Peer`.
+  const peers = Object.values(body?.peers ?? body?.Peer ?? {}).map((peer) => Object.freeze({
+    id: peer?.id ?? peer?.ID ?? null,
+    name: peer?.name ?? nameOf(peer ?? {}) ?? null,
+    dnsName: peer?.dnsName ?? peer?.DNSName ?? null,
+    ips: Object.freeze(ipv4(peer?.ips ?? peer?.TailscaleIPs)),
+    online: peer?.online === true || peer?.Online === true,
+    os: peer?.os ?? peer?.OS ?? null,
+    isSelf: false,
+  })).filter((peer) => peer.ips.length);
+  peers.sort((a, b) => (Number(b.online) - Number(a.online)) || String(a.name).localeCompare(String(b.name)));
+  const selfBody = body?.self ?? body?.Self ?? {};
+  return Object.freeze({
+    self: Object.freeze({
+      id: selfBody?.id ?? selfBody?.ID ?? null,
+      name: ((selfBody?.dnsName ?? selfBody?.DNSName ?? '').split('.')[0] || selfBody?.name || selfBody?.HostName || null),
+      dnsName: (selfBody?.dnsName ?? selfBody?.DNSName ?? '').replace(/\.$/, '') || null,
+      ips: Object.freeze(ipv4(selfBody?.ips ?? selfBody?.TailscaleIPs)),
+      isSelf: true,
+    }),
+    peers: Object.freeze(peers),
+    suffix: body?.suffix ?? body?.MagicDNSSuffix ?? null,
+    backend: body?.backend ?? body?.BackendState ?? null,
+    source: 'native',
+  });
+}
+
 function peerCandidates(peer) {
   const ips = Array.isArray(peer?.TailscaleIPs) ? peer.TailscaleIPs : [];
   // IPv4 first: Focusa binds IPv4 loopback, and IPv6 tailnet addresses add noise.
@@ -29,9 +153,9 @@ function peerCandidates(peer) {
 }
 
 function nameOf(peer) {
-  const dns = String(peer?.DNSName ?? '').replace(/\.$/, '');
+  const dns = String(peer?.dnsName ?? peer?.DNSName ?? '').replace(/\.$/, '');
   const short = dns.split('.')[0];
-  return short || peer?.HostName || null;
+  return short || peer?.hostName || peer?.HostName || null;
 }
 
 /**
@@ -41,7 +165,20 @@ function nameOf(peer) {
  * @returns {Promise<null | {self: object, peers: any[], suffix: string|null}>}
  *   null when the LocalAPI is not available here.
  */
-export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, timeoutMs = 2500 } = {}) {
+export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, timeoutMs = 2500, connectNative, force = false } = {}) {
+  if (!force) {
+    const warm = fresh(memoAt);
+    if (warm) return warm;
+    const stored = await cachedFromStorage();
+    if (stored) { memo = stored; memoAt = Date.now(); return stored; }
+  }
+  // The OS client first: it is the source that is actually available.
+  // `connectNative: null` is an explicit "this build has no native channel"
+  // (used by the LocalAPI tests); omitting it uses Chrome's, when present.
+  const native = await (connectNative === undefined
+    ? readTailscaleNative()
+    : readTailscaleNative({ connectNative })).catch(() => null);
+  if (native?.peers?.length || native?.self) return remember(native);
   for (const url of LOCALAPI_CANDIDATES) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -54,31 +191,7 @@ export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, time
       const body = await response.json().catch(() => null);
       if (!body || typeof body !== 'object') continue;
 
-      const self = {
-        id: body?.Self?.ID ?? null,
-        name: nameOf(body?.Self ?? {}) ?? body?.Self?.HostName ?? null,
-        dnsName: String(body?.Self?.DNSName ?? '').replace(/\.$/, '') || null,
-        ips: peerCandidates(body?.Self ?? {}),
-        isSelf: true,
-      };
-      const peers = [];
-      for (const peer of Object.values(body?.Peer ?? {})) {
-        const ips = peerCandidates(peer);
-        if (!ips.length) continue;
-        peers.push({
-          id: peer?.ID ?? null,
-          name: nameOf(peer),
-          dnsName: String(peer?.DNSName ?? '').replace(/\.$/, '') || null,
-          ips,
-          online: peer?.Online === true,
-          os: peer?.OS ?? null,
-          isSelf: false,
-        });
-      }
-      // Online peers first, then by name: the machines most likely to be running
-      // a daemon are the ones a person is sitting at.
-      peers.sort((a, b) => (Number(b.online) - Number(a.online)) || String(a.name).localeCompare(String(b.name)));
-      return { self, peers, suffix: body?.MagicDNSSuffix ?? null, backend: body?.BackendState ?? null };
+      return remember({ ...normalizeTopology(body), source: 'localapi' });
     } catch { /* try the next LocalAPI address */ }
     finally { clearTimeout(timer); }
   }

@@ -18,6 +18,8 @@ import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaem
 import { saveLocalEnvironment } from './lib/storage.mjs';
 import { BUILD } from './lib/build-info.mjs';
 import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
+import { readTailscaleTopology } from './lib/tailscale.mjs';
+import { peerOrigins } from './lib/discovery.mjs';
 
 /** Run an interaction and show any failure IN the surface. */
 async function guard(label, work) {
@@ -71,6 +73,9 @@ const el = {
   pillWhere: $('#conn-where'),
   pillAction: $('#conn-action'),
   detail: $('#conn-detail'),
+  roster: $('#start-roster'),
+  peerlist: $('#sp-peerlist'),
+  count: $('#sp-roster-count'),
   publicDate: $('#public-date'),
   publicMission: $('#public-mission'),
   publicWorkforce: $('#public-workforce'),
@@ -114,6 +119,81 @@ let discoveryState = { state: 'discovering', daemons: [], baseUrl: null, alive: 
 let link = initialConnection();
 
 /** The one place the Start Page's connection state is turned into words. */
+/**
+ * The tailnet roster, by workflow: the machines are always visible (seeing costs
+ * nothing), and selecting one reveals what it holds plus the single action that
+ * attaches to it. Depth is earned, never assumed.
+ */
+let selectedPeer = null;
+
+function renderRoster() {
+  const peers = link?.connectable ?? [];
+  if (!el.roster) return;
+  el.roster.hidden = peers.length === 0;
+  if (el.roster.hidden) return;
+  el.count && (el.count.textContent = `${peers.filter((p) => p.online).length} online · ${peers.length} total`);
+  el.peerlist.replaceChildren();
+  for (const peer of peers) {
+    const item = document.createElement('li');
+    const isOpen = selectedPeer === peer.name;
+    item.className = `sp-peer${peer.online ? '' : ' off'}${isOpen ? ' open' : ''}`;
+
+    // 1. the machine, always visible
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'sp-peer-pick';
+    pick.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    const dot = document.createElement('span');
+    dot.className = 'sp-peer-dot';
+    const name = document.createElement('span');
+    name.className = 'sp-peer-name';
+    name.textContent = peer.name ?? 'peer';
+    pick.append(dot, name);
+    pick.addEventListener('click', () => {
+      selectedPeer = isOpen ? null : peer.name;
+      renderRoster();
+    });
+    item.append(pick);
+
+    // 2. its detail, revealed on selection
+    if (isOpen) {
+      const detail = document.createElement('div');
+      detail.className = 'sp-peer-detail';
+      const address = document.createElement('code');
+      address.textContent = (peer.ips ?? []).join(', ') || 'no address reported';
+      const what = document.createElement('p');
+      what.className = 'sp-peer-what';
+      what.textContent = peer.summary
+        ? peer.summary
+        : peer.online ? 'Answers on the tailnet. Connect to see what it holds.' : 'Offline on the tailnet right now.';
+      const actions = document.createElement('div');
+      actions.className = 'sp-row';
+      const connect = document.createElement('button');
+      connect.type = 'button';
+      connect.className = 'sp-btn sp-btn-primary';
+      connect.textContent = peer.granted ? 'Connect' : 'Allow & connect';
+      connect.addEventListener('click', () => guard('Connect', () => connectPeer(peer)));
+      actions.append(connect);
+      detail.append(address, what, actions);
+      item.append(detail);
+    }
+    el.peerlist.append(item);
+  }
+}
+
+/** Grant one machine and attach: the single click remote attach needs. */
+async function connectPeer(peer) {
+  const origin = (peer.origins ?? [])[0] ?? (peer.ips?.[0] ? `http://${peer.ips[0]}:8787` : null);
+  if (!origin) return null;
+  const granted = await requestDaemonOriginPermission(origin).catch(() => false);
+  if (!granted) {
+    connection = { ...connection, status: 'disconnected', baseUrl: null, note: 'Access to that machine was not allowed' };
+    renderLink();
+    return null;
+  }
+  return connect(origin);
+}
+
 function renderLink() {
   const view = describeConnection(link);
   el.pill.dataset.tone = view.tone;
@@ -132,8 +212,29 @@ function renderLink() {
     );
     el.detail.append(text);
   }
-  el.private.hidden = !isAttached(link) || discoveryState.state === 'found';
-  el.unpaired.hidden = isAttached(link) || link?.status === 'disconnected';
+  // When a daemon is attached the private face is the hero; when none is, the
+  // not-connected face is. Exactly one leads, and the other is out of the way.
+  const attached = isAttached(link);
+  el.private.hidden = !attached;
+  el.unpaired.hidden = attached;
+  renderRoster();
+}
+
+/** Machines the tailnet reports, offered when they are not yet granted. */
+async function loadRoster() {
+  const reachable = await reachableOriginFilter(chrome);
+  const topology = await readTailscaleTopology().catch(() => null);
+  if (!topology) { link = { ...link, connectable: [] }; return; }
+  const connectable = [];
+  for (const peer of topology.peers) {
+    if (peer.isSelf) continue;
+    const origins = peerOrigins(peer);
+    const allowed = [];
+    for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
+    connectable.push({ name: peer.name, ips: peer.ips, online: peer.online, os: peer.os, granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]] });
+  }
+  link = { ...link, connectable };
+  renderLink();   // the roster arrives after the first paint
 }
 
 /** Daemons this browser has used before, so an absence is explained, not silent. */
@@ -246,9 +347,7 @@ async function discover({ extra = [] } = {}) {
     return;
   }
   discoveryState = { state: 'found', daemons: found, baseUrl: found[0].baseUrl, alive: true, answers };
-  if (!isAttached(link)) {
-    link = { ...link, status: 'disconnected', baseUrl: null, note: `${found.length} daemon(s) available` };
-  }
+  await loadRoster();
   renderLink();
   renderDiscovery();
   for (const daemon of found) loadPreview(daemon.baseUrl);
@@ -431,8 +530,11 @@ if (new URL(window.location.href).searchParams.get('public-work') === '1') {
   if (el.buildStamp) el.buildStamp.textContent = `build ${BUILD.sha}${BUILD.committedAt ? ` · ${BUILD.committedAt.slice(0, 10)}` : ''}`;
   // A returning tab goes straight to the workforce interface; discovery is for
   // first run (operator requirement 2026-09-27: auto-load after initial connect).
+  // Discovery is always run: what is out there must be visible without a click,
+  // whether or not a daemon is already attached.
+  const discoveryRun = guard('Discovery', () => discover({}));
   const connected = await loadSelectedConnection();
-  if (!connected) await guard('Discovery', () => discover({}));
+  await discoveryRun;
   if (connected) {
     link = { status: 'connected', baseUrl: liveConnection.base_url, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
     renderLink();

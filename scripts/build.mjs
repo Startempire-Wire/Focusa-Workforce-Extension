@@ -8,7 +8,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = process.env.WF_DIST_DIR ? resolve(process.env.WF_DIST_DIR) : resolve(root, 'dist');
 const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
 
-const exactPermissions = ['activeTab', 'contextMenus', 'scripting', 'sidePanel', 'storage'];
+// nativeMessaging is how the extension asks the OS tailscale client who the
+// tailnet is: tailscaled is only reachable via its unix socket, and a browser
+// cannot open one. The host is a read-only `tailscale status` reader.
+const exactPermissions = ['activeTab', 'contextMenus', 'nativeMessaging', 'scripting', 'sidePanel', 'storage'];
 const actualPermissions = [...(manifest.permissions ?? [])].sort();
 if (JSON.stringify(actualPermissions) !== JSON.stringify(exactPermissions)) {
   throw new Error(`manifest permissions must equal ${exactPermissions.join(', ')}`);

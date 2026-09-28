@@ -22,6 +22,7 @@
   "permissions": [
     "activeTab",
     "contextMenus",
+    "nativeMessaging",
     "scripting",
     "sidePanel",
     "storage"
@@ -60,5 +61,6 @@
     "http://127.0.0.1/*",
     "http://127.0.0.1:41112/*",
     "http://localhost/*"
-  ]
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwymnTT3yPTaxC4iQfEC8NP9/Q8hTaHFrGezGbzd9slHSCIMP6R58437ezAJ4SABZqakgb0kUQI8nPFN5DtSS79x6VRnZ/JcIiVlXC2YqxGGizFWNBxW7/OCqNqqBiVF3/F0KAWUYzfXxWObfiKVJ+SEnYykvl/dZqxV39a5rk+4HgnUdSzzva/6Tvy0NvARYbCi+IOPDLMVgPVEVlT+VcgH4nHTp+zGRw4RZfizAuNmhhd/D6iThl6P6k5BklcB9+cbzVOtwt4VM1EIIBM6bbryZBHhJCZbIEaW8h7ttsR8SY3XP+27TOi2Vj3CfBvhgxjoiCv6kL9KNL4TON+s8kQIDAQAB"
 }

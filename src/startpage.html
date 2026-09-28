@@ -7,19 +7,17 @@
   <link rel="stylesheet" href="startpage.css">
 </head>
 <!--
-  docs/17 §4 Private Start Page — "orient me". The calmest face: opening the
-  door to a functioning organization, not a monitoring dashboard.
-  Region order fixed by the atlas: brand + freshness → CURRENT WORKSTREAM hero
-  (title / objective / Foreman / last verified) → Continue + Needs You N +
-  Open Workforce → NEEDS YOU | WORKING NOW (2-col) → VERIFIED RECENTLY.
-  docs/17 §5: ?public-work=1 replaces the whole body with a curated public
-  snapshot; it never falls through to private mode.
+  docs/17 §4 Private Start Page — "orient me": the calmest face in the product.
+  Region order is the atlas order, with the tailnet roster as CONTEXT that stays
+  visible in every state (seeing what is out there must never cost a click) and
+  reveals depth only when a machine is selected (progressive disclosure along the
+  connect workflow). docs/17 §5: ?public-work=1 renders the public snapshot.
 -->
-<body>
+<body class="sp">
   <header class="sp-header">
     <p class="sp-brand">Focusa Workforce</p>
     <div class="sp-env">
-      <!-- One indicator, same words and same signal on every surface. -->
+      <!-- One indicator, the same words and signal on every surface. -->
       <button type="button" class="conn" id="connection-pill" data-tone="off" aria-live="polite">
         <span class="conn-dot" aria-hidden="true"></span>
         <span class="conn-text"><span id="conn-label">Disconnected</span><span class="conn-where" id="conn-where"></span></span>
@@ -28,20 +26,23 @@
       <span id="daemon-select-label" class="sr-only">Not connected</span>
     </div>
   </header>
+
   <!-- The words, in full, with the action that changes them. -->
   <p class="conn-detail" id="conn-detail" data-tone="off" hidden></p>
 
   <main class="sp-container">
-    <!-- PRIVATE -->
-    <section id="start-private" aria-labelledby="start-focus-heading">
+
+    <!-- ══ CONNECTED: Current Workstream hero, then the summary (docs/17 §4) ══ -->
+    <section id="start-private" hidden aria-labelledby="start-focus-heading">
       <p class="sp-label">Current Workstream</p>
       <h1 id="start-focus-heading" class="sp-hero-title">— no Workstream selected</h1>
       <p id="start-objective" class="sp-hero-objective">Choose the work you want this browser to return to.</p>
       <p id="start-meta" class="sp-hero-meta">—</p>
       <p id="start-telemetry" class="sp-hero-meta" hidden></p>
       <p id="start-stale" class="sp-stale" hidden>Last confirmed —. Current work may have changed. <button id="start-refresh" type="button" class="sp-link-btn">Refresh</button></p>
+
       <div class="sp-actions">
-        <button id="orient-now" type="button" class="sp-btn sp-btn-primary"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg> Continue</button>
+        <button id="orient-now" type="button" class="sp-btn sp-btn-primary">Continue</button>
         <button id="open-needs" type="button" class="sp-btn">Needs You <span id="start-needs-count">0</span></button>
         <button id="open-workforce" type="button" class="sp-btn sp-btn-quiet">Open Workforce</button>
       </div>
@@ -64,9 +65,7 @@
       </section>
     </section>
 
-    <!-- NOT CONNECTED (docs/17 §4): the calm face, but alive. Discovery is
-         automatic and silent, each daemon previews what it really holds, and
-         attaching is one click. No pairing form until the operator asks. -->
+    <!-- ══ NOT CONNECTED: the calm face that says what is available ══ -->
     <section id="start-unpaired" hidden aria-labelledby="start-unpaired-heading">
       <p class="sp-label">Focusa</p>
       <h1 id="start-unpaired-heading" class="sp-hero-title">Looking for your workforce</h1>
@@ -83,7 +82,17 @@
       </div>
     </section>
 
-    <!-- PUBLIC (docs/17 §5) -->
+    <!-- ══ TAILNET ROSTER: context, always visible, depth on selection ══ -->
+    <section class="sp-roster" id="start-roster" hidden aria-labelledby="sp-roster-heading">
+      <div class="sp-roster-head">
+        <h2 id="sp-roster-heading" class="sp-label">Your tailnet</h2>
+        <span class="sp-roster-count" id="sp-roster-count"></span>
+      </div>
+      <ul class="sp-peerlist" id="sp-peerlist"></ul>
+      <p class="sp-meta-line" id="sp-roster-hint">Select a machine to see what it holds, then connect.</p>
+    </section>
+
+    <!-- ══ PUBLIC (docs/17 §5) ══ -->
     <section id="start-public" hidden aria-labelledby="public-heading">
       <p class="sp-label">Public snapshot · <span id="public-date"></span></p>
       <h1 id="public-heading" class="sp-hero-title">Focusa Workforce</h1>
@@ -114,6 +123,7 @@
     <span class="sp-footer-meta" id="start-build">Focusa Workforce</span>
     <p id="build-stamp" class="sp-footer-meta"></p>
   </footer>
+
   <!-- A failure in this surface is shown in the surface, never console-only. -->
   <p id="surface-error" class="sp-error" role="alert" hidden></p>
 

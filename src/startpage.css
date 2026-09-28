@@ -275,3 +275,66 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
   details.tech[open] > summary { transition: color var(--motion-fast) var(--ease-out); }
   details.tech > * { animation: wfx-settle var(--motion-base) var(--ease-out) both; }
 }
+
+/* ── The tailnet roster (docs/17 §4, progressive disclosure) ──
+   The machines are always visible; selecting one reveals its detail. Nothing
+   about "what is out there" is behind a click. */
+.sp-roster { display: grid; gap: 12px; }
+.sp-roster-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sp-roster-head .sp-label { margin: 0; }
+.sp-roster-count { font: var(--text-micro); color: var(--text-muted); }
+.sp-meta-line { margin: 0; font: var(--text-micro); color: var(--text-muted); }
+
+.sp-peerlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sp-peer {
+  display: block; width: max-content; max-width: 100%;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  transition: border-color var(--motion-base) var(--ease-out),
+              box-shadow var(--motion-base) var(--ease-out);
+}
+.sp-peer.open { border-color: var(--accent-edge); border-radius: var(--radius-md); box-shadow: var(--elevation-2); }
+.sp-peer.off { opacity: .62; }
+.sp-peer-pick {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 16px 8px 13px; border: 0; background: transparent;
+  color: var(--text-primary); font: var(--text-body-strong); cursor: pointer; text-align: left;
+  border-radius: var(--radius-pill); white-space: nowrap;
+}
+.sp-peer-pick:hover { background: var(--bg-subtle); }
+.sp-peer-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); flex: none; }
+.sp-peer:not(.off) .sp-peer-dot { background: var(--success); }
+@media (prefers-reduced-motion: no-preference) {
+  .sp-peer:not(.off) .sp-peer-dot { animation: sp-peer-breathe 2.8s ease-in-out infinite; }
+}
+@keyframes sp-peer-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: .75; } }
+
+.sp-peer-detail {
+  display: grid; gap: 8px; padding: 11px 15px 13px; min-width: 300px;
+  border-top: 1px solid var(--border-subtle);
+}
+.sp-peer-detail code { font: var(--text-micro); color: var(--text-muted); overflow-wrap: anywhere; }
+.sp-peer-what { margin: 0; font: var(--text-small); color: var(--text-secondary); }
+
+/* ── Start Page craft (docs/17 §4: the calmest face) ───────────────────────
+   Hero leads, context follows, whitespace does the separating. At most one
+   major surface around Current Workstream, and the roster reads as context
+   rather than another card competing with it. */
+.sp-container { gap: 30px; }
+
+#start-private { display: grid; gap: 22px; }
+#start-private > .sp-label { margin: 0; }
+.sp-hero-title { letter-spacing: -0.02em; }
+.sp-hero-objective { margin-top: 6px; }
+.sp-hero-meta { margin-top: 4px; }
+
+
+/* the summary keeps the atlas 2-column rhythm and calm type */
+.sp-summary { gap: 28px; }
+.sp-summary-col { gap: 12px; }
+.sp-list { gap: 12px; }
+.sp-list li { padding-bottom: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sp-roster { animation: wfx-settle 320ms cubic-bezier(.22,.68,.32,1) both; }
+}

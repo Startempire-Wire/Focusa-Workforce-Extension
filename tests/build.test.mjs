@@ -49,7 +49,7 @@ test.after(() => rm(VERIFY_DIR, { recursive: true, force: true }));
 test('manifest is least-privilege MV3 with no content script', async () => {
   const manifest = JSON.parse(await readFile(resolve(root, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
-  assert.deepEqual([...manifest.permissions].sort(), ['activeTab', 'contextMenus', 'scripting', 'sidePanel', 'storage']);
+  assert.deepEqual([...manifest.permissions].sort(), ['activeTab', 'contextMenus', 'nativeMessaging', 'scripting', 'sidePanel', 'storage']);
   assert.deepEqual([...manifest.optional_host_permissions].sort(), ['http://*/*', 'https://*/*']);
   assert.equal(manifest.content_scripts, undefined);
   // Local daemon origins are static so discovery is automatic (operator

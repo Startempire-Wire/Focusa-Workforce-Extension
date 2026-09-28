@@ -19,7 +19,7 @@ const status = {
 const jsonFetch = (payload, status = 200) => async () => new Response(JSON.stringify(payload), { status });
 
 test('the tailnet tells the extension who its peers are', async () => {
-  const topology = await readTailscaleTopology({ fetchImpl: jsonFetch(status) });
+  const topology = await readTailscaleTopology({ connectNative: null, fetchImpl: jsonFetch(status) });
   assert.equal(topology.backend, 'Running');
   assert.equal(topology.suffix, 'tail9229d6.ts.net');
   assert.equal(topology.self.name, 'chromebook');
@@ -32,7 +32,7 @@ test('the tailnet tells the extension who its peers are', async () => {
 });
 
 test('every peer becomes a candidate on the fixed port set, never a sweep', async () => {
-  const topology = await readTailscaleTopology({ fetchImpl: jsonFetch(status) });
+  const topology = await readTailscaleTopology({ connectNative: null, fetchImpl: jsonFetch(status) });
   const candidates = tailnetCandidates(topology);
   // 4 peers x 4 ports; this machine's own address is not re-listed.
   assert.equal(candidates.length, 16);
@@ -48,15 +48,15 @@ test('every peer becomes a candidate on the fixed port set, never a sweep', asyn
 });
 
 test('an unavailable LocalAPI is reported as absent, never invented', async () => {
-  const refused = await readTailscaleTopology({ fetchImpl: async () => { throw new Error('connection refused'); } });
+  const refused = await readTailscaleTopology({ connectNative: null, fetchImpl: async () => { throw new Error('connection refused'); } });
   assert.equal(refused, null);
   assert.deepEqual(tailnetCandidates(refused), []);
-  const errored = await readTailscaleTopology({ fetchImpl: async () => new Response('nope', { status: 401 }) });
+  const errored = await readTailscaleTopology({ connectNative: null, fetchImpl: async () => new Response('nope', { status: 401 }) });
   assert.equal(errored, null, 'a LocalAPI that refuses us yields no peers, not a guess');
 });
 
 test('a payload with no peers is honest rather than fatal', async () => {
-  const topology = await readTailscaleTopology({ fetchImpl: jsonFetch({ BackendState: 'Running', Self: status.Self, Peer: {} }) });
+  const topology = await readTailscaleTopology({ connectNative: null, fetchImpl: jsonFetch({ BackendState: 'Running', Self: status.Self, Peer: {} }) });
   assert.deepEqual(topology.peers, []);
   assert.deepEqual(tailnetCandidates(topology), []);
 });
@@ -73,4 +73,52 @@ test('choosing a tailnet machine proves a daemon is there before attaching', asy
   const roster = await tailnetRoster({}, { fetchImpl: jsonFetch(status) });
   assert.equal(roster.peers.length, 4);
   assert.ok(roster.peers.every((p) => p.ips.length === 1), 'IPv4 only');
+});
+
+test('the native host is asked first, because it is the source that exists', async () => {
+  const { readTailscaleNative, NATIVE_HOST } = await import('../src/lib/tailscale.mjs');
+  assert.equal(NATIVE_HOST, 'io.focusa.workforce.tailscale');
+  // A host that answers is used without touching the network at all.
+  const listeners = [];
+  const port = {
+    onMessage: { addListener: (fn) => listeners.push(['message', fn]) },
+    onDisconnect: { addListener: (fn) => listeners.push(['disconnect', fn]) },
+    postMessage: (message) => { port.sent = message; },
+    disconnect: () => {},
+  };
+  const asked = [];
+  // start the call, then answer like the host does (the promise resolves on reply)
+  const pending = readTailscaleNative({
+    connectNative: (name) => { asked.push(name); return port; },
+  });
+  listeners.find(([kind]) => kind === 'message')[1]({
+    self: { name: 'chromebook', ips: ['100.127.113.90'] },
+    peers: [{ id: 'p1', name: 'host-philoveracity-com', ips: ['100.94.238.56'], online: true, os: 'linux' }],
+    suffix: 'tail9229d6.ts.net',
+  });
+  const result = await pending;
+  assert.deepEqual(asked, ['io.focusa.workforce.tailscale']);
+  assert.equal(result.source, 'native');
+  assert.equal(result.peers.length, 1);
+  assert.equal(result.peers[0].name, 'host-philoveracity-com');
+  assert.equal(result.self.name, 'chromebook');
+});
+
+test('a missing or refused native host is not an error', async () => {
+  const { readTailscaleNative } = await import('../src/lib/tailscale.mjs');
+  // no native messaging available at all
+  assert.equal(await readTailscaleNative({ connectNative: null }), null);
+  // host not installed: connectNative throws
+  assert.equal(await readTailscaleNative({ connectNative: () => { throw new Error('Not found'); } }), null);
+  // host refused (wrong extension id): disconnects immediately
+  const listeners = [];
+  const port = {
+    onMessage: { addListener: (fn) => listeners.push(['message', fn]) },
+    onDisconnect: { addListener: (fn) => listeners.push(['disconnect', fn]) },
+    postMessage: () => {},
+    disconnect: () => {},
+  };
+  const pending = readTailscaleNative({ connectNative: () => port });
+  listeners.find(([kind]) => kind === 'disconnect')[1]();
+  assert.equal(await pending, null);
 });
