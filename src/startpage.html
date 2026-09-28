@@ -65,31 +65,36 @@
       </section>
     </section>
 
-    <!-- ══ NOT CONNECTED: the calm face that says what is available ══ -->
+    <!-- ══ NOT CONNECTED: the calm face that says what is AVAILABLE.
+         The inventory IS the content here - no form, no wizard, no apology. ══ -->
     <section id="start-unpaired" hidden aria-labelledby="start-unpaired-heading">
-      <p class="sp-label">Focusa</p>
-      <h1 id="start-unpaired-heading" class="sp-hero-title">Looking for your workforce</h1>
-      <p class="sp-hero-objective">We check this device and your tailnet. Nothing leaves this browser, and you choose what to attach to.</p>
+      <p class="sp-label">Nothing is attached</p>
+      <h1 id="start-unpaired-heading" class="sp-hero-title">Your workforce, waiting</h1>
+      <p class="sp-hero-objective">We checked this device, your tailnet, and everywhere you have connected before. Choose what to attach to.</p>
+
+      <!-- every daemon and machine that was found, on arrival, no clicks -->
       <div id="start-connect" class="sp-connect" role="status" aria-live="polite"></div>
-      <form id="start-seed" class="sp-seed">
+
+      <!-- the roster: context, visible immediately -->
+      <section class="sp-roster" id="start-roster" hidden aria-labelledby="sp-roster-heading">
+        <div class="sp-roster-head">
+          <h2 id="sp-roster-heading" class="sp-label">Your tailnet</h2>
+          <span class="sp-roster-count" id="sp-roster-count"></span>
+        </div>
+        <ul class="sp-peerlist" id="sp-peerlist"></ul>
+        <p class="sp-meta-line" id="sp-roster-hint">Select a machine to see what it holds, then connect.</p>
+      </section>
+
+      <!-- asking for a daemon is a choice, not the entry condition -->
+      <div class="sp-more">
+        <button type="button" class="sp-link-btn" id="start-more-toggle" aria-expanded="false" aria-controls="start-seed">Connect another daemon</button>
+      </div>
+      <form id="start-seed" class="sp-seed" hidden>
         <label class="sr-only" for="start-seed-input">Focusa name or address</label>
         <input id="start-seed-input" placeholder="host or address, e.g. workhorse.local or 100.64.1.9:8787" />
         <button type="submit" class="sp-btn">Find</button>
       </form>
       <p id="start-seed-note" class="sp-hero-meta" role="status"></p>
-      <div class="sp-actions">
-        <button id="pair-focusa" type="button" class="sp-btn sp-btn-quiet">Pair a daemon we cannot see</button>
-      </div>
-    </section>
-
-    <!-- ══ TAILNET ROSTER: context, always visible, depth on selection ══ -->
-    <section class="sp-roster" id="start-roster" hidden aria-labelledby="sp-roster-heading">
-      <div class="sp-roster-head">
-        <h2 id="sp-roster-heading" class="sp-label">Your tailnet</h2>
-        <span class="sp-roster-count" id="sp-roster-count"></span>
-      </div>
-      <ul class="sp-peerlist" id="sp-peerlist"></ul>
-      <p class="sp-meta-line" id="sp-roster-hint">Select a machine to see what it holds, then connect.</p>
     </section>
 
     <!-- ══ PUBLIC (docs/17 §5) ══ -->

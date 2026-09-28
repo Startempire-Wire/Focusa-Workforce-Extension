@@ -41,10 +41,18 @@ test('start page implements the docs/17 §4 state replacements', () => {
   }
   assert.match(js, /Not connected/);
   // The not-connected state is a LIVING discovery surface, not a pairing wall.
-  assert.match(html, /Looking for your workforce/);
+  // docs/17 §4 unpaired replacement: calm, centred, and no empty sections below.
+  // The content is what discovery found, so the state is informative, not a wall.
+  assert.match(html, /Nothing is attached/);
+  assert.match(html, /Your workforce, waiting/);
+  assert.doesNotMatch(html, /Your workforce is not connected on this device/,
+    'the dead pairing copy must not come back');
+  assert.match(html, /id="start-connect"/, 'it shows what was found');
+  assert.match(html, /id="start-more-toggle"/, 'and asking for another is one quiet control');
   assert.match(html, /id="start-connect"/, 'it has a connection surface');
   assert.match(html, /name or address/, 'it accepts a name or address directly');
-  assert.match(html, /Pair a daemon we cannot see/, 'pairing stays available but secondary');
+  // Pairing a daemon this device cannot see is still one click away, in Settings.
+  assert.match(js, /#\/settings\?section=connections/, 'remote pairing remains reachable');
   assert.doesNotMatch(html, /Your workforce is not connected on this device/,
     'the dead pairing copy must not come back');
   // and it is driven by the shared discovery, with live previews

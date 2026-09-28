@@ -60,7 +60,6 @@ const el = {
   needsCount: $('#start-needs-count'),
   working: $('#start-working'),
   verified: $('#start-verified'),
-  pair: $('#pair-focusa'),
   unpairedHeading: $('#start-unpaired-heading'),
   connect: $('#start-connect'),
   seedForm: $('#start-seed'),
@@ -155,6 +154,8 @@ function buildDetail(peer) {
 function renderRoster() {
   const peers = link?.connectable ?? [];
   if (!el.roster) return;
+  // Shown whenever the tailnet has peers, connected or not: seeing what is out
+  // there must never cost a click.
   el.roster.hidden = peers.length === 0;
   if (el.roster.hidden) return;
   el.count && (el.count.textContent = `${peers.filter((p) => p.online).length} online · ${peers.length} total`);
@@ -297,7 +298,9 @@ function renderDiscovery() {
   el.unpaired.hidden = false;
   el.private.hidden = true;
   if (discoveryState.state === 'found') {
-    el.unpairedHeading && (el.unpairedHeading.textContent = 'Your workforce is here');
+    // Stated once, in the markup, and left alone: the heading is the state, not
+    // a status message that changes with every probe.
+    el.unpairedHeading && (el.unpairedHeading.textContent = 'Your workforce, waiting');
     el.connect.innerHTML = `
       <ul class="sp-daemons">
         ${discoveryState.daemons.map((daemon) => {
@@ -438,6 +441,15 @@ async function disconnect() {
   renderLink();
 }
 
+// Asking for a daemon by name is a deliberate choice, not the entry condition.
+$('#start-more-toggle')?.addEventListener('click', (event) => {
+  const form = el.seedForm;
+  const open = form.hidden;
+  form.hidden = !open;
+  event.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) el.seedInput?.focus();
+});
+
 el.pillAction?.addEventListener('click', () => {
   if (isAttached(link)) { guard('Disconnect', disconnect); return; }
   if (discoveryState.daemons?.length) { guard('Connect', () => connect(discoveryState.baseUrl ?? discoveryState.daemons[0].baseUrl)); return; }
@@ -549,7 +561,8 @@ el.continue.addEventListener('click', () => openWorkforce('#/work/detail'));
 el.openNeeds.addEventListener('click', () => openWorkforce('#/needs-you'));
 el.openNeeds2.addEventListener('click', () => openWorkforce('#/needs-you'));
 el.openWorkforce.addEventListener('click', () => openWorkforce('#/overview'));
-el.pair.addEventListener('click', () => openWorkforce('#/settings?section=connections'));
+// Pairing a remote daemon lives in Settings; the Start Page offers discovery first.
+el.pair?.addEventListener('click', () => openWorkforce('#/settings?section=connections'));
 el.refresh.addEventListener('click', refresh);
 window.addEventListener('pagehide', () => streamAbort?.abort());
 
