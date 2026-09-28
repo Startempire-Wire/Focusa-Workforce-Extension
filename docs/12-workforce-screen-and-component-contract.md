@@ -370,7 +370,7 @@ Needs You / failure / retry condition
 last Evidence / settlement
 ```
 
-Secondary detail may expose reliability, latency/resource posture, owner interruptions, defects/reversals and the W.I.N.S. outcome/momentum-leverage handoff.
+Secondary detail may expose reliability, latency/resource posture, owner interruptions, defects/reversals and the base Wirebot/Perpetua outcome/leverage handoff and optional W.I.N.S. projection.
 
 Do not show a single “routine score” that hides dimensions. Do not infer business value from scheduler/run health. Actions such as pause/revoke/retry must map to owning operations and re-read source truth afterward.
 
@@ -617,7 +617,7 @@ Related work
 Verification history
 Settlement/Receipt
 Correction/revocation
-Accepted outcome/W.I.N.S. link if present
+Source-domain accepted-outcome/base-leverage link; optional W.I.N.S. link if enabled
 ```
 
 ---
