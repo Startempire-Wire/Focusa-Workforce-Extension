@@ -454,7 +454,7 @@ working / waiting / blocked / Needs You
 missed-run / retry / recovery posture
 routine-health dimensions
 Evidence / settlement refs
-W.I.N.S. accepted-outcome / momentum-leverage handoff ref
+base leverage/outcome handoff ref plus optional W.I.N.S. projection ref
 ```
 
 Rules:
@@ -463,7 +463,8 @@ Rules:
 - no invented next-run time when the scheduler owner does not report one;
 - scheduler reachability does not imply Focusa authority;
 - a healthy run does not imply a good business outcome;
-- a W.I.N.S. score/momentum/leverage projection is not rewritten locally;
+- the base Wirebot/Perpetua leverage projection is not rewritten locally;
+- a W.I.N.S. projection, when present, is optional/setup-aware and is not required for routine health;
 - consequential pause/revoke/retry uses the owning typed operation and then re-reads source truth;
 - routine analytics remain inspectable as dimensions rather than collapsed into a Workforce KPI.
 
