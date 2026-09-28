@@ -210,9 +210,10 @@ Display order:
 1. Current focus / most recently active Workstream
 2. Needs You count and highest-consequence items
 3. Working Now summary
-4. Verified/Settled recently
-5. Workstream list with state/freshness
-6. Capacity/topology exception if meaningful
+4. Routine health exception when a commissioned recurring routine needs attention
+5. Verified/Settled recently
+6. Workstream list with state/freshness
+7. Capacity/topology exception if meaningful
 ```
 
 Primary actions:
@@ -244,6 +245,7 @@ lifecycle stage
 trajectory coverage posture
 working/waiting/blocked counts
 Needs You count
+commissioned-routine count / exception posture when source-owned data exists
 proof state
 freshness
 ```
@@ -430,6 +432,42 @@ Working / Blocked / Needs You
 ```
 
 No Workforce-local takeover lease state.
+
+---
+
+## 14.1 Commissioned routine projection
+
+Workforce does not discover, design or canonically store routines. Wirebot's Portfolio Business Compiler/Workforce Composer owns the owner-facing design/commissioning experience; Focusa owns the governed assignment/work/Evidence state; OpenClaw owns the default durable automation schedule on the persistent private VPS.
+
+When owner-backed routine refs are available for the selected Workstream, Workforce may project:
+
+```text
+routine ref + human label
+business/domain ref
+purpose / desired outcome ref
+assignment ref
+responsible Foreman/worker refs
+scheduler/job ref and source
+execution body/runtime posture
+last run / next run
+working / waiting / blocked / Needs You
+missed-run / retry / recovery posture
+routine-health dimensions
+Evidence / settlement refs
+W.I.N.S. accepted-outcome / momentum-leverage handoff ref
+```
+
+Rules:
+
+- no Workforce-local routine database or scheduler;
+- no invented next-run time when the scheduler owner does not report one;
+- scheduler reachability does not imply Focusa authority;
+- a healthy run does not imply a good business outcome;
+- a W.I.N.S. score/momentum/leverage projection is not rewritten locally;
+- consequential pause/revoke/retry uses the owning typed operation and then re-reads source truth;
+- routine analytics remain inspectable as dimensions rather than collapsed into a Workforce KPI.
+
+Routine status is contextual inside Overview/Work detail and attention surfaces. Do not create a new primary navigation destination merely because routine data exists.
 
 ---
 
