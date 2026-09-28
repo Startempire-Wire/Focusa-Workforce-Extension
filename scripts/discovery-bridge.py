@@ -263,8 +263,23 @@ class State:
             except Exception:
                 verified = None
             if verified:
+                verified["verified_epoch"] = time.time()
+                verified["stale"] = False
                 daemons.append(verified)
         with self.lock:
+            # A flaky round must not erase a known-good daemon: keep the last
+            # verification for ten minutes, honestly marked stale, so one failed
+            # SSH attempt never makes an attached workforce's home vanish.
+            previous = {d.get("url"): d
+                        for d in self.payload.get("daemons", [])
+                        if d.get("url")}
+            fresh_urls = {d["url"] for d in daemons}
+            now = time.time()
+            for url, old in previous.items():
+                if url not in fresh_urls and now - old.get("verified_epoch", 0) < 600:
+                    stale = dict(old)
+                    stale["stale"] = True
+                    daemons.append(stale)
             self.payload = {
                 "ok": True,
                 "source": "focusa-discovery-bridge",

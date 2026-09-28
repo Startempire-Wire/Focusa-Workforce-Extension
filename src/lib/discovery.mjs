@@ -417,6 +417,93 @@ export async function tailnetRoster(chromeApi, { fetchImpl, timeoutMs, connectNa
   return Object.freeze({ self: null, peers: merged.peers });
 }
 
+/**
+ * Build the roster entries every surface renders: verified daemons first (with
+ * what they actually hold), then tailnet peers, then known hosts. Pure logic
+ * over caller-supplied inputs, so it is unit-testable without a browser: the
+ * only effectful argument is `isAllowed(origin)`, which answers whether this
+ * browser may already fetch an origin.
+ *
+ * @param {{peers?: any[], verifiedDaemons?: any[], bookEntries?: any[]}} input
+ * @param {(origin: string) => Promise<boolean>|boolean} isAllowed
+ * @returns {Promise<object[]>} frozen entries, verified first
+ */
+export async function buildConnectableEntries({ peers, verifiedDaemons, bookEntries } = {}, isAllowed = async () => false) {
+  peers = Array.isArray(peers) ? peers : [];
+  verifiedDaemons = Array.isArray(verifiedDaemons) ? verifiedDaemons : [];
+  bookEntries = Array.isArray(bookEntries) ? bookEntries : [];
+  const entries = [];
+  const seen = new Set();
+  const allow = async (origins) => {
+    const allowed = [];
+    for (const origin of origins) {
+      try { if (await isAllowed(origin)) allowed.push(origin); } catch { /* treat as denied */ }
+    }
+    return allowed;
+  };
+  // 0. Daemons something already proved reachable. These carry their real
+  // contents (version, projects, sessions), so they lead honestly.
+  for (const daemon of verifiedDaemons) {
+    if (!daemon?.url) continue;
+    const allowed = await allow([daemon.url]);
+    entries.push(Object.freeze({
+      kind: 'daemon',
+      url: daemon.url,
+      name: daemon.peer ?? daemon.url,
+      ips: [],
+      online: true,
+      os: null,
+      verified: true,
+      stale: daemon.stale === true,
+      summary: daemon.summary ?? null,
+      granted: allowed.length > 0,
+      origins: allowed.length ? allowed : [daemon.url],
+    }));
+    try { seen.add(new URL(daemon.url).hostname.toLowerCase()); } catch { /* keep going */ }
+  }
+  // 1. Whatever the tailnet itself reports.
+  for (const peer of peers) {
+    if (peer.isSelf) continue;
+    const origins = peerOrigins(peer);
+    if (!origins.length) continue;
+    const key = (peer.dnsName || peer.name || origins[0]).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const allowed = await allow(origins);
+    entries.push(Object.freeze({
+      kind: 'peer',
+      name: peer.name,
+      ips: peer.ips ?? [],
+      online: peer.online !== false,
+      os: peer.os ?? null,
+      verified: false,
+      granted: allowed.length > 0,
+      origins: allowed.length ? allowed : [origins[0]],
+    }));
+  }
+  // 2. Hosts this device already knows, even when nothing answers there yet.
+  for (const entry of bookEntries) {
+    const label = entry.label ?? entry.host;
+    if (!label || seen.has(String(label).toLowerCase())) continue;
+    seen.add(String(label).toLowerCase());
+    const origins = originsForHost({ host: entry.host, allowInsecure: true });
+    if (!origins.length) continue;
+    const allowed = await allow(origins);
+    entries.push(Object.freeze({
+      kind: 'known',
+      name: label,
+      ips: [entry.host],
+      online: false,
+      os: null,
+      known: true,
+      granted: allowed.length > 0,
+      origins: allowed.length ? allowed : [origins[0]],
+      summary: 'A machine this device knows. It has not answered a Focusa probe yet.',
+    }));
+  }
+  return Object.freeze(entries);
+}
+
 /** Origins for one named peer, for the one-click grant. DNS name first: tailnet
  * reverse proxies route by Host header, so an IP literal can 404 where the DNS
  * name proxies to the daemon. Falls back to the IPv4 literal when no DNS name

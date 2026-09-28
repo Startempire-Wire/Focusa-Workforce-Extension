@@ -1,0 +1,20 @@
+[Unit]
+Description=Focusa discovery bridge (tailnet peers + daemon verification for the Workforce extension)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=verioussmith
+Group=verioussmith
+WorkingDirectory=/srv/wfx/focusa-workforce-extension
+ExecStart=/usr/bin/python3 /srv/wfx/focusa-workforce-extension/scripts/discovery-bridge.py
+Environment=FOCUSA_DISCOVERY_BIND=0.0.0.0
+Environment=FOCUSA_DISCOVERY_PORT=18989
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

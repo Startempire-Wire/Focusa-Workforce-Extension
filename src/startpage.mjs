@@ -12,15 +12,14 @@ import { runReliableEventStream } from './lib/reconnect.mjs';
 import { listConnections, listLocalEnvironments } from './lib/storage.mjs';
 import { listNotifications, notificationFromEvent, saveNotification } from './lib/notifications.mjs';
 import {
-  discoverDaemons, previewDaemon, rememberDaemon, reachableOriginFilter, seedCandidates, watchLiveness,
+  buildConnectableEntries, discoverDaemons, previewDaemon, rememberDaemon, reachableOriginFilter, seedCandidates, watchLiveness,
 } from './lib/discovery.mjs';
 import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaemonOrigin } from './lib/validation.mjs';
 import { saveLocalEnvironment } from './lib/storage.mjs';
 import { BUILD } from './lib/build-info.mjs';
 import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
-import { readTailscaleTopology } from './lib/tailscale.mjs';
-import { readHostBook, originsForHost } from './lib/host-book.mjs';
-import { peerOrigins } from './lib/discovery.mjs';
+import { readMergedTopology } from './lib/tailscale.mjs';
+import { readHostBook } from './lib/host-book.mjs';
 
 /** Run an interaction and show any failure IN the surface. */
 async function guard(label, work) {
@@ -111,7 +110,7 @@ function setFreshness(_state, text) {
   // Ask the tailnet who it is, immediately, before anything else. The read is
 // cached for a minute, so the roster is present on first paint instead of
 // arriving a beat after the daemons do.
-readTailscaleTopology().catch(() => {});
+readMergedTopology().catch(() => {});
 renderLink();
 }
 
@@ -133,12 +132,40 @@ function buildDetail(peer) {
   const detail = document.createElement('div');
   detail.className = 'sp-peer-detail';
   const address = document.createElement('code');
-  address.textContent = (peer.ips ?? []).join(', ') || 'no address reported';
+  address.textContent = peer.url ?? (peer.ips ?? []).join(', ') ?? 'no address reported';
+  if (!address.textContent) address.textContent = 'no address reported';
   const what = document.createElement('p');
   what.className = 'sp-peer-what';
-  what.textContent = peer.summary
-    ? peer.summary
-    : peer.online ? 'Answers on the tailnet. Connect to see what it holds.' : 'Offline on the tailnet right now.';
+  if (peer.verified && peer.summary) {
+    // A daemon something already proved reachable: show what it holds.
+    const parts = [];
+    if (peer.summary.version) parts.push(`Focusa ${peer.summary.version}`);
+    const projects = peer.summary.projects;
+    if (projects?.effective) parts.push(projects.effective);
+    else if (projects?.count) parts.push(`${projects.count} project(s)`);
+    if (peer.summary.sessionCount != null) parts.push(`${peer.summary.sessionCount} session(s)`);
+    what.textContent = parts.join(' · ') || 'Verified Focusa daemon.';
+    if (peer.stale) {
+      const stale = document.createElement('span');
+      stale.className = 'sp-stale-badge';
+      stale.textContent = 'last verified a while ago';
+      what.append(' ', stale);
+    }
+    const names = (projects?.names ?? []).filter((name) => name && name !== projects?.effective);
+    if (names.length) {
+      const more = document.createElement('p');
+      more.className = 'sp-names';
+      more.textContent = names.join(' · ');
+      detail.append(address, what, more);
+    } else {
+      detail.append(address, what);
+    }
+  } else {
+    what.textContent = peer.summary
+      ? peer.summary
+      : peer.online ? 'Answers on the tailnet. Connect to see what it holds.' : 'Offline on the tailnet right now.';
+    detail.append(address, what);
+  }
   const actions = document.createElement('div');
   actions.className = 'sp-row';
   const connect = document.createElement('button');
@@ -238,36 +265,15 @@ function renderLink() {
 /** Machines the tailnet reports, offered when they are not yet granted. */
 async function loadRoster() {
   const reachable = await reachableOriginFilter(chrome);
-  const topology = await readTailscaleTopology().catch(() => null);
-  const connectable = [];
-  const seen = new Set();
-  // 1. whatever the tailnet itself reports
-  for (const peer of topology?.peers ?? []) {
-    if (peer.isSelf) continue;
-    const origins = peerOrigins(peer);
-    if (!origins.length) continue;
-    seen.add(peer.name);
-    const allowed = [];
-    for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
-    connectable.push({ name: peer.name, ips: peer.ips, online: peer.online, os: peer.os, granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]] });
-  }
-  // 2. the hosts this device already knows, even when nothing answers there yet.
-  //    A known machine must be VISIBLE before it is reachable - otherwise the
-  //    authoritative daemon is invisible exactly when you need it most.
-  try {
-    for (const entry of await readHostBook(chrome)) {
-      if (seen.has(entry.label)) continue;
-      const origins = originsForHost({ host: entry.host, allowInsecure: true });
-      if (!origins.length) continue;
-      const allowed = [];
-      for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
-      connectable.push({
-        name: entry.label, ips: [entry.host], online: false, os: null,
-        known: true, granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]],
-        summary: 'A machine this device knows. It has not answered a Focusa probe yet.',
-      });
-    }
-  } catch { /* the book is optional */ }
+  // The merged read folds the discovery bridge in, so peers the OS client
+  // cannot see still appear - with whatever the bridge already verified first.
+  const merged = await readMergedTopology().catch(() => null);
+  const bookEntries = await readHostBook(chrome).catch(() => []);
+  const connectable = await buildConnectableEntries({
+    peers: merged?.peers ?? [],
+    verifiedDaemons: merged?.verifiedDaemons ?? [],
+    bookEntries,
+  }, reachable);
   link = { ...link, connectable };
   renderLink();   // the roster arrives after the first paint
 }

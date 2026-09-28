@@ -354,3 +354,43 @@ test('the authoritative parent is the daemon actually holding work', async () =>
   const local = result.found.find((d) => d.baseUrl === 'http://127.0.0.1:8787');
   assert.equal(local?.authoritative, false, 'this machine holding nothing is not the parent');
 });
+
+test('verified daemons lead the roster with what they hold', async () => {
+  const { buildConnectableEntries } = await import('../src/lib/discovery.mjs');
+  const entries = await buildConnectableEntries({
+    peers: [
+      { name: 'parent', dnsName: 'parent.tail0000.ts.net', ips: ['100.64.9.9'], online: true, os: 'linux' },
+      { name: 'desk', dnsName: 'desk.tail0000.ts.net', ips: ['100.64.9.11'], online: false, os: 'macOS' },
+    ],
+    verifiedDaemons: [
+      { peer: 'parent', url: 'http://parent.tail0000.ts.net:8787', ok: true, verified: 'ssh',
+        summary: { version: '0.9.192', projects: { effective: 'Flow', count: 1, names: ['Flow'] }, sessionCount: 2 } },
+    ],
+    bookEntries: [],
+  }, async () => true);
+  assert.equal(entries[0].kind, 'daemon', 'a proved daemon leads, not a guess');
+  assert.equal(entries[0].summary.projects.names[0], 'Flow');
+  assert.equal(entries.filter((e) => e.kind === 'daemon').length, 1, 'one row per verified daemon');
+  const names = entries.map((e) => e.name);
+  assert.ok(names.includes('desk'), 'an offline peer is still listed');
+  assert.ok(!names.includes('parent') || entries.filter((e) => e.name === 'parent').length === 1, 'no duplicate rows for the verified peer');
+});
+
+test('a stale verification says so instead of vanishing', async () => {
+  const { buildConnectableEntries } = await import('../src/lib/discovery.mjs');
+  const entries = await buildConnectableEntries({
+    peers: [],
+    verifiedDaemons: [
+      { peer: 'parent', url: 'http://parent.tail0000.ts.net:8787', ok: true, verified: 'ssh', stale: true, summary: { version: '0.9.192' } },
+    ],
+    bookEntries: [],
+  }, async () => true);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].stale, true, 'a flaky round keeps last-known-good, marked stale');
+});
+
+test('an empty tailnet is an honest empty roster, not an error', async () => {
+  const { buildConnectableEntries } = await import('../src/lib/discovery.mjs');
+  assert.deepEqual(await buildConnectableEntries({}, async () => true), []);
+  assert.deepEqual(await buildConnectableEntries({ peers: null }, async () => { throw new Error('no perms'); }), []);
+});
