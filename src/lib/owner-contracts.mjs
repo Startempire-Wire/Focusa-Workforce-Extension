@@ -82,6 +82,25 @@ export const OPERATIONS = Object.freeze({
   // Roles (closest owner surface to Foreman identity today)
   roleProfiles: op('focusa.role_profile.list', 'GET', '/v1/roles/profiles', ['project_root', 'continuity_id', 'attachment_id'], 'base_focusa', 'docs/135b'),
 
+  // Inspector reads (verified live against daemon 0.9.194 on 2026-09-28;
+  // every one is a read-only GET, so the inspector can never mutate)
+  taskPlans: op('focusa.task_plans.list', 'GET', '/v1/task-plans', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  interviewsSessions: op('focusa.interviews.sessions', 'GET', '/v1/interviews/sessions', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  specSessions: op('focusa.spec_workbench.sessions', 'GET', '/v1/spec-workbench/sessions', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  providersContracts: op('focusa.providers.contracts', 'GET', '/v1/providers/contracts', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  stateCurrent: op('focusa.state.current', 'GET', '/v1/state/current', ['project_root'], 'base_focusa', 'docs/133'),
+  lineageHead: op('focusa.lineage.head', 'GET', '/v1/lineage/head', [], 'base_focusa', 'docs/133'),
+  lineageTree: op('focusa.lineage.tree', 'GET', '/v1/lineage/tree', [], 'base_focusa', 'docs/133'),
+  workRail: op('focusa.work_rail.read', 'GET', '/v1/work-rail', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  predictionsRecent: op('focusa.predictions.recent', 'GET', '/v1/predictions/recent', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  resourceMode: op('focusa.resource.mode', 'GET', '/v1/resource/mode', [], 'base_focusa', 'docs/133'),
+  toolDoctor: op('focusa.tool_doctor.read', 'GET', '/v1/tool-doctor', [], 'base_focusa', 'docs/133'),
+  missionCanvasState: op('focusa.mission_canvas.state', 'GET', '/v1/mission-canvas/state', ['project_root', 'continuity_id'], 'base_focusa', 'docs/133'),
+  contextGraph: op('focusa.context.graph', 'GET', '/v1/context/graph', [], 'base_focusa', 'docs/133'),
+  contextSources: op('focusa.context.sources', 'GET', '/v1/context/sources', [], 'base_focusa', 'docs/133'),
+  memorySemantic: op('focusa.memory.semantic', 'GET', '/v1/memory/semantic', [], 'base_focusa', 'docs/133'),
+  memoryProcedural: op('focusa.memory.procedural', 'GET', '/v1/memory/procedural', [], 'base_focusa', 'docs/133'),
+
   // Evidence (owner of proof)
   evidenceCapture: op('focusa.evidence.capture', 'POST', '/v1/evidence/capture', ['project_root'], 'base_focusa', 'docs/05', true),
   workpointLinkEvidence: op('focusa.workpoint.link_evidence', 'POST', '/v1/workpoint/link-evidence', ['project_root'], 'base_focusa', 'docs/05', true),

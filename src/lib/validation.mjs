@@ -22,14 +22,28 @@ function isTailnetHost(hostname) {
 }
 
 /**
- * True when a host is this machine (browser loopback, its local bridges) or a
- * tailnet peer. Single source of truth for both origin validation and the
- * local-environment contract, so the two can never drift apart.
+ * True for a Tailscale MagicDNS name (`*.ts.net`, Tailscale's public suffix for
+ * every tailnet - a platform convention like `localhost`, not personal data).
+ * `tailscale serve` fronts daemons over plain HTTP there, with WireGuard
+ * underneath, and browsers always send the URL hostname as the Host header, so
+ * this is also the name form that actually routes.
+ * @param {string} hostname
+ */
+export function isTailnetName(hostname) {
+  return typeof hostname === 'string' && hostname.toLowerCase().endsWith('.ts.net');
+}
+
+/**
+ * True when a host is this machine (browser loopback, its local bridges), a
+ * tailnet peer by address, or a tailnet peer by MagicDNS name. Single source
+ * of truth for origin validation, scheme choice, and the local-environment
+ * contract, so the three can never drift apart.
  * @param {string} hostname
  */
 export function isLocalDaemonHost(hostname) {
   if (typeof hostname !== 'string') return false;
   if (LOOPBACK_HOSTS.has(hostname)) return true;
+  if (isTailnetName(hostname)) return true;
   return isTailnetHost(hostname);
 }
 
@@ -43,7 +57,6 @@ export function isLocalDaemonHost(hostname) {
  */
 export function daemonSchemeForHost(hostname) {
   if (isLocalDaemonHost(hostname)) return 'http:';
-  if (typeof hostname === 'string' && hostname.toLowerCase().endsWith('.ts.net')) return 'http:';
   // A dotted quad on the tailnet is local; anything with letters is a name.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(String(hostname))) return 'https:';
   return 'https:';
@@ -66,8 +79,7 @@ export function normalizeDaemonOrigin(value, { trustedHosts = null } = {}) {
   const trusted = trustedHosts instanceof Set
     ? trustedHosts.has(parsed.hostname)
     : Array.isArray(trustedHosts) && trustedHosts.includes(parsed.hostname);
-  const magicDns = typeof parsed.hostname === 'string' && parsed.hostname.toLowerCase().endsWith('.ts.net');
-  const local = isLocalDaemonHost(parsed.hostname) || trusted || magicDns;
+  const local = isLocalDaemonHost(parsed.hostname) || trusted;
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) {
     throw new TypeError('daemon URL off this machine, off the tailnet and outside the host book must use HTTPS');
   }
@@ -75,7 +87,12 @@ export function normalizeDaemonOrigin(value, { trustedHosts = null } = {}) {
 }
 
 export function originPermission(origin) {
-  return `${normalizeDaemonOrigin(origin)}/*`;
+  // Chrome match patterns are scheme + host + path: they carry no port, so a
+  // pattern with one never matches. Strip it - `contains` and `request` must
+  // agree, and both go through here.
+  const normalized = normalizeDaemonOrigin(origin);
+  const url = new URL(normalized);
+  return `${url.protocol}//${url.hostname}/*`;
 }
 
 export async function requestDaemonOriginPermission(origin, chromeApi = globalThis.chrome) {

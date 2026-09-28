@@ -262,6 +262,35 @@ export function createWorkforceClient(config) {
       scope: { projectRoot: ws.projectRoot, continuityId: ws.continuityId, attachmentId: ws.attachmentId ?? 'default' },
     }),
 
+    // ── inspector reads: every list the daemon offers about its own work ────
+    // All read-only. Each takes the project scope the inspector resolved from
+    // project/list (+ continuity when trajectory reported one). A 400 that says
+    // scope is missing is an honest answer, surfaced as such, never retried.
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    taskPlans: (ws) => call('taskPlans', { scope: ws }),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    interviewsSessions: (ws) => call('interviewsSessions', { scope: ws }),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    specSessions: (ws) => call('specSessions', { scope: ws }),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    providersContracts: (ws) => call('providersContracts', { scope: ws }),
+    /** @param {string} projectRoot */
+    stateCurrent: (projectRoot) => call('stateCurrent', { scope: { projectRoot } }),
+    lineageHead: () => call('lineageHead'),
+    lineageTree: () => call('lineageTree'),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    workRail: (ws) => call('workRail', { scope: ws }),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    predictionsRecent: (ws) => call('predictionsRecent', { scope: ws }),
+    resourceMode: () => call('resourceMode'),
+    toolDoctor: () => call('toolDoctor'),
+    /** @param {{projectRoot: string, continuityId?: string}} ws */
+    missionCanvasState: (ws) => call('missionCanvasState', { scope: ws }),
+    contextGraph: () => call('contextGraph'),
+    contextSources: () => call('contextSources'),
+    memorySemantic: () => call('memorySemantic'),
+    memoryProcedural: () => call('memoryProcedural'),
+
     // ── events ─────────────────────────────────────────────────────────────
     /** @param {string} projectRoot */
     eventsRecent: (projectRoot, limit = 20) =>

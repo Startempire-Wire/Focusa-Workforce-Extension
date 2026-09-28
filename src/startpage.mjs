@@ -18,6 +18,9 @@ import { hasDaemonOriginPermission, requestDaemonOriginPermission, normalizeDaem
 import { saveLocalEnvironment } from './lib/storage.mjs';
 import { BUILD } from './lib/build-info.mjs';
 import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
+import { createDiagnostics } from './lib/diagnostics.mjs';
+import { createWorkforceClient } from './lib/workforce-client.mjs';
+import { resolveScope, continuityFromTrajectory, loadInspector } from './lib/inspector.mjs';
 import { readMergedTopology } from './lib/tailscale.mjs';
 import { readHostBook } from './lib/host-book.mjs';
 
@@ -72,6 +75,18 @@ const el = {
   pillWhere: $('#conn-where'),
   pillAction: $('#conn-action'),
   detail: $('#conn-detail'),
+  inspector: $('#start-inspector'),
+  inspectorScope: $('#inspector-scope'),
+  inspectorRefresh: $('#inspector-refresh'),
+  inspectorEvents: $('#inspector-events'),
+  inspectorEventsState: $('#inspector-events-state'),
+  inspectorEventsToggle: $('#inspector-events-toggle'),
+  inspectorNote: $('#inspector-note'),
+  inspectorSections: $('#inspector-sections'),
+  diagCount: $('#diag-count'),
+  diagList: $('#diag-list'),
+  diagCopy: $('#diag-copy'),
+  diagClear: $('#diag-clear'),
   roster: $('#start-roster'),
   peerlist: $('#sp-peerlist'),
   count: $('#sp-roster-count'),
@@ -84,6 +99,26 @@ const el = {
 };
 
 const CONNECTION_KEY = 'focusa_startpage_connection.v1';
+
+const diag = createDiagnostics({ chromeApi: typeof chrome !== 'undefined' ? chrome : undefined });
+
+function renderDiagnostics() {
+  if (!el.diagList) return;
+  const events = diag.recent(50);
+  el.diagCount && (el.diagCount.textContent = events.length ? `(${events.length})` : '');
+  el.diagList.replaceChildren(...events.map((event) => {
+    const li = document.createElement('li');
+    const code = event.code ? ` [${event.code}]` : '';
+    const detail = event.details ? ` ${JSON.stringify(event.details).slice(0, 160)}` : '';
+    const message = event.message ? ` — ${event.message}` : '';
+    li.append(
+      Object.assign(document.createElement('strong'), { textContent: `${event.at.slice(11, 19)} ` }),
+      Object.assign(document.createElement('span'), { textContent: `${event.name}${code}${detail}${message}` }),
+    );
+    if (event.level === 'error') li.className = 'diag-error';
+    return li;
+  }));
+}
 
 let liveConnection = null;
 let streamAbort = null;
@@ -226,14 +261,40 @@ function renderRoster() {
 /** Grant one machine and attach: the single click remote attach needs. */
 async function connectPeer(peer) {
   const origin = (peer.origins ?? [])[0] ?? (peer.ips?.[0] ? `http://${peer.ips[0]}:8787` : null);
-  if (!origin) return null;
-  const granted = await requestDaemonOriginPermission(origin).catch(() => false);
-  if (!granted) {
-    connection = { ...connection, status: 'disconnected', baseUrl: null, note: 'Access to that machine was not allowed' };
-    renderLink();
+  if (!origin) {
+    diag.warn('connect.no-origin', { peer: peer?.name ?? null });
+    renderDiagnostics();
     return null;
   }
-  return connect(origin);
+  const done = diag.step('connect.peer', { origin, peer: peer?.name ?? null });
+  const already = await hasDaemonOriginPermission(origin).catch((error) => {
+    done({ code: 'permission-missing', error });
+    return false;
+  });
+  diag.log('connect.permission', { origin, already });
+  if (!already) {
+    const granted = await requestDaemonOriginPermission(origin, chrome).catch((error) => {
+      done({ code: 'permission-denied', error });
+      return false;
+    });
+    if (!granted) {
+      done({ code: 'permission-denied' });
+      connection = { ...connection, status: 'disconnected', baseUrl: null, note: 'Chrome did not grant access to that machine. Click Connect again and choose Allow in the prompt.' };
+      renderLink();
+      renderDiagnostics();
+      return null;
+    }
+  }
+  try {
+    const result = await connect(origin);
+    done(null, { attached: connection?.baseUrl ?? null });
+    renderDiagnostics();
+    return result;
+  } catch (error) {
+    done(error);
+    renderDiagnostics();
+    throw error;
+  }
 }
 
 function renderLink() {
@@ -399,28 +460,52 @@ async function discover({ extra = [] } = {}) {
 }
 
 async function connect(baseUrl) {
-  const origin = normalizeDaemonOrigin(baseUrl);
+  const done = diag.step('connect.attach', { baseUrl });
+  let origin;
+  try {
+    origin = normalizeDaemonOrigin(baseUrl);
+  } catch (error) {
+    done(error);
+    renderDiagnostics();
+    throw error;
+  }
   link = { ...link, status: 'connecting', baseUrl: origin, note: 'Connecting…' };
   renderLink();
   const already = await hasDaemonOriginPermission(origin).catch(() => false);
+  diag.log('connect.permission', { origin, already });
   if (!already) {
     const granted = await requestDaemonOriginPermission(origin, chrome).catch(() => false);
-    if (!granted) return;
+    if (!granted) {
+      done({ code: 'permission-denied' });
+      link = { ...link, status: 'disconnected', baseUrl: null, note: 'Chrome did not grant access. Click Connect again and choose Allow in the prompt.' };
+      renderLink();
+      renderDiagnostics();
+      return;
+    }
   }
-  await saveLocalEnvironment({
-    schema: 'focusa.workforce_local_environment.v1',
-    environment_id: `local:${origin}`,
-    label: `Focusa daemon (${origin})`,
-    base_url: origin,
-    created_at: new Date().toISOString(),
-  }, chrome);
+  try {
+    await saveLocalEnvironment({
+      schema: 'focusa.workforce_local_environment.v1',
+      environment_id: `local:${origin}`,
+      label: `Focusa daemon (${origin})`,
+      base_url: origin,
+      created_at: new Date().toISOString(),
+    }, chrome);
+  } catch (error) {
+    done(error, { step: 'saveLocalEnvironment' });
+    renderDiagnostics();
+    throw error;
+  }
   await rememberDaemon(chrome, { baseUrl: origin, label: 'Focusa daemon' });
   liveConnection = { connection_id: `local:${origin}`, label: `Focusa daemon (${origin})`, base_url: origin, token: null };
   await chrome.storage.local.set({ [CONNECTION_KEY]: liveConnection.connection_id });
   link = { status: 'connected', baseUrl: origin, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
   el.connect.hidden = true;
   renderLink();
+  done(null, { attached: origin });
+  renderDiagnostics();
   await refresh();
+  await loadInspector();
   startStream();
   stopHeartbeat?.();
   stopHeartbeat = watchLiveness(origin, (beat) => {
@@ -443,6 +528,7 @@ async function disconnect() {
   }
   await chrome.storage.local.remove(CONNECTION_KEY);
   streamAbort?.abort();
+  stopInspectorEvents();
   liveConnection = null;
   discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [], known: [] };
   renderLink();
@@ -571,7 +657,165 @@ el.openWorkforce.addEventListener('click', () => openWorkforce('#/overview'));
 // Pairing a remote daemon lives in Settings; the Start Page offers discovery first.
 el.pair?.addEventListener('click', () => openWorkforce('#/settings?section=connections'));
 el.refresh.addEventListener('click', refresh);
-window.addEventListener('pagehide', () => streamAbort?.abort());
+el.inspectorRefresh?.addEventListener('click', () => guard('Inspector refresh', loadInspectorIntoUI));
+let eventsAbort = null;
+function stopInspectorEvents() {
+  eventsAbort?.abort();
+  eventsAbort = null;
+  el.inspectorEventsToggle && (el.inspectorEventsToggle.textContent = 'Watch live events');
+  el.inspectorEventsState && (el.inspectorEventsState.textContent = '');
+}
+async function watchInspectorEvents() {
+  if (!liveConnection || eventsAbort) { stopInspectorEvents(); return; }
+  const done = diag.step('inspector.events', { baseUrl: liveConnection.base_url });
+  eventsAbort = new AbortController();
+  el.inspectorEventsToggle.textContent = 'Stop watching';
+  el.inspectorEventsState.textContent = 'connecting…';
+  renderDiagnostics();
+  try {
+    const response = await fetch(new URL('/v1/events/stream', liveConnection.base_url), {
+      headers: { accept: 'text/event-stream' },
+      signal: eventsAbort.signal,
+    });
+    if (!response.ok || !response.body) throw new Error(`stream answered ${response.status}`);
+    el.inspectorEventsState.textContent = 'live';
+    done(null, {});
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done: finished, value } = await reader.read();
+      if (finished) break;
+      buffer += decoder.decode(value, { stream: true });
+      let index;
+      while ((index = buffer.indexOf('\n\n')) >= 0) {
+        const chunk = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        const data = chunk.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('\n');
+        if (!data || data === '[DONE]') continue;
+        let label = data.slice(0, 160);
+        try {
+          const parsed = JSON.parse(data);
+          label = parsed.type ?? parsed.event ?? parsed.event_type ?? label.slice(0, 160);
+        } catch { /* keep raw text */ }
+        const li = document.createElement('li');
+        li.append(Object.assign(document.createElement('strong'), { textContent: new Date().toISOString().slice(11, 19) }));
+        li.append(Object.assign(document.createElement('span'), { textContent: ` ${label}` }));
+        el.inspectorEvents.prepend(li);
+        while (el.inspectorEvents.children.length > 30) el.inspectorEvents.lastChild.remove();
+      }
+    }
+    el.inspectorEventsState.textContent = 'ended';
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      el.inspectorEventsState.textContent = 'unavailable';
+      done(error);
+    }
+  }
+  renderDiagnostics();
+}
+el.inspectorEventsToggle?.addEventListener('click', () => guard('Live events', watchInspectorEvents));
+if (el.diagCopy && !el.diagCopy.dataset.wired) {
+  el.diagCopy.dataset.wired = '1';
+  el.diagCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(await diag.exportJson());
+      el.diagCopy.textContent = 'Copied';
+      setTimeout(() => { el.diagCopy.textContent = 'Copy diagnostics'; }, 1500);
+    } catch {
+      el.diagCopy.textContent = 'Copy failed';
+    }
+  });
+  el.diagClear?.addEventListener('click', async () => { await diag.clear(); renderDiagnostics(); });
+}
+
+/**
+ * Fill the Daemon inspector for the attached daemon. Scope comes from the
+ * owner's own project/list (+ continuity when trajectory reports one), so
+ * scoped reads carry what the daemon asks for instead of guessing.
+ */
+async function loadInspectorIntoUI() {
+  if (!liveConnection || !el.inspector) return;
+  const done = diag.step('inspector.load', { baseUrl: liveConnection.base_url });
+  const client = createWorkforceClient({ baseUrl: liveConnection.base_url, token: liveConnection.token ?? null });
+  el.inspector.hidden = false;
+  el.inspectorNote.hidden = false;
+  el.inspectorNote.textContent = 'Reading the daemon…';
+  try {
+    const projects = await client.projectList();
+    const projectListBody = projects?.data ?? null;
+    const scope = resolveScope(projectListBody);
+    if (!scope.projectRoot) {
+      el.inspectorNote.textContent = 'The daemon reports no project to inspect yet.';
+      el.inspectorScope.textContent = '';
+      el.inspectorSections.replaceChildren();
+      done(null, { empty: true });
+      return;
+    }
+    let ws = { projectRoot: scope.projectRoot };
+    const trajectoryProbe = await client.trajectory(ws).catch(() => null);
+    const continuityId = continuityFromTrajectory(trajectoryProbe?.data ?? null);
+    if (continuityId) ws = { ...ws, continuityId };
+    el.inspectorScope.textContent = ws.continuityId
+      ? `${ws.projectRoot} · ${ws.continuityId}`
+      : ws.projectRoot;
+    const { sections, operationsTotal } = await loadInspector(client, ws, { projectListBody });
+    el.inspectorNote.textContent = operationsTotal != null
+      ? `The daemon offers ${operationsTotal} governed operations. Everything below is read-only.`
+      : 'Everything below is read-only.';
+    el.inspectorSections.replaceChildren(...sections.map(renderInspectorSection));
+    done(null, { sections: sections.length, operationsTotal });
+  } catch (error) {
+    el.inspectorNote.textContent = `Inspector failed: ${String(error?.message ?? error).slice(0, 160)}`;
+    done(error);
+  }
+  renderDiagnostics();
+}
+
+/** One inspector section: a heading with its count, then owner rows. */
+function renderInspectorSection(section) {
+  const wrap = document.createElement('section');
+  wrap.className = 'sp-inspector-section';
+  const head = document.createElement('h3');
+  head.className = 'sp-label';
+  head.textContent = section.count != null ? `${section.title} (${section.count})` : section.title;
+  wrap.append(head);
+  if (section.note && section.state !== 'ok') {
+    const note = document.createElement('p');
+    note.className = 'sp-hero-meta';
+    note.textContent = section.note;
+    wrap.append(note);
+  }
+  if (section.rows?.length) {
+    const list = document.createElement('ul');
+    list.className = 'sp-list';
+    const filter = section.rows.length > 12 ? document.createElement('input') : null;
+    const draw = (query) => {
+      list.replaceChildren(...section.rows
+        .filter((row) => !query
+          || `${row.primary ?? ''} ${row.secondary ?? ''} ${row.meta ?? ''}`.toLowerCase().includes(query))
+        .slice(0, 60)
+        .map((row) => {
+          const li = document.createElement('li');
+          li.append(Object.assign(document.createElement('strong'), { textContent: String(row.primary ?? '—') }));
+          if (row.secondary) li.append(Object.assign(document.createElement('span'), { className: 'sp-row-meta', textContent: String(row.secondary).slice(0, 220) }));
+          if (row.meta) li.append(Object.assign(document.createElement('span'), { className: 'sp-row-meta', textContent: String(row.meta).slice(0, 160) }));
+          return li;
+        }));
+    };
+    if (filter) {
+      filter.type = 'search';
+      filter.placeholder = `Filter ${section.title.toLowerCase()}…`;
+      filter.setAttribute('aria-label', `Filter ${section.title}`);
+      filter.addEventListener('input', () => draw(filter.value.trim().toLowerCase()));
+      wrap.append(filter);
+    }
+    draw('');
+    wrap.append(list);
+  }
+  return wrap;
+}
+window.addEventListener('pagehide', () => { streamAbort?.abort(); stopInspectorEvents(); });
 
 // docs/17 §5: public mode loads a dedicated module that cannot read private
 // storage or private projections. The private path is never executed.

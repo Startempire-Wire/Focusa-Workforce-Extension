@@ -63,6 +63,23 @@
         <h2 id="start-verified-heading" class="sp-label">Verified Recently</h2>
         <ul id="start-verified" class="sp-list"><li class="sp-empty">No settled proof yet.</li></ul>
       </section>
+
+      <section aria-labelledby="start-inspector-heading" id="start-inspector" hidden>
+        <div class="sp-inspector-head">
+          <h2 id="start-inspector-heading" class="sp-label">Daemon inspector</h2>
+          <span class="sp-hero-meta" id="inspector-scope"></span>
+          <button type="button" class="sp-link-btn" id="inspector-refresh">Refresh</button>
+        </div>
+        <p class="sp-hero-meta" id="inspector-note" hidden></p>
+        <section aria-labelledby="inspector-events-heading" class="sp-inspector-section">
+          <h3 id="inspector-events-heading" class="sp-label">Live events <span id="inspector-events-state" class="sp-hero-meta"></span></h3>
+          <div class="sp-row">
+            <button type="button" class="sp-btn" id="inspector-events-toggle">Watch live events</button>
+          </div>
+          <ul id="inspector-events" class="sp-list"></ul>
+        </section>
+        <div id="inspector-sections"></div>
+      </section>
     </section>
 
     <!-- ══ NOT CONNECTED: the calm face that says what is AVAILABLE.
@@ -127,6 +144,11 @@
   <footer class="sp-footer">
     <span class="sp-footer-meta" id="start-build">Focusa Workforce</span>
     <p id="build-stamp" class="sp-footer-meta"></p>
+    <details id="diagnostics" class="sp-diagnostics">
+      <summary>Diagnostics <span id="diag-count" class="sp-footer-meta"></span></summary>
+      <p class="sp-footer-meta">Connection attempts and failures, newest last. No tokens or credentials are ever recorded. <button type="button" class="sp-link-btn" id="diag-copy">Copy diagnostics</button> <button type="button" class="sp-link-btn" id="diag-clear">Clear</button></p>
+      <ul id="diag-list" class="sp-list"></ul>
+    </details>
   </footer>
 
   <!-- A failure in this surface is shown in the surface, never console-only. -->

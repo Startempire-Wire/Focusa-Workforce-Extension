@@ -340,3 +340,27 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
 @media (prefers-reduced-motion: no-preference) {
   .sp-roster { animation: wfx-settle 320ms cubic-bezier(.22,.68,.32,1) both; }
 }
+
+/* ── Daemon inspector: read-only visibility into the attached daemon ── */
+.sp-inspector-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.sp-inspector-head h2 { margin: 0; }
+#inspector-sections { display: grid; gap: 18px; margin-top: 8px; }
+.sp-inspector-section { display: grid; gap: 8px; }
+.sp-inspector-section h3 { margin: 0; }
+.sp-inspector-section input[type="search"] { max-width: 320px; }
+.sp-inspector-section .sp-list { gap: 8px; }
+.sp-inspector-section li { display: grid; gap: 2px; }
+.sp-inspector-section strong { overflow-wrap: anywhere; }
+
+/* ── Diagnostics: connection attempts and failures, newest last ── */
+.sp-diagnostics { margin-top: 18px; }
+.sp-diagnostics summary { cursor: pointer; }
+.sp-diagnostics .sp-list { gap: 4px; margin-top: 8px; max-height: 240px; overflow: auto; }
+.sp-diagnostics li { font-size: 12px; display: flex; gap: 8px; }
+.sp-diagnostics li strong { font-variant-numeric: tabular-nums; }
+.diag-error { color: var(--danger, #b91c1c); }
+.sp-stale-badge {
+  display: inline-block; margin-left: 8px; padding: 1px 8px;
+  border-radius: 999px; font-size: 11px;
+  background: var(--warning-weak, #fef3c7); color: var(--warning, #b45309);
+}
