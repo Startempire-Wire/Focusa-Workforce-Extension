@@ -74,7 +74,7 @@ workers / Pi / Silent Sessions / UIAI / Agent Computers
         ↓
 Evidence / settlement
         ↓
-accepted outcome / W.I.N.S.
+source-domain accepted outcome / optional W.I.N.S. projection
 ```
 
 Workforce must remain usable with any compatible Operating Partner presentation. It must never assume that the customer-facing partner is literally named `Wirebot`.
@@ -145,7 +145,7 @@ working / waiting / blocked / Needs You
 last run / next run / missed-run or failure
 Evidence / settlement
 routine health dimensions
-accepted-outcome / W.I.N.S. handoff ref
+base leverage/outcome handoff ref + optional W.I.N.S. projection ref
 ```
 
 OpenClaw is the default durable automations plane on the Operator's persistent Tailscale-connected remote VPS; Focusa remains canonical work/authority/Evidence owner. Workforce may pause/revoke only through the owning operations.
@@ -188,7 +188,7 @@ observed business/life need
 → Focusa Workforce
 → execution
 → routine health / Evidence / settlement
-→ accepted outcome / W.I.N.S. momentum-leverage projection
+→ source-domain accepted outcome → base leverage/momentum projection → optional W.I.N.S. projection
 ```
 
 Workforce MUST NOT create a parallel role/roster authority to make this flow easier to render.
@@ -374,7 +374,7 @@ Workforce may show source-backed:
 - defects or reversals;
 - Evidence/settlement refs.
 
-It should deep-link to Wirebot/W.I.N.S. for portfolio-level outcome, momentum and leverage interpretation. A healthy routine can still be useless to the business; a failed run can still be recovered without implying the broader outcome failed.
+It should deep-link to Wirebot for the base portfolio-level outcome, momentum and leverage interpretation, and to W.I.N.S. only when that setup participates. A healthy routine can still be useless to the business; a failed run can still be recovered without implying the broader outcome failed.
 
 ### 10.1 Evidence and trust
 
@@ -422,7 +422,7 @@ Closure follows ADLBOS:
 execution
 → Focusa Evidence
 → verification / settlement
-→ accepted outcome / W.I.N.S. where applicable
+→ source-domain accepted outcome → base private leverage loop → optional W.I.N.S. where enabled
 → optional MeriFolio standing
 ```
 
