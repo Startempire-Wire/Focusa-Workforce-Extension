@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeDaemonOrigin, originPermission, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../src/lib/validation.mjs';
+import { normalizeDaemonOrigin, originPermission, requestDaemonOriginPermission, hasDaemonOriginPermission, daemonSchemeForHost } from '../src/lib/validation.mjs';
 
 test('daemon origins require HTTPS except exact loopback', () => {
   assert.equal(normalizeDaemonOrigin('https://focusa.example/'), 'https://focusa.example');
@@ -34,4 +34,15 @@ test('host permission is requested for exact origin from caller gesture', async 
   assert.equal(originPermission('https://focusa.example'), 'https://focusa.example/*');
   assert.equal(await requestDaemonOriginPermission('https://focusa.example', chrome), true);
   assert.deepEqual(calls, [{ origins: ['https://focusa.example/*'] }]);
+});
+
+test('MagicDNS names speak plain HTTP like the rest of the tailnet', () => {
+  // `tailscale serve` fronts daemons over plain HTTP on tailnet names, with
+  // WireGuard underneath - the same trust basis as the CGNAT range.
+  assert.equal(normalizeDaemonOrigin('http://parent.tail0000.ts.net:8787'), 'http://parent.tail0000.ts.net:8787');
+  assert.equal(daemonSchemeForHost('parent.tail0000.ts.net'), 'http:');
+  assert.equal(daemonSchemeForHost('PARENT.TAIL0000.TS.NET'), 'http:');
+  // ...while any other name still requires HTTPS.
+  assert.throws(() => normalizeDaemonOrigin('http://focusa.example'), /HTTPS/);
+  assert.equal(daemonSchemeForHost('focusa.example'), 'https:');
 });

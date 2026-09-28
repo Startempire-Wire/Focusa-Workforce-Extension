@@ -331,6 +331,7 @@ const PLACES = [
 ];
 
 function isTailnetHost(host) {
+  if (typeof host === 'string' && host.toLowerCase().endsWith('.ts.net')) return true;
   const parts = String(host).split('.');
   return /^[\d.]+$/.test(host) && parts[0] === '100' && Number(parts[1]) >= 64 && Number(parts[1]) <= 127;
 }

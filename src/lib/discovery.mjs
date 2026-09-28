@@ -38,6 +38,7 @@ import { listLocalEnvironments } from './storage.mjs';
 import { daemonSchemeForHost } from './validation.mjs';
 import { hostBookCandidates, originsForHost, readHostBook } from './host-book.mjs';
 import { readTailscaleTopology, tailnetCandidates } from './tailscale.mjs';
+import { readMergedTopology } from './tailscale.mjs';
 
 const REMEMBERED_KEY = 'focusa.workforce.discovered.v1';
 
@@ -89,12 +90,17 @@ export async function reachableOriginFilter(chromeApi) {
 }
 
 /** What kind of place an origin is, so the UI can say it plainly. */
-export function classifyBaseUrl(baseUrl, { localAddresses = [] } = {}) {
+export function classifyBaseUrl(baseUrl, { localAddresses = [], tailnetHosts = [] } = {}) {
   let host;
   try { host = new URL(baseUrl).hostname; } catch { return 'unknown'; }
   if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return 'loopback';
   // "This device" means whatever the machine itself reported, on any computer.
   if (localAddresses.includes(host)) return 'device';
+  // A host the tailnet itself reported, or any MagicDNS name (Tailscale's
+  // public `ts.net` suffix, the same class of platform convention as
+  // `localhost`), is a tailnet peer. IP literals stay classified by range.
+  if (tailnetHosts.includes(host) || tailnetHosts.includes(host.toLowerCase())) return 'tailnet';
+  if (typeof host === 'string' && host.toLowerCase().endsWith('.ts.net')) return 'tailnet';
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
     const [a, b] = host.split('.').map(Number);
     if (a === 100 && b >= 64 && b <= 127) return 'tailnet';
@@ -167,12 +173,14 @@ export async function discoveryCandidates(chromeApi) {
   for (const record of remembered) {
     try { learned.add(new URL(record.baseUrl).hostname); } catch { /* skip junk */ }
   }
-  // Remote discovery is over the tailnet, and it comes first. The tailnet itself
-  // is asked who its peers are (Tailscale LocalAPI on this host's loopback), so
-  // remote daemons are found without being told about them. The host book is the
-  // explicit fallback for hosts the LocalAPI does not report.
-  const topology = await readTailscaleTopology().catch(() => null);
-  const fromTailnet = tailnetCandidates(topology).map((item) => item.origin);
+  // Remote discovery is over the tailnet, and verified daemons come first: a
+  // daemon the discovery bridge already proved reachable is a fact, not a
+  // guess. The merged topology also folds in the OS client, the LocalAPI and
+  // the host book, so no single source is a single point of failure.
+  const merged = await readMergedTopology().catch(() => null);
+  const verified = (merged?.verifiedDaemons ?? []).map((daemon) => daemon.url);
+  const fromTailnet = tailnetCandidates(merged).map((item) => item.origin);
+  const topology = merged;
   // This machine's own non-loopback addresses, reported by the local host
   // program. Hardcoding them would make the product work on exactly one
   // computer; asking the machine is what makes one build portable.
@@ -180,7 +188,7 @@ export async function discoveryCandidates(chromeApi) {
     .map((ip) => `http://${ip}:${PORT}`);
   const fromBook = (await hostBookCandidates(chromeApi)).map((item) => item.origin);
   const fromLearned = [...learned].flatMap((host) => hostCandidates(host));
-  const ordered = [...fromTailnet, ...fromBook, ...fromLocalAddrs,
+  const ordered = [...verified, ...fromTailnet, ...fromBook, ...fromLocalAddrs,
     ...remembered.map((item) => item.baseUrl), ...fromLearned, ...DEVICE_CANDIDATES];
   return Object.freeze([...new Set(ordered)]);
 }
@@ -339,7 +347,14 @@ function collapseAliases(found) {
 }
 
 export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {
-  const topology = await readTailscaleTopology().catch(() => null);
+  const merged = await readMergedTopology({ fetchImpl, timeoutMs }).catch(() => null);
+  const topology = merged ?? await readTailscaleTopology({ fetchImpl, timeoutMs }).catch(() => null);
+  const tailnetHosts = [];
+  for (const peer of merged?.peers ?? topology?.peers ?? []) {
+    if (peer.dnsName) tailnetHosts.push(peer.dnsName.toLowerCase());
+    for (const ip of peer.ips ?? []) tailnetHosts.push(ip);
+    if (peer.name) tailnetHosts.push(peer.name.toLowerCase());
+  }
   const reachable = await reachableOriginFilter(chromeApi);
   const candidates = [...new Set([...extra, ...(await discoveryCandidates(chromeApi))])];
   // Only origins this extension is GRANTED are probed. A browser may not fetch
@@ -359,7 +374,7 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
   const found = collapseAliases(answers
     .filter((answer) => answer.ok)
     .map((answer) => {
-      const kind = classifyBaseUrl(answer.baseUrl, { localAddresses });
+      const kind = classifyBaseUrl(answer.baseUrl, { localAddresses, tailnetHosts });
       return { ...answer, kind, kindLabel: kindLabel(kind), aliases: kind === 'loopback' ? LOOPBACK_ALIASES : [] };
     }));
   return { connected: found[0] ?? null, found, answers };
@@ -390,17 +405,26 @@ export async function discoverDaemon(chromeApi, { fetchImpl, timeoutMs = PROBE_T
  * @returns {Promise<{self: object|null, peers: any[]}>}
  */
 export async function tailnetRoster(chromeApi, { fetchImpl, timeoutMs, connectNative } = {}) {
-  // forward the source choice: a caller naming one is asking about that one
-  const topology = await readTailscaleTopology({ fetchImpl, timeoutMs, connectNative }).catch(() => null);
-  if (!topology) return Object.freeze({ self: null, peers: [] });
-  return Object.freeze({ self: topology.self, peers: topology.peers });
+  // forward the source choice: a caller naming one is asking about that one.
+  // The merged read folds the discovery bridge in, so peers the OS client
+  // cannot see (no LocalAPI, no native host on this browser) still appear.
+  const merged = await readMergedTopology({ fetchImpl, timeoutMs, connectNative }).catch(() => null);
+  if (!merged || !merged.peers.length) {
+    const topology = await readTailscaleTopology({ fetchImpl, timeoutMs, connectNative }).catch(() => null);
+    if (!topology) return Object.freeze({ self: null, peers: [] });
+    return Object.freeze({ self: topology.self, peers: topology.peers });
+  }
+  return Object.freeze({ self: null, peers: merged.peers });
 }
 
-/** Origins for one named peer, for the one-click grant. */
+/** Origins for one named peer, for the one-click grant. DNS name first: tailnet
+ * reverse proxies route by Host header, so an IP literal can 404 where the DNS
+ * name proxies to the daemon. Falls back to the IPv4 literal when no DNS name
+ * was reported. */
 export function peerOrigins(peer, { ports = [8787, 8788, 8789, 18787] } = {}) {
-  const ip = (peer?.ips ?? []).find((value) => typeof value === 'string' && !value.includes(':'));
-  if (!ip) return [];
-  return ports.map((port) => `http://${ip}:${port}`);
+  const host = peer?.dnsName || (peer?.ips ?? []).find((value) => typeof value === 'string' && !value.includes(':'));
+  if (!host) return [];
+  return ports.map((port) => `http://${host}:${port}`);
 }
 
 export async function discoverDaemons(chromeApi, { fetchImpl, timeoutMs = PROBE_TIMEOUT_MS, extra = [], onAnswer = null } = {}) {

@@ -149,9 +149,12 @@ test('a known host is probed on every plausible Focusa port, never swept', async
   const { hostCandidates, PORT_VARIANTS } = await import('../src/lib/discovery.mjs');
   assert.deepEqual(PORT_VARIANTS, [8787, 8788, 8789, 18787], 'a small fixed set, not a range');
   assert.equal(hostCandidates('100.64.1.9').length, PORT_VARIANTS.length);
-  // A tailnet literal speaks HTTP; anything else must be HTTPS.
+  // A tailnet literal speaks HTTP, and so does any MagicDNS name: `tailscale
+  // serve` fronts daemons over plain HTTP there, with WireGuard underneath.
+  // Anything else must be HTTPS.
   assert.ok(hostCandidates('100.64.1.9').every((u) => u.startsWith('http://')));
-  assert.ok(hostCandidates('kh.tailnet.ts.net').every((u) => u.startsWith('https://')));
+  assert.ok(hostCandidates('parent.tail0000.ts.net').every((u) => u.startsWith('http://')));
+  assert.ok(hostCandidates('example.com').every((u) => u.startsWith('https://')));
 });
 
 test('a seed accepts a name, an address, or a URL with its own port', async () => {

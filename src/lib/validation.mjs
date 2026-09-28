@@ -7,8 +7,12 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 /**
  * HTTP is permitted only on this machine and on the tailnet. Tailscale's CGNAT
  * range (100.64.0.0/10) is end-to-end encrypted and never leaves the operator's
- * own devices, so a discovered daemon there is as safe as loopback. Everything
- * reachable off-LAN must still use HTTPS.
+ * own devices, so a discovered daemon there is as safe as loopback. The same
+ * holds for Tailscale MagicDNS names (`*.ts.net`, Tailscale's public suffix
+ * for every tailnet — a platform convention like `localhost`, not personal
+ * data): `tailscale serve` fronts daemons over plain HTTP there, and the
+ * transport underneath is still WireGuard. Everything reachable off-tailnet
+ * must still use HTTPS.
  */
 function isTailnetHost(hostname) {
   if (typeof hostname !== 'string' || !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return false;
@@ -39,6 +43,7 @@ export function isLocalDaemonHost(hostname) {
  */
 export function daemonSchemeForHost(hostname) {
   if (isLocalDaemonHost(hostname)) return 'http:';
+  if (typeof hostname === 'string' && hostname.toLowerCase().endsWith('.ts.net')) return 'http:';
   // A dotted quad on the tailnet is local; anything with letters is a name.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(String(hostname))) return 'https:';
   return 'https:';
@@ -61,7 +66,8 @@ export function normalizeDaemonOrigin(value, { trustedHosts = null } = {}) {
   const trusted = trustedHosts instanceof Set
     ? trustedHosts.has(parsed.hostname)
     : Array.isArray(trustedHosts) && trustedHosts.includes(parsed.hostname);
-  const local = isLocalDaemonHost(parsed.hostname) || trusted;
+  const magicDns = typeof parsed.hostname === 'string' && parsed.hostname.toLowerCase().endsWith('.ts.net');
+  const local = isLocalDaemonHost(parsed.hostname) || trusted || magicDns;
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) {
     throw new TypeError('daemon URL off this machine, off the tailnet and outside the host book must use HTTPS');
   }

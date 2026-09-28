@@ -21,6 +21,22 @@ const LOCALAPI_CANDIDATES = Object.freeze([
   'http://localhost:41112/localapi/v0/status',
 ]);
 
+/**
+ * The discovery bridge is a tiny read-only HTTP service that may run on this
+ * machine (same pattern as the daemon loopback bridges): it enumerates the
+ * tailnet from `tailscale status` and verifies remote daemons over SSH, and it
+ * serves the result to any browser on the machine. Reached by platform
+ * convention names only — never an address — so there is nothing
+ * machine-specific to compile in. Absent on machines without it: every read
+ * degrades to null and the other sources carry on.
+ */
+const DISCOVERY_BRIDGE_PORT = 18989;
+const DISCOVERY_BRIDGE_CANDIDATES = Object.freeze([
+  `http://localhost:${DISCOVERY_BRIDGE_PORT}/v1/discovery/tailnet`,
+  `http://127.0.0.1:${DISCOVERY_BRIDGE_PORT}/v1/discovery/tailnet`,
+  `http://penguin.linux.test:${DISCOVERY_BRIDGE_PORT}/v1/discovery/tailnet`,
+]);
+
 export const NATIVE_HOST = 'io.focusa.workforce.tailscale';
 const NATIVE_TIMEOUT_MS = 6000;
 const CACHE_KEY = 'focusa.workforce.tailnet_cache.v1';
@@ -126,7 +142,7 @@ function normalizeTopology(body) {
   const peers = Object.values(body?.peers ?? body?.Peer ?? {}).map((peer) => Object.freeze({
     id: peer?.id ?? peer?.ID ?? null,
     name: peer?.name ?? nameOf(peer ?? {}) ?? null,
-    dnsName: peer?.dnsName ?? peer?.DNSName ?? null,
+    dnsName: (peer?.dnsName ?? peer?.DNSName ?? '').replace(/\.$/, '') || null,
     ips: Object.freeze(ipv4(peer?.ips ?? peer?.TailscaleIPs)),
     online: peer?.online === true || peer?.Online === true,
     os: peer?.os ?? peer?.OS ?? null,
@@ -209,8 +225,83 @@ export async function readTailscaleTopology({ fetchImpl = globalThis.fetch, time
 }
 
 /**
+ * Read the discovery bridge if one answers on this machine. The bridge reports
+ * the tailnet's peers plus daemons it already verified (via the operator's own
+ * SSH config), so a browser that cannot enumerate anything itself still learns
+ * real, reachable daemon URLs. HTTP is fine here: loopback and the container
+ * link address never leave the machine.
+ *
+ * @returns {Promise<null|object>} normalized topology with `source` set, plus
+ *   an optional `verifiedDaemons` list, or null when no bridge answers.
+ */
+export async function readBridgeTopology({ fetchImpl = globalThis.fetch, timeoutMs = 2500 } = {}) {
+  for (const url of DISCOVERY_BRIDGE_CANDIDATES) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, {
+        method: 'GET', cache: 'no-store', signal: controller.signal,
+        headers: { accept: 'application/json' },
+      });
+      if (!response.ok) continue;
+      const body = await response.json().catch(() => null);
+      if (!body || body.ok !== true || !Array.isArray(body.peers)) continue;
+      const topology = normalizeTopology({ Peer: Object.fromEntries(
+        body.peers.map((peer, index) => [`bridge-${index}`, {
+          HostName: peer.name,
+          DNSName: peer.dns,
+          TailscaleIPs: peer.ips,
+          Online: peer.online,
+          OS: peer.os,
+        }]),
+      ) });
+      const verifiedDaemons = Array.isArray(body.daemons)
+        ? body.daemons.filter((daemon) => daemon?.ok && typeof daemon?.url === 'string')
+        : [];
+      return { ...topology, source: 'discovery-bridge', verifiedDaemons };
+    } catch { /* try the next bridge address */ }
+    finally { clearTimeout(timer); }
+  }
+  return null;
+}
+
+/**
+ * Read every tailnet source and merge: discovery bridge first (it carries
+ * verified daemons), then the OS client, then the LocalAPI. Peers merge by DNS
+ * name so one machine never appears twice. Nothing is invented: only hosts a
+ * source actually reported are ever probed.
+ *
+ * @returns {Promise<{peers: any[], verifiedDaemons: any[], sources: string[]}>}
+ */
+export async function readMergedTopology({ fetchImpl = globalThis.fetch, timeoutMs = 2500, connectNative, force = false } = {}) {
+  const [bridged, owned] = await Promise.all([
+    readBridgeTopology({ fetchImpl, timeoutMs }).catch(() => null),
+    readTailscaleTopology({ fetchImpl, timeoutMs, connectNative, force }).catch(() => null),
+  ]);
+  const seen = new Set();
+  const peers = [];
+  for (const topology of [bridged, owned]) {
+    for (const peer of topology?.peers ?? []) {
+      const key = peer.dnsName || peer.ips.join(',');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      peers.push(peer);
+    }
+  }
+  return {
+    peers,
+    verifiedDaemons: bridged?.verifiedDaemons ?? [],
+    sources: [bridged && 'discovery-bridge', owned && owned.source].filter(Boolean),
+  };
+}
+
+/**
  * Candidate origins for every peer that could be running Focusa, on the fixed
  * port set. Peers are probed, never swept: one host, four ports.
+ *
+ * Addresses use the tailnet DNS name first: several tailnet reverse proxies
+ * (including `tailscale serve`) route by Host header, so an IP literal can
+ * answer 404 where the DNS name proxies to the daemon.
  *
  * @param {any} topology result of readTailscaleTopology
  * @param {{ports?: readonly number[]}} [options]
@@ -222,17 +313,18 @@ export function tailnetCandidates(topology, { ports = [8787, 8788, 8789, 18787] 
     // This machine's own tailnet address is already covered by the device
     // candidates; probing it twice would list the same daemon twice.
     if (peer.isSelf) continue;
-    for (const ip of peer.ips) {
-      for (const port of ports) {
-        out.push(Object.freeze({
-          origin: `http://${ip}:${port}`,
-          host: ip,
-          peer: peer.name,
-          dnsName: peer.dnsName,
-          online: peer.online,
-          os: peer.os,
-        }));
-      }
+    const host = peer.dnsName || peer.ips[0];
+    if (!host) continue;
+    for (const port of ports) {
+      out.push(Object.freeze({
+        origin: `http://${host}:${port}`,
+        host,
+        peer: peer.name,
+        dnsName: peer.dnsName,
+        online: peer.online,
+        os: peer.os,
+        tailnet: true,
+      }));
     }
   }
   return Object.freeze(out);
