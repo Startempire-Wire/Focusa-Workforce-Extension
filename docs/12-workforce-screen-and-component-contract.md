@@ -34,6 +34,12 @@ work/
   WorkProgression
   LifecycleBadge
 
+routine/
+  RoutineHealthSummary
+  RoutineRunRow
+  RoutineExecutionPosture
+  RoutineOutcomeHandoff
+
 people/
   PeopleList
   PersonCard
@@ -256,7 +262,8 @@ Desktop order:
 ```text
 Current Focus                    Needs You
 Working Now                      Verified Recently
-Workstreams                      Capacity exception (conditional)
+Routine exception (conditional)  Capacity exception (conditional)
+Workstreams
 ```
 
 Do not render empty capacity/upsell panels if no meaningful condition exists.
@@ -345,6 +352,27 @@ ForemanCard | NeedsYouList scoped to Workstream
 ```
 
 DirectionComposer spans below Foreman card or full width based on available width.
+
+### 5.2.1 Routine health block — conditional
+
+Render only when the selected Workstream has source-backed commissioned routine refs.
+
+Primary content:
+
+```text
+routine name / purpose
+responsible role
+state
+last run
+next run if scheduler owner reports it
+scheduler/body posture
+Needs You / failure / retry condition
+last Evidence / settlement
+```
+
+Secondary detail may expose reliability, latency/resource posture, owner interruptions, defects/reversals and the W.I.N.S. outcome/momentum-leverage handoff.
+
+Do not show a single “routine score” that hides dimensions. Do not infer business value from scheduler/run health. Actions such as pause/revoke/retry must map to owning operations and re-read source truth afterward.
 
 ### 5.3 Trajectory block
 
