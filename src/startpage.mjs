@@ -19,6 +19,7 @@ import { saveLocalEnvironment } from './lib/storage.mjs';
 import { BUILD } from './lib/build-info.mjs';
 import { initialConnection, describeConnection, applyBeat, isAttached } from './lib/connection.mjs';
 import { readTailscaleTopology } from './lib/tailscale.mjs';
+import { readHostBook, originsForHost } from './lib/host-book.mjs';
 import { peerOrigins } from './lib/discovery.mjs';
 
 /** Run an interaction and show any failure IN the surface. */
@@ -237,15 +238,35 @@ function renderLink() {
 async function loadRoster() {
   const reachable = await reachableOriginFilter(chrome);
   const topology = await readTailscaleTopology().catch(() => null);
-  if (!topology) { link = { ...link, connectable: [] }; return; }
   const connectable = [];
-  for (const peer of topology.peers) {
+  const seen = new Set();
+  // 1. whatever the tailnet itself reports
+  for (const peer of topology?.peers ?? []) {
     if (peer.isSelf) continue;
     const origins = peerOrigins(peer);
+    if (!origins.length) continue;
+    seen.add(peer.name);
     const allowed = [];
     for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
     connectable.push({ name: peer.name, ips: peer.ips, online: peer.online, os: peer.os, granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]] });
   }
+  // 2. the hosts this device already knows, even when nothing answers there yet.
+  //    A known machine must be VISIBLE before it is reachable - otherwise the
+  //    authoritative daemon is invisible exactly when you need it most.
+  try {
+    for (const entry of await readHostBook(chrome)) {
+      if (seen.has(entry.label)) continue;
+      const origins = originsForHost({ host: entry.host, allowInsecure: true });
+      if (!origins.length) continue;
+      const allowed = [];
+      for (const origin of origins) if (await reachable(origin)) allowed.push(origin);
+      connectable.push({
+        name: entry.label, ips: [entry.host], online: false, os: null,
+        known: true, granted: allowed.length > 0, origins: allowed.length ? allowed : [origins[0]],
+        summary: 'A machine this device knows. It has not answered a Focusa probe yet.',
+      });
+    }
+  } catch { /* the book is optional */ }
   link = { ...link, connectable };
   renderLink();   // the roster arrives after the first paint
 }
