@@ -125,9 +125,34 @@ The Chief of Staff is not a global Foreman. A Foreman does not inherit owner-wid
 
 ---
 
-## 4. Workforce Composer versus Focusa Workforce
+## 4. Portfolio Business Compiler / Workforce Composer versus Focusa Workforce
 
-Wirebot's **Workforce Composer** designs and commissions the organization.
+Wirebot's **Portfolio Business Compiler** discovers and designs how the owner's portfolio should operate. It may span several businesses plus life domains and produces reviewable routine blueprints, leverage hypotheses and proposed organization changes.
+
+Wirebot's **Workforce Composer** then designs and commissions the organization.
+
+Focusa Workforce does **not** become the compiler, scheduler, routine analytics warehouse or W.I.N.S. scoreboard. It projects the accepted governed organization in operation.
+
+For a commissioned routine, Workforce should be able to project:
+
+```text
+routine identity / purpose
+business/domain + Workstream scope
+Foreman / responsible people
+current scheduler/job ref when applicable
+execution body / OpenClaw / UIAI posture
+working / waiting / blocked / Needs You
+last run / next run / missed-run or failure
+Evidence / settlement
+routine health dimensions
+accepted-outcome / W.I.N.S. handoff ref
+```
+
+OpenClaw is the default durable automations plane on the Operator's persistent Tailscale-connected remote VPS; Focusa remains canonical work/authority/Evidence owner. Workforce may pause/revoke only through the owning operations.
+
+### 4.1 Workforce Composer versus Focusa Workforce
+
+Wirebot's **Workforce Composer** designs and commissions the organization after the Portfolio Business Compiler has identified evidenced routines/capability gaps.
 
 It answers:
 
@@ -162,8 +187,8 @@ observed business/life need
 → Focusa Workstream/Foreman/authority binding
 → Focusa Workforce
 → execution
-→ Evidence / settlement
-→ accepted outcome
+→ routine health / Evidence / settlement
+→ accepted outcome / W.I.N.S. momentum-leverage projection
 ```
 
 Workforce MUST NOT create a parallel role/roster authority to make this flow easier to render.
@@ -336,7 +361,22 @@ The system should minimize babysitting while making human authority easy at the 
 
 ---
 
-## 10. Evidence and trust
+## 10. Routine health, Evidence and trust
+
+Routine health is operational projection, not outcome truth.
+
+Workforce may show source-backed:
+- last/next run;
+- success/failure/retry/recovery;
+- latency and resource posture;
+- owner interruptions/Needs You;
+- execution body/scheduler posture;
+- defects or reversals;
+- Evidence/settlement refs.
+
+It should deep-link to Wirebot/W.I.N.S. for portfolio-level outcome, momentum and leverage interpretation. A healthy routine can still be useless to the business; a failed run can still be recovered without implying the broader outcome failed.
+
+### 10.1 Evidence and trust
 
 Workforce must visually distinguish activity from proof.
 
