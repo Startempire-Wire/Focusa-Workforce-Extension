@@ -108,7 +108,11 @@ function emptyRow(message) {
 /** Owner freshness is reported inside the connection detail line, not beside it. */
 function setFreshness(_state, text) {
   if (isAttached(link)) link = { ...link, note: text };
-  renderLink();
+  // Ask the tailnet who it is, immediately, before anything else. The read is
+// cached for a minute, so the roster is present on first paint instead of
+// arriving a beat after the daemons do.
+readTailscaleTopology().catch(() => {});
+renderLink();
 }
 
 /* ── the living connection surface ──────────────────────────────────────────
@@ -124,7 +128,28 @@ let link = initialConnection();
  * nothing), and selecting one reveals what it holds plus the single action that
  * attaches to it. Depth is earned, never assumed.
  */
-let selectedPeer = null;
+/** The panel a selected machine reveals: where it is, and the one action. */
+function buildDetail(peer) {
+  const detail = document.createElement('div');
+  detail.className = 'sp-peer-detail';
+  const address = document.createElement('code');
+  address.textContent = (peer.ips ?? []).join(', ') || 'no address reported';
+  const what = document.createElement('p');
+  what.className = 'sp-peer-what';
+  what.textContent = peer.summary
+    ? peer.summary
+    : peer.online ? 'Answers on the tailnet. Connect to see what it holds.' : 'Offline on the tailnet right now.';
+  const actions = document.createElement('div');
+  actions.className = 'sp-row';
+  const connect = document.createElement('button');
+  connect.type = 'button';
+  connect.className = 'sp-btn sp-btn-primary';
+  connect.textContent = peer.granted ? 'Connect' : 'Allow & connect';
+  connect.addEventListener('click', () => guard('Connect', () => connectPeer(peer)));
+  actions.append(connect);
+  detail.append(address, what, actions);
+  return detail;
+}
 
 function renderRoster() {
   const peers = link?.connectable ?? [];
@@ -135,48 +160,36 @@ function renderRoster() {
   el.peerlist.replaceChildren();
   for (const peer of peers) {
     const item = document.createElement('li');
-    const isOpen = selectedPeer === peer.name;
-    item.className = `sp-peer${peer.online ? '' : ' off'}${isOpen ? ' open' : ''}`;
+    item.className = `sp-peer${peer.online ? '' : ' off'}`;
 
     // 1. the machine, always visible
     const pick = document.createElement('button');
     pick.type = 'button';
     pick.className = 'sp-peer-pick';
-    pick.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    pick.setAttribute('aria-expanded', 'false');
     const dot = document.createElement('span');
     dot.className = 'sp-peer-dot';
     const name = document.createElement('span');
     name.className = 'sp-peer-name';
     name.textContent = peer.name ?? 'peer';
     pick.append(dot, name);
+    // Toggling this item only: rebuilding the list on every selection would
+    // destroy keyboard focus (docs/17 §21.5) and lose the open panel's scroll.
     pick.addEventListener('click', () => {
-      selectedPeer = isOpen ? null : peer.name;
-      renderRoster();
+      const opening = !item.classList.contains('open');
+      for (const other of el.peerlist.querySelectorAll('.sp-peer.open')) {
+        other.classList.remove('open');
+        other.querySelector('.sp-peer-pick')?.setAttribute('aria-expanded', 'false');
+        other.querySelector('.sp-peer-detail')?.remove();
+      }
+      if (!opening) return;
+      item.classList.add('open');
+      pick.setAttribute('aria-expanded', 'true');
+      item.append(buildDetail(peer));
     });
     item.append(pick);
 
     // 2. its detail, revealed on selection
-    if (isOpen) {
-      const detail = document.createElement('div');
-      detail.className = 'sp-peer-detail';
-      const address = document.createElement('code');
-      address.textContent = (peer.ips ?? []).join(', ') || 'no address reported';
-      const what = document.createElement('p');
-      what.className = 'sp-peer-what';
-      what.textContent = peer.summary
-        ? peer.summary
-        : peer.online ? 'Answers on the tailnet. Connect to see what it holds.' : 'Offline on the tailnet right now.';
-      const actions = document.createElement('div');
-      actions.className = 'sp-row';
-      const connect = document.createElement('button');
-      connect.type = 'button';
-      connect.className = 'sp-btn sp-btn-primary';
-      connect.textContent = peer.granted ? 'Connect' : 'Allow & connect';
-      connect.addEventListener('click', () => guard('Connect', () => connectPeer(peer)));
-      actions.append(connect);
-      detail.append(address, what, actions);
-      item.append(detail);
-    }
     el.peerlist.append(item);
   }
 }

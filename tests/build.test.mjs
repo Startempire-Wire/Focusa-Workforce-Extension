@@ -59,6 +59,8 @@ test('manifest is least-privilege MV3 with no content script', async () => {
     'http://100.115.92.26/*',
     'http://100.115.92.26:7456/*',
     'http://100.127.113.90/*',
+    'http://100.69.132.82/*',   // estate tailnet node (ovh) - known host, no prompt
+    'http://100.94.238.56/*',   // estate tailnet node (kh) - the authoritative daemon
     'http://127.0.0.1/*',
     'http://127.0.0.1:41112/*',   // Tailscale LocalAPI: how the tailnet is enumerated
     'http://localhost/*',
