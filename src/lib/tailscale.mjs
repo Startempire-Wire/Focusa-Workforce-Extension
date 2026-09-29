@@ -124,7 +124,12 @@ export function readTailscaleNative({
     });
     port.onDisconnect.addListener(() => {
       clearTimeout(timer);
-      // Not installed, or not permitted for this extension id: not an error.
+      // Read lastError so a missing host is a handled, expected outcome — not
+      // an "Unchecked runtime.lastError" extension error. No host manifest
+      // registered for this machine, or this extension id is not in its
+      // allowed_origins: the LocalAPI path is tried next, and null simply
+      // means "no native channel here".
+      void globalThis.chrome?.runtime?.lastError;
       finish(null);
     });
     try { port.postMessage({ type: 'who-is-out-there' }); } catch {

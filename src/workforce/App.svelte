@@ -36,6 +36,19 @@
   let route = $state(parseRoute(location.hash).route);
   let ctx = $state(parseRoute(location.hash));
   let railOpen = $state(false);
+  let diagCopyLabel = $state('Copy diagnostics');
+  /** The workforce shell's own failure record, reload-proof: an empty report
+   *  after a dead button is itself the bug, so this must never be empty. */
+  async function copyWorkforceDiagnostics() {
+    try {
+      await navigator.clipboard.writeText(await store.exportDiagnostics());
+      diagCopyLabel = 'Copied';
+    } catch {
+      diagCopyLabel = 'Copy failed';
+    } finally {
+      setTimeout(() => { diagCopyLabel = 'Copy diagnostics'; }, 1500);
+    }
+  }
   let instruction = $state('');
   let granularity = $state('full');
   let category = $state('O');
@@ -1160,6 +1173,9 @@
                 <dt>Owner gaps</dt><dd>{store.ownerGaps.join(', ') || 'none reported'}</dd>
               </dl>
               <p class="muted tiny">All Workforce data is local to this extension; nothing is synced to a private surface.</p>
+              <h4>Diagnostics</h4>
+              <p class="muted tiny">Every connect, disconnect and discovery outcome is recorded here — including across reloads. Copy this when reporting a dead button.</p>
+              <div class="row"><button type="button" class="wf-btn" onclick={copyWorkforceDiagnostics}>{diagCopyLabel}</button></div>
             </section>
           {/if}
           </div>{/key}

@@ -131,6 +131,36 @@ test('a missing or refused native host is not an error', async () => {
   assert.equal(await pending, null);
 });
 
+test('a refused native host leaves no Unchecked runtime.lastError behind', async () => {
+  // Regression: every topology read on a machine without the host manifest
+  // sprayed "Unchecked runtime.lastError: Specified native messaging host
+  // not found" into the extension console, because onDisconnect never read
+  // lastError. Chrome only stays quiet when the property is actually touched.
+  const { readTailscaleNative } = await import('../src/lib/tailscale.mjs');
+  let lastErrorRead = false;
+  const priorChrome = globalThis.chrome;
+  Object.defineProperty(globalThis, 'chrome', {
+    configurable: true,
+    value: { runtime: { get lastError() { lastErrorRead = true; return new Error('Specified native messaging host not found'); } } },
+  });
+  try {
+    const listeners = [];
+    const port = {
+      onMessage: { addListener: (fn) => listeners.push(['message', fn]) },
+      onDisconnect: { addListener: (fn) => listeners.push(['disconnect', fn]) },
+      postMessage: () => {},
+      disconnect: () => {},
+    };
+    const pending = readTailscaleNative({ connectNative: () => port });
+    listeners.find(([kind]) => kind === 'disconnect')[1]();
+    assert.equal(await pending, null);
+    assert.equal(lastErrorRead, true, 'onDisconnect must touch runtime.lastError so Chrome marks it handled');
+  } finally {
+    if (priorChrome === undefined) delete globalThis.chrome;
+    else Object.defineProperty(globalThis, 'chrome', { configurable: true, value: priorChrome });
+  }
+});
+
 test('a discovery bridge reports peers and verified daemons', async () => {
   const { readBridgeTopology } = await import('../src/lib/tailscale.mjs');
   const body = {

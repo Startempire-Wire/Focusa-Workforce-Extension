@@ -68,6 +68,11 @@
 
 {#if show}
   <div class="strip" data-state={d.state} transition:fade={{ duration: dur }}>
+    {#if store.lastAction}
+      <p class="action-note" class:pending={store.lastAction.ok == null} class:bad={store.lastAction.ok === false} role="status">
+        <strong>{store.lastAction.label}</strong> — {store.lastAction.note}
+      </p>
+    {/if}
     <!-- The tailnet roster, read from the tailnet itself (Tailscale LocalAPI on
          this host's loopback, so it works on any OS the tailnet runs on). A peer
          that is not granted yet cannot be probed - a browser may only fetch
@@ -228,6 +233,17 @@
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
     padding: 11px 14px;
   }
+  /* The last action speaks when the state cannot: a dead button with no
+     message is the failure this line exists to prevent. Pending progress is
+     neutral; only failure carries the danger colour. */
+  .action-note {
+    margin: 0; padding: 8px 14px; width: 100%;
+    font: var(--text-small); color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-default); background: var(--bg-subtle);
+  }
+  .action-note strong { color: var(--text-primary); }
+  .action-note.bad { color: var(--danger); }
+  .action-note.bad strong { color: var(--danger); }
   strong { font: var(--text-body-strong); }
   .dim { color: var(--text-secondary); font: var(--text-small); }
   code { color: var(--text-secondary); font: var(--text-micro); overflow-wrap: anywhere; }

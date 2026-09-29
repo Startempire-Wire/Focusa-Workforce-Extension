@@ -24,7 +24,8 @@ import { listNotifications, markNotificationsRead, notificationFromEvent, saveNo
 import { normalizeDaemonOrigin, requestDaemonOriginPermission, hasDaemonOriginPermission } from '../../lib/validation.mjs';
 import { orchestrateAction } from '../../lib/orchestration.mjs';
 import { promptWorkLoop } from '../../lib/work-loop-prompt.mjs';
-import { readCache, writeCache, isUsable, ageLabel } from '../../lib/daemon-cache.mjs';
+import { readCache, writeCache, clearCache, isUsable, ageLabel } from '../../lib/daemon-cache.mjs';
+import { createDiagnostics } from '../../lib/diagnostics.mjs';
 import { trustedHosts, readHostBook, addHost, removeHost } from '../../lib/host-book.mjs';
 import { readTailscaleTopology } from '../../lib/tailscale.mjs';
 import { tailnetRoster, peerOrigins } from '../../lib/discovery.mjs';
@@ -97,6 +98,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   let directing = $state(false);
   let lastDirection = $state(/** @type {any} */ (null));
   let bootError = $state(/** @type {string|null} */ (null));
+  // The workforce shell's own diagnostics: every connect/disconnect/discover
+  // outcome is recorded here and survives reload via storage, so a failure
+  // report is never an empty export. The strip renders lastAction whenever an
+  // action ends without a state change that speaks for itself.
+  const diag = createDiagnostics({ chromeApi });
+  let lastAction = $state(/** @type {{label: string, ok: boolean|null, note: string, at: string}|null} */ (null));
   // Age label for cache-hydrated reads; cleared the moment live reads land.
   let cacheNote = $state(/** @type {string|null} */ (null));
   // Silent read-only discovery; attaching is always one explicit click.
@@ -377,7 +384,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   async function connectDiscovered(target) {
     const origin = typeof target === 'string' ? target : (target?.baseUrl ?? discovery.baseUrl);
     if (!origin) return null;
+    const done = diag.step('connect', { baseUrl: origin });
+    // The strip shows this while the probe runs: a hanging probe must never
+    // look like a dead button.
+    lastAction = { label: 'Connect', ok: null, note: `Connecting to ${origin}…`, at: new Date().toISOString() };
     connection = { ...connection, status: 'connecting', baseUrl: origin, note: 'Connecting…' };
+    try {
     // Prove a daemon is actually there before attaching. Choosing a machine from
     // the tailnet roster must never leave the surface attached to something that
     // is not a Focusa daemon.
@@ -385,6 +397,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     if (!answer.ok) {
       connection = { ...connection, status: 'disconnected', baseUrl: null, note: `Nothing answered on ${origin}` };
       discovery = { ...discovery, notAnswering: origin };
+      lastAction = { label: 'Connect', ok: false, note: `Nothing answered on ${origin}`, at: new Date().toISOString() };
+      done(null, { answered: false });
       return null;
     }
     // An origin the manifest already grants is attached with no permission call
@@ -395,6 +409,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       const granted = await requestDaemonOriginPermission(origin, chromeApi).catch(() => false);
       if (!granted) {
         connection = { ...connection, status: 'disconnected', baseUrl: null, note: 'Access to that machine was not allowed' };
+        lastAction = { label: 'Connect', ok: false, note: 'Access to that machine was not allowed — allow it in the prompt and try again', at: new Date().toISOString() };
+        done(null, { permitted: false });
         return null;
       }
     }
@@ -411,6 +427,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     } else {
       await attachDaemon(origin, 'Focusa daemon');
     }
+    lastAction = null;
+    done(null, { attached: origin });
     discovery = { state: 'connected', baseUrl: origin, answers: discovery.answers, daemons: discovery.daemons, alive: true, lastSeenAt: new Date().toISOString(), notAnswering: null };
     stopLiveness?.();
     stopLiveness = watchLiveness(origin, (beat) => {
@@ -419,6 +437,15 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       previewDaemon({ baseUrl: origin }).then((preview) => { previews = { ...previews, [origin]: preview }; }).catch(() => {});
     });
     return origin;
+    } catch (error) {
+      // Whatever broke after the probe, the surface says so: a Connect that
+      // ends with the same button and no message is the failure being fixed.
+      const note = error instanceof Error ? error.message : String(error);
+      connection = { ...connection, status: 'disconnected', baseUrl: null, note: `Connect failed: ${note}` };
+      lastAction = { label: 'Connect', ok: false, note: `Connect failed: ${note.slice(0, 160)}`, at: new Date().toISOString() };
+      done(error);
+      return null;
+    }
   }
 
   /**
@@ -466,13 +493,14 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   }
 
   async function disconnect() {
+    const done = diag.step('disconnect', {});
     stopLiveness?.();
     stopLiveness = null;
     const current = active;
     stopStream();
-    if (current) await forgetLocalEnvironment(current.id, chromeApi).catch(() => {});
-    // An explicit, remembered disconnect: the surface says so until the operator
-    // connects again, instead of quietly looking like a first run.
+    // The visible state changes FIRST: whatever the cleanup below meets, the
+    // surface already says disconnected. A Disconnect that ends with the same
+    // button and no message is the failure being fixed.
     suppressed = true;
     connection = {
       status: 'disconnected', baseUrl: null,
@@ -481,7 +509,19 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     };
     discovery = { state: 'idle', baseUrl: null, answers: [], daemons: [] };
     previews = {};
-    await refreshEnvironments();
+    cacheNote = null;
+    lastAction = null;
+    try {
+      if (current) await forgetLocalEnvironment(current.id, chromeApi).catch(() => {});
+      await clearCache(chromeApi);
+      await refreshEnvironments();
+      done(null, {});
+    } catch (error) {
+      // Cleanup failed, but the detach stands: say both, plainly.
+      const note = error instanceof Error ? error.message : String(error);
+      lastAction = { label: 'Disconnect', ok: false, note: `Detached, but cleanup stumbled: ${note.slice(0, 140)}`, at: new Date().toISOString() };
+      done(error);
+    }
     return true;
   }
 
@@ -1106,10 +1146,13 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     async connectTailnetPeer(peer) {
       const entry = (tailnet.connectable ?? []).find((item) => item.name === (peer?.name ?? peer));
       const origin = entry?.origins?.[0] ?? peerOrigins(entry ?? peer)[0];
-      if (!origin) return null;
-      await connectDiscovered(origin);
-      await loadTailnet();
-      return origin;
+      if (!origin) {
+        lastAction = { label: 'Connect', ok: false, note: 'That machine has no address to reach', at: new Date().toISOString() };
+        return null;
+      }
+      const attached = await connectDiscovered(origin);
+      try { await loadTailnet(); } catch { /* the attach stands; the roster refresh is best-effort */ }
+      return attached;
     },
     addTailnetHost,
     removeTailnetHost,
@@ -1153,6 +1196,8 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     get uiaiTakeovers() { return uiaiTakeovers; },
     get bootError() { return bootError; },
     get cacheNote() { return cacheNote; },
+    get lastAction() { return lastAction; },
+    exportDiagnostics() { return diag.exportJson(); },
     get discovery() { return discovery; },
     get connection() { return connection; },
     get suppressed() { return suppressed; },

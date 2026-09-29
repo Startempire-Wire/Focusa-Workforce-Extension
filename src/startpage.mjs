@@ -532,23 +532,35 @@ async function connect(baseUrl) {
 }
 
 async function disconnect() {
+  const done = diag.step('disconnect', { baseUrl: liveConnection?.base_url ?? null });
   stopHeartbeat?.();
   stopHeartbeat = null;
   // An explicit, remembered disconnect: stated plainly, and searched for nothing
-  // until the operator asks again.
+  // until the operator asks again. Rendered FIRST: whatever the cleanup below
+  // meets, the surface already says disconnected.
   link = { status: 'disconnected', baseUrl: null, label: null, since: new Date().toISOString(), lastSeenAt: null, note: 'You disconnected. Nothing is attached.' };
-  stopInspectorRefresh();
-  await clearCache(chrome);
-  diag.log('cache.cleared', {});
-  const { forgetLocalEnvironment } = await import('./lib/storage.mjs');
-  if (liveConnection?.connection_id?.startsWith('local:')) {
-    await forgetLocalEnvironment(liveConnection.connection_id, chrome).catch(() => {});
-  }
-  await chrome.storage.local.remove(CONNECTION_KEY);
-  streamAbort?.abort();
-  stopInspectorEvents();
+  const departingId = liveConnection?.connection_id ?? null;
   liveConnection = null;
   discoveryState = { state: 'idle', daemons: [], baseUrl: null, alive: false, answers: [], known: [] };
+  renderLink();
+  try {
+    stopInspectorRefresh();
+    await clearCache(chrome);
+    diag.log('cache.cleared', {});
+    const { forgetLocalEnvironment } = await import('./lib/storage.mjs');
+    if (departingId?.startsWith('local:')) {
+      await forgetLocalEnvironment(departingId, chrome).catch(() => {});
+    }
+    await chrome.storage.local.remove(CONNECTION_KEY);
+    streamAbort?.abort();
+    stopInspectorEvents();
+    done(null, {});
+  } catch (error) {
+    // The detach stands (rendered above); only the cleanup stumbled.
+    done(error);
+    renderDiagnostics();
+    throw error;
+  }
   renderLink();
 }
 

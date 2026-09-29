@@ -143,7 +143,20 @@ export function createDiagnostics({ chromeApi = globalThis.chrome, now = () => n
       } catch { return []; }
     },
     async exportJson() {
-      return JSON.stringify({ exportedAt: now(), events: ring.slice() }, null, 2);
+      // A reload wipes the in-memory ring but not storage: an export taken
+      // after a reload must still contain what happened before it, or every
+      // failure report arrives empty and undebuggable. Merge persisted
+      // (older) with live (newer), without double-counting the events that
+      // were persisted and are still in memory.
+      let persisted = [];
+      try {
+        const raw = await chromeApi?.storage?.local?.get(STORE_KEY);
+        if (Array.isArray(raw?.[STORE_KEY])) persisted = raw[STORE_KEY];
+      } catch { /* the live ring alone is still evidence */ }
+      const seen = new Set(ring.map((e) => `${e?.at}|${e?.name}`));
+      const older = persisted.filter((e) => e && !seen.has(`${e?.at}|${e?.name}`));
+      const events = [...older, ...ring].slice(-Math.max(ringCap, 200));
+      return JSON.stringify({ exportedAt: now(), events }, null, 2);
     },
     async clear() {
       ring.length = 0;
