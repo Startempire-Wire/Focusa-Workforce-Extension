@@ -1,5 +1,6 @@
 import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -129,6 +130,26 @@ for (const ent of await readdir(dist, { recursive: true })) {
   if (out !== txt) { await writeFile(p, out); touched++; }
 }
 console.log(`PASS: built ${brand} MV3 unpacked extension at ${dist} (${touched} files re-branded${uiBundled ? ', workforce page bundled' : ''})`);
+
+// ── Mirror to the browser's unpacked load path ──
+// The extension is loaded unpacked from a directory, while the code is built
+// and committed here. Those are two different places and they drifted silently:
+// the loaded tree sat three commits behind, so every shipped fix was absent
+// from the browser and looked like a broken button. A build now carries itself
+// to the load path, so "built but not deployed" stops being a state that can
+// be reached and forgotten.
+// Absent path (CI, or any host without that share) is a clean no-op.
+const LOADED = process.env.WFX_LOADED_DIR || '/mnt/shared/MyFiles/Downloads/FocusaWorkforceExtension';
+if (existsSync(join(LOADED, 'manifest.json'))) {
+  const { execFileSync } = await import('node:child_process');
+  try {
+    execFileSync('/srv/wfx/sync-loaded.sh', { stdio: 'ignore', timeout: 120_000 });
+    const stamp = (await readFile(join(LOADED, 'lib/build-info.mjs'), 'utf8')).match(/sha: "([^"]+)"/)?.[1] ?? 'unknown';
+    console.log(`PASS: mirrored build to the loaded extension path ${LOADED} (sha ${stamp})`);
+  } catch {
+    console.log(`WARN: could not mirror to ${LOADED}; the timer (wfx-sync-loaded.timer) will retry.`);
+  }
+}
 
 // ── Public demo: FOCUSA_PUBLIC_NEWTAB=1 makes the default new tab render the
 // public Work view (dated, curated snapshot). Private builds are unchanged. ──
