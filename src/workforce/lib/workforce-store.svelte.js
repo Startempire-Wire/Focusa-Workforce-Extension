@@ -14,6 +14,7 @@
 import { listConnections, listLocalEnvironments, forgetLocalEnvironment, saveLocalEnvironment } from '../../lib/storage.mjs';
 import { startPairing, pollPairing } from '../../lib/pairing.mjs';
 import { createWorkforceClient, ResultState, rosterFromOwner, trajectoryFromOwner, projectsFromOwner, discoveredFromOwner, eventsFromOwner, capabilitiesFromOwner } from '../../lib/workforce-client.mjs';
+import { projectEntitlement } from '../../lib/projections.mjs';
 import { workstreamRef, OWNER_GAPS } from '../../lib/owner-contracts.mjs';
 import { resolveTrajectorySource } from '../../lib/trajectory-source.mjs';
 import { parseExactTarget, resolveDirectionTarget, describeTarget, targetFromCreatedSession } from '../../lib/direction-target.mjs';
@@ -163,7 +164,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       : null,
   );
   const health = $derived(reads.health?.data ?? null);
-  const entitlement = $derived(reads.license?.data?.authority ?? reads.license?.data ?? null);
+  const entitlement = $derived(reads.license?.state === ResultState.OK ? projectEntitlement(reads.license.data) : null);
   const entitlementState = $derived(
     reads.license?.state === ResultState.ENTITLEMENT_BLOCKED ? 'blocked'
       : (entitlement?.state ?? (reads.license?.data ? 'unknown' : null)),
@@ -597,6 +598,27 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     record('health', await c.health());
     record('license', await c.licenseStatus());
     record('projects', await c.projectList());
+    // Adopt the daemon's own effective project. Everything scoped - workpoint,
+    // trajectory, sessions, events, roles - is keyed to a project root, so an
+    // unbound surface reports nothing even though the daemon is answering.
+    // Binding is silent and only ever happens when nothing was chosen yet, so
+    // it never overrides an explicit operator choice (operator directive:
+    // daemon binding is automatic, with zero manual entries or prompts).
+    const effective = reads.projects?.state === ResultState.OK
+      ? (reads.projects.data?.effective_project ?? null)
+      : null;
+    if (effective?.project_root && !selection.projectRoot) {
+      // Bound in place rather than via setSelection(): setSelection re-enters
+      // refreshOwner, which would read every scoped endpoint twice on the first
+      // connect. Setting it here lets the same pass continue straight into the
+      // project-scoped reads below, exactly once.
+      selection = {
+        projectRoot: effective.project_root,
+        continuityId: effective.continuity_id ?? selection.continuityId,
+      };
+      await persistSelection(chromeApi, activeId, selection);
+      diag.log('project.auto_bound', { projectRoot: effective.project_root });
+    }
     record('capabilities', await c.operations());
     if (selection.projectRoot) {
       record('project', await c.projectIdentity(selection.projectRoot));

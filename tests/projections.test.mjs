@@ -43,3 +43,52 @@ test('failure projection preserves distinct capability states without messages o
     assert.deepEqual(projectObservationFailure({ kind, status: 403, message: 'token secret' }), { status: kind, http_status: 403 });
   }
 });
+
+// ── Entitlement shapes (added 2026-10-02) ────────────────────────────────────
+test('the canonical developer_full projection is read, not guessed at', async () => {
+  // Regression: the Workforce surface rendered "Entitlement unknown" against a
+  // fully entitled daemon, because it only understood { authority: { state } }
+  // and the daemon serves focusa.developer_full_projection.v1 instead. To an
+  // operator "unknown" reads as "not permitted" - the worst thing this surface
+  // can say when the daemon is actually entitled.
+  const { projectEntitlement } = await import('../src/lib/projections.mjs');
+  const body = {
+    developer_full: {
+      all_focusa_features: true,
+      authority_source: 'cached_trusted_origin',
+      developer_profile: 'developer_full',
+      license_class: 'developer',
+      recovery_reason: null,
+      schema: 'focusa.developer_full_projection.v1',
+      state: 'active_paid',
+    },
+    expired: false,
+    next_action: 'authority entitlement ready',
+    status: 'active',
+    summary: 'developer_full (trusted development origin)',
+    tier: 'developer_full',
+  };
+  const e = projectEntitlement(body);
+  assert.equal(e.state, 'active_paid');
+  assert.equal(e.posture, 'developer_full');
+  assert.equal(e.authoritySource, 'cached_trusted_origin');
+  assert.equal(e.licenseClass, 'developer');
+  assert.equal(e.allFeatures, true);
+  assert.equal(e.expired, false);
+  assert.equal(e.summary, 'developer_full (trusted development origin)');
+});
+
+test('the legacy authority shape still reads, so this cannot regress', async () => {
+  const { projectEntitlement } = await import('../src/lib/projections.mjs');
+  const e = projectEntitlement({ authority: { state: 'active_paid', authority_source: 'agent_kb', summary: 'seat' } });
+  assert.equal(e.state, 'active_paid');
+  assert.equal(e.authoritySource, 'agent_kb');
+});
+
+test('an unentitled or unreadable body never invents a posture', async () => {
+  const { projectEntitlement } = await import('../src/lib/projections.mjs');
+  assert.equal(projectEntitlement({}).state, 'unknown');
+  assert.equal(projectEntitlement(null).state, 'unknown');
+  assert.equal(projectEntitlement({ status: 'expired', expired: true }).state, 'unknown');
+  assert.equal(projectEntitlement({ status: 'expired', expired: true }).expired, true);
+});

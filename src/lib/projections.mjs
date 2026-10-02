@@ -74,3 +74,54 @@ export function projectObservationFailure(error) {
   const allowed = new Set(['unauthenticated','forbidden','unsupported','degraded','request_rejected','invalid_envelope']);
   return Object.freeze({ status: allowed.has(error?.kind) ? error.kind : 'degraded', http_status: error?.status ?? null });
 }
+
+/**
+ * Entitlement, from whatever shape the daemon used to report it.
+ *
+ * The daemon serves a canonical `focusa.developer_full_projection.v1` whose
+ * posture is the top-level key (`developer_full`) and whose detail lives under
+ * it, alongside flat `status`/`tier`/`summary` fields. An older/paired shape
+ * reports `{ authority: { state, ... } }`. Reading only one of those made a
+ * fully entitled daemon render as "unknown" on the Workforce surface, which
+ * reads as "not permitted" to the operator - the most misleading thing this
+ * extension can possibly say.
+ *
+ * Never invents a posture: an unrecognised body yields state 'unknown' with the
+ * raw summary, so the surface stays honest instead of guessing.
+ * @param {unknown} body
+ * @returns {{state: string, posture: string|null, authoritySource: string|null,
+ *            licenseClass: string|null, allFeatures: boolean|null,
+ *            summary: string|null, nextAction: string|null, expired: boolean}}
+ */
+export function projectEntitlement(body) {
+  const envelope = (body && typeof body === 'object') ? body : {};
+  // Canonical: the posture keys the envelope, e.g. { developer_full: {…} }.
+  const postures = ['developer_full', 'active_paid', 'unactivated', 'expired', 'blocked'];
+  const key = postures.find((p) => envelope[p] && typeof envelope[p] === 'object') ?? null;
+  const detail = key ? envelope[key] : null;
+  const flat = detail ?? envelope;
+  const legacy = (envelope.authority && typeof envelope.authority === 'object') ? envelope.authority : null;
+
+  const state = firstString(
+    detail?.state,
+    envelope.tier,
+    key,
+    legacy?.state,
+    flat?.state,
+  ) ?? 'unknown';
+  return Object.freeze({
+    state,
+    posture: key ?? firstString(envelope.tier, legacy?.posture) ?? null,
+    authoritySource: firstString(detail?.authority_source, legacy?.authority_source) ?? null,
+    licenseClass: firstString(detail?.license_class, legacy?.license_class) ?? null,
+    allFeatures: typeof detail?.all_focusa_features === 'boolean' ? detail.all_focusa_features : null,
+    summary: firstString(envelope.summary, legacy?.summary) ?? null,
+    nextAction: firstString(envelope.next_action, legacy?.next_action) ?? null,
+    expired: envelope.expired === true,
+  });
+}
+
+function firstString(...values) {
+  for (const value of values) if (typeof value === 'string' && value) return value;
+  return null;
+}
