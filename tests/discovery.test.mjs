@@ -1,3 +1,4 @@
+import { reachableOriginFilter } from "../src/lib/discovery.mjs";
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -393,4 +394,48 @@ test('an empty tailnet is an honest empty roster, not an error', async () => {
   const { buildConnectableEntries } = await import('../src/lib/discovery.mjs');
   assert.deepEqual(await buildConnectableEntries({}, async () => true), []);
   assert.deepEqual(await buildConnectableEntries({ peers: null }, async () => { throw new Error('no perms'); }), []);
+});
+
+// ── static host_permissions are the enforcing grant ───────────────────────
+// permissions.getAll() reports optional origins only. Reading just that source
+// made the filter allow everything, so discovery probed a tailnet host the
+// browser would refuse, and the surface showed "not answering" against a
+// healthy local daemon.
+test('reachableOriginFilter honours static host_permissions, not only optional origins', async () => {
+  const chromeApi = {
+    runtime: { getManifest: async () => ({ host_permissions: ['http://127.0.0.1/*', 'http://localhost/*'] }) },
+    permissions: { getAll: async () => ({ origins: [] }) },
+  };
+  const reachable = await reachableOriginFilter(chromeApi);
+  assert.equal(await reachable('http://127.0.0.1:8787'), true, 'granted loopback must probe');
+  assert.equal(await reachable('http://localhost:8787'), true, 'granted localhost must probe');
+  assert.equal(
+    await reachable('http://host-philoveracity-com.tail9229d6.ts.net:8787'), false,
+    'a host the manifest does not grant must never be probed',
+  );
+});
+
+test('reachableOriginFilter still honours optional origins granted at runtime', async () => {
+  const chromeApi = {
+    runtime: { getManifest: async () => ({ host_permissions: ['http://127.0.0.1/*'] }) },
+    permissions: { getAll: async () => ({ origins: ['http://100.115.92.26/*'] }) },
+  };
+  const reachable = await reachableOriginFilter(chromeApi);
+  assert.equal(await reachable('http://100.115.92.26:7456'), true, 'runtime grant counts');
+  assert.equal(await reachable('http://kh.tail9229d6.ts.net:8787'), false, 'ungranted stays out');
+});
+
+test('reachableOriginFilter fails closed when a manifest exists but grants nothing', async () => {
+  const chromeApi = {
+    runtime: { getManifest: async () => ({ host_permissions: [] }) },
+    permissions: { getAll: async () => ({ origins: [] }) },
+  };
+  const reachable = await reachableOriginFilter(chromeApi);
+  assert.equal(await reachable('http://127.0.0.1:8787'), false,
+    'an unreachable connection is worse than none');
+});
+
+test('reachableOriginFilter stays permissive only when there is no browser at all', async () => {
+  const reachable = await reachableOriginFilter({});
+  assert.equal(await reachable('http://127.0.0.1:8787'), true, 'unit tests have no manifest');
 });

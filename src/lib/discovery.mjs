@@ -62,19 +62,43 @@ export const PROBE_TIMEOUT_MS = 2500;
  * cross-origin and refused by CORS, which both fails and prints an error. Asking
  * the permissions the browser already holds keeps discovery honest and quiet.
  *
- * With no permissions API (unit tests, preview harnesses) nothing is filtered.
+ * The authority is the union of two sources, and using only one of them is the
+ * defect this replaces:
+ *  - `chrome.runtime.getManifest().host_permissions` - the static grant the
+ *    browser enforces at fetch time. This is what actually decides whether a
+ *    request succeeds.
+ *  - `chrome.permissions.getAll().origins` - optional grants added at runtime.
+ * `permissions.getAll()` does NOT list static host_permissions, so reading only
+ * that source yields an empty set for a browser that has never granted an
+ * optional permission, which used to fall through to allow-everything. The
+ * extension then probed a tailnet host, the browser refused the fetch, and the
+ * surface reported "not answering" against a perfectly healthy local daemon.
+ *
+ * With no permissions API and no manifest (unit tests, preview harnesses)
+ * nothing is filtered.
  *
  * @param {any} chromeApi
  * @returns {Promise<(baseUrl: string) => boolean>}
  */
 export async function reachableOriginFilter(chromeApi) {
   const getAll = chromeApi?.permissions?.getAll;
-  if (typeof getAll !== 'function') return async () => true;
+  const getManifest = chromeApi?.runtime?.getManifest;
   let patterns = [];
+  // Static grants first: this is the set the browser will actually enforce.
   try {
-    patterns = (await getAll.call(chromeApi.permissions))?.origins ?? [];
-  } catch { return async () => true; }
-  if (!patterns.length) return async () => true;
+    if (typeof getManifest === 'function') {
+      const manifest = await getManifest.call(chromeApi.runtime);
+      patterns.push(...(manifest?.host_permissions ?? []));
+    }
+  } catch { /* fall through to whatever else we can learn */ }
+  if (typeof getAll === 'function') {
+    try {
+      patterns.push(...((await getAll.call(chromeApi.permissions))?.origins ?? []));
+    } catch { /* keep the static grant; it is the enforcing one */ }
+  }
+  // Fail closed when we cannot tell. Offering an unreachable origin is worse
+  // than offering none: it produces a connection that can never succeed.
+  if (!patterns.length) return async () => (typeof getManifest === 'function' ? false : true);
   return (baseUrl) => {
     let url;
     try { url = new URL(baseUrl); } catch { return false; }
