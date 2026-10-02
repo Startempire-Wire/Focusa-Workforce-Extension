@@ -168,11 +168,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
   // daemon serves entitlement as a projection envelope the client classifies as
   // degraded rather than ok, and gating on OK alone made a fully entitled daemon
   // render "unknown" - which an operator reads as "not permitted".
-  const licenseBody = reads.license?.data ?? null;
-  const entitlement = $derived(licenseBody ? projectEntitlement(licenseBody) : null);
+  const entitlement = $derived(reads.license?.data ? projectEntitlement(reads.license.data) : null);
   const entitlementState = $derived(
     reads.license?.state === ResultState.ENTITLEMENT_BLOCKED ? 'blocked'
-      : (entitlement?.state ?? (licenseBody ? 'unknown' : null)),
+      // Derived, never a plain const: a plain const is evaluated once at store
+      // creation, before any read has landed, and would then never update.
+      : (entitlement?.state ?? (reads.license?.data ? 'unknown' : null)),
   );
   const roster = $derived(reads.sessions?.state === ResultState.OK ? rosterFromOwner(reads.sessions.data) : []);
   const trajectory = $derived(reads.trajectory?.state === ResultState.OK || reads.trajectory?.state === ResultState.DEGRADED
@@ -606,6 +607,7 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
 
   async function refreshOwner() {
     if (!active) return;
+    const done = diag.step('owner.refresh', { baseUrl: active.baseUrl });
     const c = client();
     record('health', await c.health());
     record('license', await c.licenseStatus());
@@ -636,6 +638,20 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('project', await c.projectIdentity(selection.projectRoot));
       record('projectStatus', await c.projectStatus(selection.projectRoot));
       record('workpoint', await c.workpointCurrent(selection.projectRoot));
+      // The continuity axis comes from the owner, never from a constant here.
+      // effective_project does not publish one, but the project-scoped
+      // workpoint read reports which workstream the daemon is actually on -
+      // and every trajectory/work-loop read is refused without it, so without
+      // this the surface shows "stopgap projection" and an empty workpoint
+      // while talking to a perfectly healthy daemon.
+      const detected = (reads.workpoint?.state === ResultState.OK || reads.workpoint?.state === ResultState.DEGRADED)
+        ? (reads.workpoint.data?.detected_continuity_id ?? null)
+        : null;
+      if (detected && !selection.continuityId) {
+        selection = { ...selection, continuityId: detected };
+        await persistSelection(chromeApi, activeId, selection);
+        diag.log('workstream.auto_bound', { continuityId: detected });
+      }
       record('sessions', await c.sessions(selection.projectRoot));
       record('events', await c.eventsRecent(selection.projectRoot, 20));
       record('profiles', await c.sessionProfiles(selection.projectRoot));
@@ -649,6 +665,14 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
     cacheNote = null;
     // Connected means pulled: every successful refresh refreshes the cache too.
     await writeCache(chromeApi, active.baseUrl, { reads, selection });
+    // Name every read that did not land. A surface that renders "unknown" or
+    // "-" is indistinguishable from a broken one unless the failed call is
+    // recorded, so the operator can see which request to look at.
+    const failed = Object.entries(reads)
+      .filter(([, r]) => r && r.state !== ResultState.OK && r.state !== ResultState.DEGRADED)
+      .map(([name, r]) => `${name}:${r.state}${r.note ? `/${String(r.note).slice(0, 60)}` : ''}`);
+    if (failed.length) diag.warn('owner.reads_partial', { failed });
+    done(null, { failed: failed.length });
   }
 
   /**

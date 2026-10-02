@@ -125,6 +125,11 @@ body {
 .rail-close { display: none; }
 .count-big { font: var(--text-display-2); color: var(--text-primary); margin: 0; }
 .rail-facts { font: var(--text-small); }
+/* An unbound axis is guidance, not status: it spans both columns so the
+   instruction reads as one line and never as a value the daemon returned. */
+.rail-facts .hint-row { color: var(--text-secondary); }
+.rail-facts .hint-row dd { color: var(--text-secondary); }
+.rail-facts .hint-row a { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ────────────────────────── PRIMITIVES ────────────────────────── */
 .card {

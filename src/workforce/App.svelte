@@ -1226,7 +1226,17 @@
         <dl class="facts rail-facts">
           <dt>Entitlement</dt><dd>{store.entitlementState ?? 'unknown'}</dd>
           <dt>Trajectory</dt><dd>{store.trajectoryView.authoritative ? 'canonical' : 'stopgap projection'}</dd>
-          <dt>Workpoint</dt><dd>{store.trajectoryView.ladder.currentWorkpoint ?? '—'}</dd>
+          {#if !store.selection.continuityId}
+            <dt class="hint-row">Workstream</dt>
+            <dd class="hint-row">
+              <!-- The daemon publishes no continuity id for a selected project, so
+                   this axis cannot be discovered - only bound. Say so, and say
+                   where, instead of leaving a cryptic fallback label. -->
+              not bound — <a class="quiet" href="#/settings?section=connections">bind it in Connections</a>
+            </dd>
+          {:else}
+            <dt>Workpoint</dt><dd>{store.trajectoryView.ladder.currentWorkpoint ?? '—'}</dd>
+          {/if}
           <dt>Stream</dt><dd>{store.streamState?.phase ?? 'idle'}</dd>
           <dt>Target origin</dt><dd>{store.directionTargetOrigin ?? '—'}</dd>
         </dl>
