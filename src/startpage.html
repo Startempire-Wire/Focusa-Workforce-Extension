@@ -44,7 +44,6 @@
       <div class="sp-actions">
         <button id="orient-now" type="button" class="sp-btn sp-btn-primary">Continue</button>
         <button id="open-needs" type="button" class="sp-btn">Needs You <span id="start-needs-count">0</span></button>
-        <button id="open-workforce" type="button" class="sp-btn sp-btn-quiet">Open Workforce</button>
       </div>
 
       <div class="sp-summary">
@@ -63,6 +62,13 @@
         <h2 id="start-verified-heading" class="sp-label">Verified Recently</h2>
         <ul id="start-verified" class="sp-list"><li class="sp-empty">No settled proof yet.</li></ul>
       </section>
+
+      <!-- IA §6: Open Workforce is item 6, the route into FULL WORKFORCE.
+           It was third in the action row and styled quiet, which made the only
+           way into the work screens the hardest thing on the page to find. -->
+      <div class="sp-actions sp-actions-closing">
+        <button id="open-workforce" type="button" class="sp-btn sp-btn-quiet">Open Workforce</button>
+      </div>
 
       <section aria-labelledby="start-inspector-heading" id="start-inspector" hidden>
         <div class="sp-inspector-head">

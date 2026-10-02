@@ -378,18 +378,15 @@ function renderDiscovery() {
   // operator to pick a daemon they had already picked. Say what is attached
   // instead, and point at the header's Disconnect, which already exists and
   // already works - no second control here to keep in step with it.
+  // Attached has its own face, and it is the private one: Current Focus, Needs
+  // You, Projects, telemetry, and the Open Workforce button that is the only
+  // way into the work screens. The unpaired block is the door for when nothing
+  // is attached. Showing the door while attached hid the whole connected face,
+  // which is what left the page with a status line, a form and diagnostics and
+  // no way to reach any actual work.
   if (isAttached(link)) {
-    el.unpaired.hidden = false;
-    el.private.hidden = true;
-    // The heading, the label above it and the sentence under it are one piece
-    // of copy. Updating only the heading left "Nothing is attached" printed
-    // directly beneath a strip saying Connected.
-    el.unpairedHeading && (el.unpairedHeading.textContent = 'Attached');
-    el.unpairedLabel && (el.unpairedLabel.textContent = 'Attached to your daemon');
-    el.unpairedObjective && (el.unpairedObjective.textContent = 'Everything below is your live daemon.');
-    el.connect.innerHTML = `
-      <p class="muted">Your live daemon is <b>${escapeText(link.baseUrl)}</b>.</p>
-      <p class="muted">Use <b>Disconnect</b> above to attach a different one.</p>`;
+    el.unpaired.hidden = true;
+    el.private.hidden = false;
     return;
   }
   el.unpaired.hidden = false;

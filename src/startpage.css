@@ -364,3 +364,7 @@ body { margin: 0; min-width: 320px; background: var(--bg-app); color: var(--text
   border-radius: 999px; font-size: 11px;
   background: var(--warning-weak, #fef3c7); color: var(--warning, #b45309);
 }
+
+/* The closing route into Full Workforce: last in the page, as the IA orders it,
+   and given room so it reads as the way onward rather than a third button. */
+.sp-actions-closing { margin-top: 20px; justify-content: flex-start; }

@@ -663,8 +663,12 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       // work, evidence, needs) reported "none in this scope" against a daemon
       // that held all of it. genesis/status is the read that publishes it.
       record('genesis', await c.projectGenesisStatus(selection.projectRoot));
+      // genesis/status publishes the binding under authority.continuity_id, not
+      // at the top level. Reading the top level returned undefined and the bind
+      // silently never fired, which is exactly the empty-scoped-faces symptom
+      // this change exists to remove.
       const detected = (reads.genesis?.state === ResultState.OK || reads.genesis?.state === ResultState.DEGRADED)
-        ? (reads.genesis.data?.continuity_id ?? null)
+        ? (reads.genesis.data?.authority?.continuity_id ?? reads.genesis.data?.continuity_id ?? null)
         : null;
       if (detected && !selection.continuityId) {
         selection = { ...selection, continuityId: detected };

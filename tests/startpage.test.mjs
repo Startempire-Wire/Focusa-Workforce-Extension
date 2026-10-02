@@ -120,17 +120,38 @@ test('start page consumes the shared token layer', () => {
   assert.match(css, /--text: var\(--text-primary\)/);
 });
 
-// The label, the heading and the sentence under it are one piece of copy.
-// Updating only the heading left "Nothing is attached" printed directly beneath
-// a strip reading Connected, which reads as two different truths at once.
-test('the unpaired block updates all three copy lines together', async () => {
-  const src = js;
-  for (const id of ['start-unpaired-heading', 'start-unpaired-label', 'start-unpaired-objective']) {
-    assert.match(html, new RegExp(`id="${id}"`), `${id} must be addressable`);
-  }
 
-  assert.match(src, /unpairedLabel\s*&&\s*\(el\.unpairedLabel\.textContent = 'Attached to your daemon'\)/,
-    'the attached state must rewrite the label, not leave the static text');
-  assert.match(src, /unpairedObjective\s*&&\s*\(el\.unpairedObjective\.textContent = 'Everything below is your live daemon\.'\)/,
-    'the attached state must rewrite the sentence under the heading');
+// The unpaired block is the door for when nothing is attached. The connected
+// face - Current Focus, Needs You, Projects and the Open Workforce button, the
+// only way into the work screens - lives in the private section. Showing the
+// door while attached hid all of it.
+test('attached shows the connected face, not the door', async () => {
+  assert.match(js, /if \(isAttached\(link\)\) \{\s*el\.unpaired\.hidden = true;\s*el\.private\.hidden = false;/,
+    'attached must reveal the private content face');
+  assert.match(html, /id="start-private"[\s\S]*id="open-workforce"/,
+    'the connected face must carry the way into the work screens');
+});
+
+// docs/18 §6 is the authority for the Start Page hierarchy. Open Workforce is
+// item 6: it is the route into FULL WORKFORCE, and it used to sit third in the
+// action row styled quiet, making the only way into the work screens the
+// hardest control on the page to find.
+test('connected face renders the IA §6 hierarchy in order', () => {
+  const privateFace = html.slice(html.indexOf('id="start-private"'));
+  const order = [...privateFace.slice(0, privateFace.indexOf('id="start-unpaired"'))
+    .matchAll(/id="(orient-now|open-needs|open-workforce|start-needs-heading|start-working-heading|start-verified-heading)"/g)]
+    .map((m) => m[1]);
+  assert.deepEqual(order, [
+    'orient-now',
+    'open-needs',
+    'start-needs-heading',
+    'start-working-heading',
+    'start-verified-heading',
+    'open-workforce',
+  ], 'the connected face must follow the IA order');
+  // Position comes from IA section 6; treatment from docs/17 section 4, which
+  // allows exactly one primary action and Continue already holds it. Honouring
+  // one without the other is how this drifted in the first place.
+  assert.match(html, /id="open-workforce"[^>]*sp-btn-quiet/,
+    'Open Workforce stays quiet: docs/17 allows a single primary action');
 });
