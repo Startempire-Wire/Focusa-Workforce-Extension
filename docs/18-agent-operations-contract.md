@@ -67,19 +67,59 @@ Use the HTTP API. `focusa project identity`, `focusa project genesis start`,
 
 ---
 
-## 4. Known defect: deployed daemon predates the trajectory readback fix
+## 4. Trajectory readback — fixed 2026-10-02; keep this from regressing
+
+**Status: RESOLVED.** The daemon is now **0.9.198**, rebuilt from `origin/main`.
+`define-goal` -> `trajectory/view` round-trips, `canonical: true`, and
+`clarity_gate.status` is `clear`.
+
+```sh
+/usr/local/bin/focusa-daemon --version      # expect 0.9.198, NOT 0.9.194-dev
+curl -s "http://127.0.0.1:8787/v1/trajectory/view?project_root=/srv/wfx/focusa-workforce-extension&continuity_id=37574af3709baa6b" \
+  | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['status'], d['details']['tool_result_v1']['intelligence_view']['clarity_gate']['status'])"
+# -> completed clear
+```
+
+### The failure shape, kept so it is recognised instantly
 
 | | |
 |---|---|
-| Symptom | `define-goal` → `status: completed` with a real `trajectory_id`; `trajectory/view` → `not_found`; `assess` → `clarity_gate` blocked on `long_term_goal`/`desired_end_state` |
+| Symptom | `define-goal` returns `status: completed` with a real `trajectory_id`; `trajectory/view` returns `not_found`; `assess` reports `clarity_gate.blocking_reasons: [long_term_goal, desired_end_state, ...]` |
 | Not the cause | scope, project identity, or persistence — the record **is** on disk |
 | Where it is | `~/.local/lib/focusa/trajectory-ledger/<scope-hash>/events.jsonl` |
-| Root cause | deployed `focusa-daemon` 0.9.194-dev built **2026-09-16**; the fix landed **2026-09-17** |
-| Fix | rebuild from `origin/main`, which contains `01ab90ca1` (goal admission) and `9bea89c1c` (reconcile view revision with scoped ledger) |
-| Tracking | Focusa #621, closed upstream |
+| Root cause it was | deployed binary built **2026-09-16**; the fix landed **2026-09-17** |
+| Fix | rebuild from `origin/main` (`01ab90ca1` goal admission, `9bea89c1c` reconcile view revision with scoped ledger) |
+| Tracking | Focusa #621 |
 
-Do not spend a session re-diagnosing this. Confirm the version, confirm the
-ledger holds the record, then rebuild.
+If it ever returns: check the version first. Do not re-diagnose the scope.
+
+### Rebuild recipe (kh -> ovh; this container has 4 GB RAM and cannot build)
+
+kh's memory is contended (`mariadbd` alone holds ~4.9 GB, no swap permitted), so
+compile on ovh through the project's own helper rather than locally:
+
+```sh
+# 1. clean origin/main checkout (never the divergent /home/wirebot/focusa tree)
+runuser -u wirebot -- git clone --filter=blob:none \
+  https://github.com/Startempire-Wire/Focusa.git /home/wirebot/focusa-main
+runuser -u wirebot -- bash -lc "cd /home/wirebot/focusa-main && git reset --hard origin/main"
+
+# 2. delegate the compile to ovh (kh -> focusa-build-ovh)
+cd /home/wirebot/focusa-main
+runuser -u wirebot -- env FOCUSA_SOURCE_ROOT=/home/wirebot/focusa-main \
+  /usr/local/bin/focusa-ovh-build cargo build -p focusa-api --bin focusa-daemon --release
+# ARTIFACT local=/home/wirebot/focusa-main/target/release/focusa-daemon
+
+# 3. install here
+sudo install -m 0755 <artifact> /usr/local/bin/focusa-daemon
+systemctl --user restart focusa-daemon.service
+```
+
+Notes learned the hard way: `focusa-*` crates need `rustc >= 1.91` (kh has 1.91.0
+installed but not selected — `cargo +1.91.0`); AlmaLinux 8 has no musl package, so
+build the default glibc target (forward-compatible with this Debian container);
+scp the binary across and `--version` it here before replacing anything.
+
 
 Rebuild recipe (kh; this container has 4 GB RAM and cannot build):
 
