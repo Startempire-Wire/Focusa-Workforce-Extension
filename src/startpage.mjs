@@ -362,8 +362,29 @@ const isTailnet = (host) => {
   return /^[\d.]+$/.test(host) && parts[0] === '100' && Number(parts[1]) >= 64 && Number(parts[1]) <= 127;
 };
 
+/** Daemon addresses and labels come from the network; never let them become markup. */
+function escapeText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 function renderDiscovery() {
   if (!el.connect) return;
+  // Attached is the answer to "what do I choose?". While something is attached
+  // this prompt is a lie: the header strip says Connected and this asked the
+  // operator to pick a daemon they had already picked. Say what is attached
+  // instead, and point at the header's Disconnect, which already exists and
+  // already works - no second control here to keep in step with it.
+  if (isAttached(link)) {
+    el.unpaired.hidden = false;
+    el.private.hidden = true;
+    el.unpairedHeading && (el.unpairedHeading.textContent = 'Attached');
+    el.connect.innerHTML = `
+      <p class="muted">Your live daemon is <b>${escapeText(link.baseUrl)}</b>.</p>
+      <p class="muted">Use <b>Disconnect</b> above to attach a different one.</p>`;
+    return;
+  }
   el.unpaired.hidden = false;
   el.private.hidden = true;
   if (discoveryState.state === 'found') {
@@ -515,6 +536,9 @@ async function connect(baseUrl) {
   await chrome.storage.local.set({ [CONNECTION_KEY]: liveConnection.connection_id });
   link = { status: 'connected', baseUrl: origin, label: liveConnection.label, since: new Date().toISOString(), lastSeenAt: new Date().toISOString(), note: null };
   el.connect.hidden = true;
+  // The body must follow the header: without this the page keeps asking the
+  // operator to choose a daemon they just attached to.
+  renderDiscovery();
   renderLink();
   done(null, { attached: origin });
   renderDiagnostics();
@@ -562,6 +586,9 @@ async function disconnect() {
     throw error;
   }
   renderLink();
+  // Likewise on the way out: the choice prompt belongs on screen once nothing
+  // is attached.
+  renderDiscovery();
 }
 
 // Asking for a daemon by name is a deliberate choice, not the entry condition.
