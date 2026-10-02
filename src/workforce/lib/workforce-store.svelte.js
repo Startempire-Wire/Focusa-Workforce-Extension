@@ -164,10 +164,15 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       : null,
   );
   const health = $derived(reads.health?.data ?? null);
-  const entitlement = $derived(reads.license?.state === ResultState.OK ? projectEntitlement(reads.license.data) : null);
+  // Read the posture from whatever body arrived, not only from a strict OK: the
+  // daemon serves entitlement as a projection envelope the client classifies as
+  // degraded rather than ok, and gating on OK alone made a fully entitled daemon
+  // render "unknown" - which an operator reads as "not permitted".
+  const licenseBody = reads.license?.data ?? null;
+  const entitlement = $derived(licenseBody ? projectEntitlement(licenseBody) : null);
   const entitlementState = $derived(
     reads.license?.state === ResultState.ENTITLEMENT_BLOCKED ? 'blocked'
-      : (entitlement?.state ?? (reads.license?.data ? 'unknown' : null)),
+      : (entitlement?.state ?? (licenseBody ? 'unknown' : null)),
   );
   const roster = $derived(reads.sessions?.state === ResultState.OK ? rosterFromOwner(reads.sessions.data) : []);
   const trajectory = $derived(reads.trajectory?.state === ResultState.OK || reads.trajectory?.state === ResultState.DEGRADED
@@ -262,6 +267,13 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
             return;
           }
           connection = { ...connection, status: 'connected', lastSeenAt: answer.at ?? new Date().toISOString(), note: null };
+          // Attached means pulled. Without this the surface reaches "Focusa is
+          // live" from the preview read alone and then shows nothing else:
+          // entitlement, project, workpoint, trajectory, sessions and evidence
+          // all stay empty on every returning visit, because nothing on the
+          // adopt path ever asked for them.
+          await refreshOwner().catch(() => {});
+          startStream().catch(() => {});
           // The connection surface must exist while attached: it is where
           // Disconnect lives, on every surface (operator direction 2026-09-27).
           if (discovery.state === 'idle' || discovery.state === 'not_found') {
