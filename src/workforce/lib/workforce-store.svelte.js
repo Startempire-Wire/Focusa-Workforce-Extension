@@ -657,13 +657,14 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       record('projectStatus', await c.projectStatus(selection.projectRoot));
       record('workpoint', await c.workpointCurrent(selection.projectRoot));
       // The continuity axis comes from the owner, never from a constant here.
-      // effective_project does not publish one, but the project-scoped
-      // workpoint read reports which workstream the daemon is actually on -
-      // and every trajectory/work-loop read is refused without it, so without
-      // this the surface shows "stopgap projection" and an empty workpoint
-      // while talking to a perfectly healthy daemon.
-      const detected = (reads.workpoint?.state === ResultState.OK || reads.workpoint?.state === ResultState.DEGRADED)
-        ? (reads.workpoint.data?.detected_continuity_id ?? null)
+      // project/list, project/status, project/identity and silent-sessions all
+      // omit it, and workpoint/current only echoes one back when it is already
+      // supplied - so with nothing bound, every workstream-scoped read (people,
+      // work, evidence, needs) reported "none in this scope" against a daemon
+      // that held all of it. genesis/status is the read that publishes it.
+      record('genesis', await c.projectGenesisStatus(selection.projectRoot));
+      const detected = (reads.genesis?.state === ResultState.OK || reads.genesis?.state === ResultState.DEGRADED)
+        ? (reads.genesis.data?.continuity_id ?? null)
         : null;
       if (detected && !selection.continuityId) {
         selection = { ...selection, continuityId: detected };

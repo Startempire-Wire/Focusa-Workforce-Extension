@@ -53,6 +53,10 @@ export const OPERATIONS = Object.freeze({
   projectStatus: op('focusa.project.status', 'GET', '/v1/project/status', ['project_root'], 'base_focusa', 'docs/135a'),
   projectList: op('focusa.project.list', 'GET', '/v1/project/list', [], 'base_focusa', 'docs/135a'),
   projectDiscover: op('focusa.project.discover', 'GET', '/v1/project/discover', [], 'base_focusa', 'docs/135a'),
+  // The only project-scoped read that publishes the project's continuity id.
+  // Every other route either omits it or echoes back one already supplied, so
+  // this is what makes the workstream axis discoverable rather than guessable.
+  projectGenesisStatus: op('focusa.project.genesis.status', 'GET', '/v1/project/genesis/status', ['project_root'], 'base_focusa', 'docs/135a'),
   projectUse: op('focusa.project.use', 'POST', '/v1/project/use', [], 'base_focusa', 'docs/135a', true),
   projectNew: op('focusa.project.new', 'POST', '/v1/project/new', [], 'base_focusa', 'docs/135a', true),
 

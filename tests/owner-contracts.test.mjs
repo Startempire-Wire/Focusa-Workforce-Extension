@@ -58,3 +58,22 @@ test('declared owner gaps match today’s unbound semantics', () => {
   assert.equal(SEMANTIC_RESOLUTION.workstream.resolution, Resolution.EQUIVALENT);
   assert.match(SEMANTIC_RESOLUTION.workstream.note, /logical_workstream = continuity_id/);
 });
+
+// The workstream axis is discoverable, not guessable. Every other project-scoped
+// read omits the continuity id, so surfaces showed "none in this scope" against
+// a daemon holding all the data. genesis/status is the read that publishes it,
+// and it must stay a project-scoped GET or the auto-bind silently dies.
+test('genesis status is bound as a project-scoped GET', () => {
+  const op = OPERATIONS.projectGenesisStatus;
+  assert.ok(op, 'projectGenesisStatus must be a real operation');
+  assert.equal(op.method, 'GET');
+  assert.equal(op.path, '/v1/project/genesis/status');
+  assert.deepEqual([...op.scopes], ['project_root'], 'must not require a continuity to read');
+  assert.equal(op.mutating, false, 'reading the binding must not write anything');
+
+  const q = scopeQuery({ projectRoot: '/srv/wfx/focusa-workforce-extension' }, op.scopes);
+  assert.equal(q.project_root, '/srv/wfx/focusa-workforce-extension',
+    'the project root alone must reach the route');
+  assert.equal(q.continuity_id, undefined,
+    'and it must be reachable with no continuity, or nothing can bootstrap');
+});

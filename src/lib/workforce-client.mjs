@@ -190,6 +190,7 @@ export function createWorkforceClient(config) {
     projectIdentity: (projectRoot) => call('projectIdentity', { scope: { projectRoot } }),
     /** @param {string} projectRoot */
     projectStatus: (projectRoot) => call('projectStatus', { scope: { projectRoot } }),
+    projectGenesisStatus: (projectRoot) => call('projectGenesisStatus', { scope: { projectRoot } }),
     /** Owner project dashboard (selected project + registered projects). */
     projectList: () => call('projectList'),
     /** The daemon's governed operation catalog: what this owner can actually do. */
