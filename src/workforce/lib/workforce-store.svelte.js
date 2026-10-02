@@ -257,6 +257,24 @@ export function createWorkforceStore(chromeApi = globalThis.chrome) {
       // on the very first paint, not only after a click (operator requirement:
       // auto-load after the initial connect).
       const adopted = environments.find((item) => item.id === activeId) ?? null;
+      // A stored environment the browser is not granted cannot ever answer, so
+      // adopting it would leave a permanently dead connection with no way to
+      // tell "not permitted" from "not running". Refuse to adopt, keep the
+      // record, and let discovery bind something this browser can actually
+      // reach. The operator still chooses in the roster.
+      const grant = await reachableOriginFilter(chromeApi);
+      if (adopted && !(await grant(adopted.baseUrl))) {
+        diag.warn('environment.unreachable', { baseUrl: adopted.baseUrl });
+        connection = {
+          status: 'disconnected', baseUrl: adopted.baseUrl, label: adopted.label,
+          reason: 'not_permitted',
+          detail: 'This browser has no grant for this address, so it can never answer. '
+            + 'Choose another daemon, or grant access to it from the roster.',
+          at: new Date().toISOString(),
+        };
+        activeId = null;
+        return;
+      }
       if (adopted && connection.status === 'disconnected' && !suppressed) {
         connection = {
           status: 'connecting', baseUrl: adopted.baseUrl, label: adopted.label,

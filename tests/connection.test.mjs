@@ -71,3 +71,18 @@ test('Disconnect is reachable while attached, on every surface', async () => {
   assert.match(store, /async function disconnect\(\)/);
   assert.match(store, /You disconnected\. Nothing is attached\./, 'a disconnect says so in words');
 });
+
+// A blocked request never reaches the daemon. Labelling that "not answering"
+// blames the daemon for this browser's missing grant, which sent the operator
+// looking at a healthy daemon instead of at the grant.
+test('describeConnection distinguishes a missing grant from a silent daemon', () => {
+  const blocked = describeConnection({
+    status: 'not_permitted', baseUrl: 'http://host.tail9229d6.ts.net:8787',
+  });
+  assert.equal(blocked.label, 'Not permitted');
+  assert.match(blocked.detail, /grant/i, 'must name the grant as the cause');
+
+  const silent = describeConnection({ status: 'unreachable', baseUrl: 'http://127.0.0.1:8787' });
+  assert.equal(silent.label, 'Not answering');
+  assert.notEqual(silent.detail, blocked.detail, 'the two causes must not read alike');
+});

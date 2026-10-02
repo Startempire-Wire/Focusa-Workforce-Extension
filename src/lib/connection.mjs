@@ -34,6 +34,12 @@ const COPY = Object.freeze({
   connected: { label: 'Connected', tone: 'live', detail: 'attached and answering' },
   unreachable: { label: 'Not answering', tone: 'lost', detail: 'attached, but the daemon stopped answering' },
   disconnected: { label: 'Disconnected', tone: 'off', detail: 'nothing is attached' },
+  // A blocked request never reaches the daemon, so calling it "not answering"
+  // blames the daemon for this browser's missing grant. Say which it is.
+  not_permitted: {
+    label: 'Not permitted', tone: 'lost',
+    detail: 'this browser has no grant for this address, so the request never left it',
+  },
 });
 
 /** The one place a status becomes words. */
