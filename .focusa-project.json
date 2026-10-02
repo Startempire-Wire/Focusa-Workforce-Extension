@@ -12,7 +12,7 @@
     "workpoint_id": "fa80e460-895a-587c-9eac-ea29c9a49c5f"
   },
   "project_id": "focusa-workforce-extension",
-  "project_root": "/home/verioussmith/src/focusa-workforce-extension",
+  "project_root": "/srv/wfx/focusa-workforce-extension",
   "schema": "focusa.project.v2",
   "trajectory_integrity_guard": {
     "causal_chain_valid": true,
@@ -27,5 +27,8 @@
     "status": "HLT_IMPASSE",
     "unresolved_conflicts": []
   },
-  "workspace_kind": "rust-monorepo"
+  "workspace_kind": "rust-monorepo",
+  "root_relocated_from": "/home/verioussmith/src/focusa-workforce-extension",
+  "root_relocated_at": "2026-10-02",
+  "root_relocated_reason": "previous root was the stale /home checkout; canonical code lives at /srv/wfx on persistent root disk"
 }

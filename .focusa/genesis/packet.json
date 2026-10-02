@@ -1,0 +1,128 @@
+{
+  "authority": {
+    "continuity_id": "37574af3709baa6b",
+    "operator_steering_precedence": true,
+    "scope": "/srv/wfx/focusa-workforce-extension"
+  },
+  "bootstrap_receipt": {
+    "idempotency_key": "wfx-genesis-commit-1",
+    "phase": "inventory",
+    "receipt_id": "genesis-c908701960c01b4c59ff",
+    "recorded_at": "2026-10-02T06:20:58.906602678+00:00",
+    "status": "staged"
+  },
+  "confidence": "high",
+  "coordination_owner": null,
+  "current_and_desired_state": {
+    "current_state": "Project root rebound to /srv/wfx/focusa-workforce-extension (scope_safety safe). Extension deployed and loaded at 64dac72, 260/260, CI green. This continuity previously pointed at the dead /home share, so no trajectory or workpoint was readable; reclaiming it for the live root.",
+    "desired_end_state": "An authorized owner or delegated human can open the Workforce extension, see the live Focusa workforce for the bound project, understand what needs them and what is verified, and issue a real Direction that the daemon accepts and reflects - all read from the daemon, never invented by the extension."
+  },
+  "evidence_refs": [
+    "docs/14-workforce-full-trajectory.md"
+  ],
+  "first_workpoint": null,
+  "first_workpoint_candidate": {
+    "blocked_by": [],
+    "evidence_refs": [],
+    "id": "genesis-task-1",
+    "priority": 0,
+    "status": "open",
+    "title": "Project root selected and verified"
+  },
+  "freshness": {
+    "observed_at": "2026-10-02T06:20:58.906622416+00:00"
+  },
+  "hlt": "HLT-WF-001: Deliver a production-grade Focusa Workforce browser experience that makes a Focusa-governed AI organization continuously understandable, steerable, collaborative, evidence-backed, and operable without creating duplicate canonical authority.",
+  "hlt_status": "canonical_explicit",
+  "idempotency_key": "wfx-genesis-commit-1",
+  "missing_links": [],
+  "mlg": "Bind the Workforce extension to the live daemon project and surface its real governance state.",
+  "next_action": "commit Project Genesis",
+  "project_identity": {
+    "project_root": "/srv/wfx/focusa-workforce-extension",
+    "verified": true
+  },
+  "provenance": {
+    "hlt": "operator_request",
+    "lower_levels": "spec143_deliberate_inference",
+    "tasks": "beads"
+  },
+  "readiness_receipt": null,
+  "recovery_tools": [
+    "focusa_project_verify",
+    "focusa_trajectory_view",
+    "focusa_workpoint_resume"
+  ],
+  "schema": "focusa.project_genesis.v1",
+  "specification_and_acceptance": {
+    "acceptance_criteria": [
+      "Workforce extension connects to the live Focusa daemon automatically",
+      "Bound project renders real daemon data",
+      "No value on any surface is invented by the extension",
+      "A live Direction is accepted by the daemon"
+    ],
+    "specification_ref": "docs/14-workforce-full-trajectory.md"
+  },
+  "status": "preparing",
+  "stg": "Live acceptance: connected, project-bound, real data, first live Direction accepted.",
+  "task_provider_and_task_graph": {
+    "provider": "beads",
+    "tasks": [
+      {
+        "blocked_by": [],
+        "evidence_refs": [],
+        "id": "genesis-task-1",
+        "priority": 0,
+        "status": "open",
+        "title": "Project root selected and verified"
+      },
+      {
+        "blocked_by": [
+          "genesis-task-1"
+        ],
+        "evidence_refs": [],
+        "id": "genesis-task-2",
+        "priority": 1,
+        "status": "open",
+        "title": "Trajectory committed for this project root"
+      },
+      {
+        "blocked_by": [
+          "genesis-task-2"
+        ],
+        "evidence_refs": [],
+        "id": "genesis-task-3",
+        "priority": 2,
+        "status": "open",
+        "title": "Active Workpoint present"
+      },
+      {
+        "blocked_by": [
+          "genesis-task-3"
+        ],
+        "evidence_refs": [],
+        "id": "genesis-task-4",
+        "priority": 3,
+        "status": "open",
+        "title": "Extension renders live daemon data"
+      },
+      {
+        "blocked_by": [
+          "genesis-task-4"
+        ],
+        "evidence_refs": [],
+        "id": "genesis-task-5",
+        "priority": 4,
+        "status": "open",
+        "title": "First live Direction accepted and echoed"
+      }
+    ]
+  },
+  "waypoints": [
+    "Project root selected and verified",
+    "Trajectory committed for this project root",
+    "Active Workpoint present",
+    "Extension renders live daemon data",
+    "First live Direction accepted and echoed"
+  ]
+}
