@@ -49,6 +49,8 @@ const el = {
   envLabel: $('#daemon-select-label'),
   private: $('#start-private'),
   unpaired: $('#start-unpaired'),
+  unpairedLabel: $('#start-unpaired-label'),
+  unpairedObjective: $('#start-unpaired-objective'),
   public: $('#start-public'),
   focusTitle: $('#start-focus-heading'),
   objective: $('#start-objective'),
@@ -379,7 +381,12 @@ function renderDiscovery() {
   if (isAttached(link)) {
     el.unpaired.hidden = false;
     el.private.hidden = true;
+    // The heading, the label above it and the sentence under it are one piece
+    // of copy. Updating only the heading left "Nothing is attached" printed
+    // directly beneath a strip saying Connected.
     el.unpairedHeading && (el.unpairedHeading.textContent = 'Attached');
+    el.unpairedLabel && (el.unpairedLabel.textContent = 'Attached to your daemon');
+    el.unpairedObjective && (el.unpairedObjective.textContent = 'Everything below is your live daemon.');
     el.connect.innerHTML = `
       <p class="muted">Your live daemon is <b>${escapeText(link.baseUrl)}</b>.</p>
       <p class="muted">Use <b>Disconnect</b> above to attach a different one.</p>`;
@@ -387,6 +394,8 @@ function renderDiscovery() {
   }
   el.unpaired.hidden = false;
   el.private.hidden = true;
+  el.unpairedLabel && (el.unpairedLabel.textContent = 'Nothing is attached');
+  el.unpairedObjective && (el.unpairedObjective.textContent = 'We checked this device, your tailnet, and everywhere you have connected before. Choose what to attach to.');
   if (discoveryState.state === 'found') {
     // Stated once, in the markup, and left alone: the heading is the state, not
     // a status message that changes with every probe.

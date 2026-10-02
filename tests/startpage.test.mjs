@@ -119,3 +119,18 @@ test('start page consumes the shared token layer', () => {
   assert.match(css, /--panel: var\(--bg-surface\)/);
   assert.match(css, /--text: var\(--text-primary\)/);
 });
+
+// The label, the heading and the sentence under it are one piece of copy.
+// Updating only the heading left "Nothing is attached" printed directly beneath
+// a strip reading Connected, which reads as two different truths at once.
+test('the unpaired block updates all three copy lines together', async () => {
+  const src = js;
+  for (const id of ['start-unpaired-heading', 'start-unpaired-label', 'start-unpaired-objective']) {
+    assert.match(html, new RegExp(`id="${id}"`), `${id} must be addressable`);
+  }
+
+  assert.match(src, /unpairedLabel\s*&&\s*\(el\.unpairedLabel\.textContent = 'Attached to your daemon'\)/,
+    'the attached state must rewrite the label, not leave the static text');
+  assert.match(src, /unpairedObjective\s*&&\s*\(el\.unpairedObjective\.textContent = 'Everything below is your live daemon\.'\)/,
+    'the attached state must rewrite the sentence under the heading');
+});
